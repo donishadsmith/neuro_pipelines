@@ -1,0 +1,132 @@
+import argparse, tempfile, shutil
+from pathlib import Path
+from typing import Literal, Optional
+
+from nifti2bids.io import _copy_file, compress_image, regex_glob
+from standardize_task_names import _standardize_task_pipeline
+from create_bids_dir import _generate_bids_dir_pipeline
+from create_metadata import _create_json_sidecar_pipeline
+
+
+def _get_cmd_args() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Pipeline to convert dataset to BIDS.")
+    parser.add_argument(
+        "--src_dir",
+        dest="src_dir",
+        required=True,
+        help=(
+            "Source directory containing original data where NIfTI files "
+            "are stored in folders with the following format {subject_ID}_{date}."
+        ),
+    )
+    parser.add_argument(
+        "--temp_dir",
+        dest="temp_dir",
+        required=False,
+        default=None,
+        help="Temporary directory to store intermediate content in.",
+    )
+    parser.add_argument(
+        "--bids_dir", dest="bids_dir", required=True, help="The BIDS directory."
+    )
+    parser.add_argument(
+        "--subjects",
+        dest="subjects",
+        required=False,
+        nargs="+",
+        default=None,
+        help="The subject IDs in the 'src_dir' to convert to BIDS.",
+    )
+    parser.add_argument(
+        "--dataset",
+        dest="dataset",
+        required=False,
+        default="mph",
+        help="Name of the dataset (i.e., mph and naag).",
+    )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=False,
+        default="kids",
+        help="The cohort if dataset is 'mph' (i.e., kids and adult).",
+    )
+
+    return parser
+
+
+def _filter_subjects(
+    folders: list[Path], subjects: Optional[list[str | int]]
+) -> list[Path]:
+    if subjects:
+        return [folder for folder in folders if folder.name.split("_")[0] in subjects]
+    else:
+        return folders
+
+
+def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
+    dst_file = temp_dir / nifti_file.parent.name / nifti_file.name
+    _copy_file(
+        src_file=nifti_file,
+        dst_file=dst_file,
+        remove_src_file=False,
+    )
+
+    if nifti_file.name.endswith(".nii"):
+        compress_image(dst_file, dst_file.parent, remove_src_file=True)
+
+
+def _copy_data_to_temp_dir(
+    src_dir: Path, temp_dir: Path, subjects: Optional[list[str | int]]
+) -> None:
+    subject_folders = _filter_subjects(
+        folders=regex_glob(src_dir, pattern=r"^(\d+)_(\d+)$"), subjects=subjects
+    )
+
+    for subject_folder in subject_folders:
+        nifti_files = regex_glob(subject_folder, pattern=r"^.*\.(nii|nii.gz)$")
+        for nifti_file in nifti_files:
+            _copy_nifti_files(nifti_file, temp_dir)
+
+
+def main(
+    src_dir: str,
+    temp_dir: str,
+    bids_dir: str,
+    subjects: Optional[list[str | int]],
+    dataset: Literal["mph", "naag"],
+    cohort: Literal["kids", "adults"],
+) -> None:
+    try:
+        if (dataset := dataset.lower()) not in ["naag", "mph"]:
+            raise ValueError("'--dataset' must be 'naag' or 'mph'.")
+
+        if (cohort := cohort.lower()) not in ["kids", "adults"]:
+            raise ValueError("'--cohort' must be 'kids' or 'adults'.")
+
+        # Create temporary directory with compressed files
+        temp_dir = temp_dir or tempfile.TemporaryDirectory(delete=False).name
+        temp_dir: Path = Path(temp_dir)
+        if not temp_dir.exists():
+            temp_dir.mkdir()
+
+        bids_dir = Path(bids_dir)
+
+        _copy_data_to_temp_dir(Path(src_dir), temp_dir, subjects)
+
+        # Pipeline to identify un-named NIfTI images and standardize task names
+        _standardize_task_pipeline(temp_dir, dataset, cohort)
+
+        # Pipeline to move files to BIDs directory
+        _generate_bids_dir_pipeline(temp_dir, bids_dir, dataset, cohort)
+
+        # Pipeline to create JSON sidecars for NIfTI images
+        _create_json_sidecar_pipeline(bids_dir)
+    finally:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+
+
+if __name__ == "__main__":
+    _args = _get_cmd_args().parse_args()
+    main(**vars(_args))

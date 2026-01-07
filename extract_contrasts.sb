@@ -1,0 +1,46 @@
+#!/bin/bash
+#SBATCH --job-name=extract_contrasts
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=16G
+# Outputs --------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_contrasts_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_contrasts_%A_%a.err
+# ----------------------------------------------------------------------------------
+
+# Use --array to process multiple subjects at the same time
+module load afni
+
+ANALYSIS_DIR="/projects/bigos_lab/mph-study/kids/dset/derivatives/firstlevel"
+CODE_DIR="/projects/bigos_lab/code"
+AFNI_IMG_PATH="/projects/bigos_lab/singularity-images/afni_23.0.07_20230302.simg"
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+TASK="nback" # nback, mtle, mtlr, princess, flanker
+
+# Check values passed to script to process specific subjects
+SUBJECTS=( $@ )
+ARR_LEN=${#SUBJECTS[@]}
+
+# slurm job value; essentially extracting sub-{id}
+if [ ${ARR_LEN} -eq 0]; then
+        SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line {print $1}' ${BIDS_DIR}/participants.tsv)
+else
+        SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
+fi
+
+cmd="${PYTHON} ${CODE_DIR}/extract_contrasts.py \
+	--analysis_dir ${ANALYSIS_DIR} \
+	--afni_img_path ${AFNI_IMG_PATH} \
+	--subject ${SUBJECT} \
+	--task ${TASK}"
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?
+
