@@ -1,1 +1,2 @@
-Neuroimaging scripts
+Neuroimaging pipelines.
+
