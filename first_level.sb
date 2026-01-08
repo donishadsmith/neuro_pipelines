@@ -18,7 +18,7 @@ DST_DIR="${BIDS_DIR}/derivatives/firstlevel"
 mkdir -p ${DST_DIR}
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
-AFNI_IMG_PATH="/projects/bigos_lab/singularity-images/afni_23.0.07_20230302.simg"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 TASK="nback" # nback, mtle, mtlr, princess, flanker
 

@@ -9,11 +9,12 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/fmriprep_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/fmriprep_%A_%a.err
 # -------------------------------------------------------------------------
-
 # Use --array to process multiple subjects at the same time
 FMRIPREP_VERSION="25.2.3"
 
+USERNAME=${HOME#/home/}
 COHORT="kids" # kids, adults
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 FS_LICENSE="/projects/bigos_lab/freesurfer/license.txt"
 DSET_DIR="/projects/bigos_lab/mph-study/${COHORT}"
 BIDS_DIR="${DSET_DIR}/dset"
@@ -32,7 +33,7 @@ for ((i = 0; i < ARR_LEN; i++)); do
 done
 
 # slurm job value; essentially extracting sub-{id}
-if [ ${ARR_LEN} -eq 0]; then
+if (( ARR_LEN == 0 )); then
 	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line {print $1}' ${BIDS_DIR}/participants.tsv)
 else
 	SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
@@ -41,28 +42,34 @@ fi
 DERIVS_DIR="${BIDS_DIR}/derivatives/fmriprep-${FMRIPREP_VERSION}"
 mkdir -p ${DERIVS_DIR}
 
-# Directory within the container templateflow will be in
-APPTAINER_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/templateflow/"
-
-SCRATCH_DIR="/scratch/dsmit420/mph/fmriprep-${FMRIPREP_VERSION}/$SUBJECT"
+SCRATCH_DIR="/scratch/${USERNAME}/mph/fmriprep-${FMRIPREP_VERSION}/${SUBJECT}"
 mkdir -p ${SCRATCH_DIR}
 
-APPTAINER_CMD="apptainer run --cleanenv \
+TMP_DIR="${SCRATCH_DIR}/tmp"
+mkdir -p ${TMP_DIR}
+
+# Directory within the container templateflow will be in
+APPTAINERENV_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/templateflow/"
+export APPTAINERENV_TEMPLATEFLOW_HOME
+
+APPTAINER_CMD="apptainer run --containall --writable-tmpfs --cleanenv \
 	-B ${BIDS_DIR}:/data \
 	-B ${DERIVS_DIR}:/out \
-	-B ${TEMPLATEFLOW_HOST_HOME}:${APPTAINER_TEMPLATEFLOW_HOME} \
+	-B ${TEMPLATEFLOW_HOST_HOME}:${APPTAINERENV_TEMPLATEFLOW_HOME} \
 	-B ${SCRATCH_DIR}:/work \
+	-B ${TMP_DIR}:/tmp \
 	-B ${FS_LICENSE}:/freesurfer \
 	$IMG_DIR"
 
-if [ $COHORT == "kids" ]; then
+if [[ "$COHORT" == "kids" ]]; then
 	SKULL_STRIP_TEMPLATE="--skull-strip-template MNIPediatricAsym:cohort-1"
 	OUTPUT_SPACES="--output-spaces MNIPediatricAsym:cohort-1:res-2"
 else
 	SKULL_STRIP_TEMPLATE="--skull-strip-template OASIS30ANTs"
-	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsy:res-2 MNI152NLin6Asym:res-02"
-	
-# subject-anatomical-reference 'unbiased' is computationally expensive for three or more sessions
+	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsy:res-2 MNI152NLin6Asym:res-2"
+fi
+
+# Dummy scans already discarded during scanning	
 CMD="${APPTAINER_CMD} \
 	/data \
 	/out \
@@ -79,7 +86,8 @@ CMD="${APPTAINER_CMD} \
 	--ignore fieldmaps \
 	--use-syn-sdc \
 	$SKULL_STRIP_TEMPLATE \
-	--dummy-scans 4 \
+	--subject-anatomical-reference first-lex \
+	--dummy-scans 0 \
 	--slice-time-ref 0 \
 	--fd-spike-threshold 0.9 \
 	$OUTPUT_SPACES \

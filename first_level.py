@@ -1,32 +1,12 @@
-import argparse
-import json
-import logging
-import subprocess
-import sys
+import argparse, json, subprocess, sys
 from pathlib import Path
 
-import bids
-import numpy as np
-import pandas as pd
+import bids, numpy as np, pandas as pd
 
-try:
-    sys.path.append("/code")
-    from utils import setup_logger
+from nifti2bids.logging import setup_logger
 
-    LGR = setup_logger("FirstLevel")
-    LGR.setLevel("INFO")
-except ImportError:
-    LGR = logging.getLogger("FirstLevel")
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel("INFO")
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(formatter)
-
-    LGR.addHandler(console_handler)
+LGR = setup_logger(__name__)
+LGR.setLevel("INFO")
 
 
 def _get_cmd_args():
@@ -342,6 +322,7 @@ def perform_first_level(
         f"Running 3dREMLfit for first level accounting for auto-correlation: {cmd}"
     )
     subprocess.run(cmd, shell=True, check=True)
+
 
 def main(
     bids_dir,

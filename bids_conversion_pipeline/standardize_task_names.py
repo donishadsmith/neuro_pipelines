@@ -38,18 +38,13 @@ def _infer_file_identity(
             if is_3d_img(nifti_file):
                 desc = "mprage32"
             else:
-                try:
-                    desc = infer_task_from_image(nifti_file, task_volume_map)
-                except:
-                    # Corrupted
-                    nifti_file.unlink()
-                    continue
+                desc = infer_task_from_image(nifti_file, task_volume_map)
 
             # Special case since there are two mtl_neu with 96 volumes
             # Each mtl file has the acquisition number in the filename that preceeds "_1"
             # MTLE comes before the MTLR hence the acquisition number is important
             if desc.startswith("mtl"):
-                pattern = r"^.*_(\d)_(\d)\.nii\.gz$"
+                pattern = r"^.*_(\d+)_(\d)\.nii\.gz$"
                 acquisition_number = re.search(pattern, nifti_file.name).group(1)
                 desc += f"_{acquisition_number}_1"
 
@@ -87,7 +82,7 @@ def _standardize_mtl_filenames(temp_dir: Path) -> None:
 
     for nifti_file in nifti_files:
         if "WIPMTL" in nifti_file.name:
-            pattern = r"^.*_(\d)_(\d)\.nii\.gz$"
+            pattern = r"^.*_(\d+)_(\d)\.nii\.gz$"
             acquisition_number = re.search(pattern, nifti_file.name).group(1)
             new_filename = (
                 str(nifti_file).split("_WIP")[0] + f"_mtl_{acquisition_number}_1.nii.gz"
@@ -97,28 +92,37 @@ def _standardize_mtl_filenames(temp_dir: Path) -> None:
 
 
 def _rename_mtl_filenames(temp_dir: Path) -> None:
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
-    nifti_files = [
-        nifti_file for nifti_file in nifti_files if "mtl" in nifti_file.name.lower()
-    ]
-
-    # Cant sort due to lexicographical sorting which makes 10 preceed 9
-    pattern = r"_(\d{1,2})_1"
-    nii_tuple_list = sorted(
-        [
-            (int(re.search(pattern, str(nifti_file)).group(1)), nifti_file)
-            for nifti_file in nifti_files
-        ]
-    )
-
-    for indx, nii_tuple in enumerate(nii_tuple_list):
-        _, nifti_file = nii_tuple
-        task_name = "mtle" if indx == 0 else "mtlr"
-        replace_name = "mtl_neu" if "mtl_neu" in nifti_file.name else "mtl"
-        new_nifti_filename = nifti_file.parent / nifti_file.name.replace(
-            replace_name, task_name
+    for subject_folder in temp_dir.glob("*"):
+        nifti_files = regex_glob(
+            subject_folder, pattern=r"^.*\.(nii.gz)$", recursive=True
         )
-        nifti_file.rename(new_nifti_filename)
+        nifti_files = [
+            nifti_file for nifti_file in nifti_files if "mtl" in nifti_file.name.lower()
+        ]
+
+        # Cant sort due to lexicographical sorting which makes 10 preceed 9.
+        # Solution: create a list of tuples where the first element is the acquisition
+        # number extracted using regex and the second element is the path
+        # Then the sorting of tuples is done on the acquisition numbers
+
+        # Note an alternative could be sorting based on modified or created time;
+        # however; this may not be as reliable on Unix vs Windows
+        pattern = r"_(\d+)_1"
+        nii_tuple_list = sorted(
+            [
+                (int(re.search(pattern, str(nifti_file)).group(1)), nifti_file)
+                for nifti_file in nifti_files
+            ]
+        )
+
+        for indx, nii_tuple in enumerate(nii_tuple_list):
+            _, nifti_file = nii_tuple
+            task_name = "mtle" if indx == 0 else "mtlr"
+            replace_name = "mtl_neu" if "mtl_neu" in nifti_file.name else "mtl"
+            new_nifti_filename = nifti_file.parent / nifti_file.name.replace(
+                replace_name, task_name
+            )
+            nifti_file.rename(new_nifti_filename)
 
 
 def _standardize_nback_filenames(temp_dir: Path, all_desc: list[str]) -> None:

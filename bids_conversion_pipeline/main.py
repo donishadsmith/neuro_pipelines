@@ -3,9 +3,12 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from nifti2bids.io import _copy_file, compress_image, regex_glob
+from nifti2bids.logging import setup_logger
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
+
+LGR = setup_logger(__name__)
 
 
 def _get_cmd_args() -> argparse.ArgumentParser:
@@ -73,7 +76,14 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
     )
 
     if nifti_file.name.endswith(".nii"):
-        compress_image(dst_file, dst_file.parent, remove_src_file=True)
+        try:
+            compress_image(dst_file, dst_file.parent, remove_src_file=True)
+        except OSError:
+            LGR.critical(
+                f"An OSError occured while compressing the following file {dst_file}. "
+                "Removing file from the temporary directory."
+            )
+            dst_file.unlink()
 
 
 def _copy_data_to_temp_dir(
@@ -105,7 +115,7 @@ def main(
             raise ValueError("'--cohort' must be 'kids' or 'adults'.")
 
         # Create temporary directory with compressed files
-        temp_dir = temp_dir or tempfile.TemporaryDirectory(delete=False).name
+        temp_dir = temp_dir or tempfile.TemporaryDirectory().name
         temp_dir: Path = Path(temp_dir)
         if not temp_dir.exists():
             temp_dir.mkdir()

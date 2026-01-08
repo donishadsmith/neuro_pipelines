@@ -1,27 +1,10 @@
-import argparse
-import logging
-import subprocess
-import sys
+import argparse, subprocess, sys
 from pathlib import Path
 
-try:
-    sys.path.append("/code")
-    from utils import setup_logger
+from nifti2bids.logging import setup_logger
 
-    LGR = setup_logger("FirstLevel")
-    LGR.setLevel("INFO")
-except ImportError:
-    LGR = logging.getLogger("FirstLevel")
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel("INFO")
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(formatter)
-
-    LGR.addHandler(console_handler)
+LGR = setup_logger(__name__)
+LGR.setLevel("INFO")
 
 
 def _get_cmd_args():
@@ -55,11 +38,11 @@ def _task_specific_contrasts(task):
     if task == "nback":
         contrasts = ("1-back_vs_0-back#0_Coef", "2-back_vs_0-back#0_Coef")
     elif task == "mtle":
-        pass
+        contrasts = "indoor#0_Coef"
     elif task == "mtlr":
-        pass
+        contrasts = "seen#0_Coef"
     elif task == "princess":
-        pass
+        contrasts = "switch_vs_nonswitch#0_Coef"
     else:
         pass
 
@@ -80,6 +63,7 @@ def create_contrast_files(stats_file, contrast_dir, afni_path_img, task):
             "-overwrite"
         )
         LGR.info(f"Extracting {contrast} contrast: {cmd}")
+
         subprocess.run(cmd, shell=True, check=True)
 
 
@@ -87,7 +71,6 @@ def main(analysis_dir, subject, afni_img_path, task):
     subject_base_dir = Path(analysis_dir) / (
         f"sub-{subject}" if not str(subject).startswith("sub-") else subject
     )
-
     sessions = [x.name for x in subject_base_dir.glob("*ses-*")]
     if not sessions:
         LGR.critical(f"No sessions for {subject} for {task}.")
