@@ -1,5 +1,4 @@
-import argparse
-import tempfile
+import argparse, shutil, tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -33,6 +32,13 @@ def _get_cmd_args():
         help="Path to destination directory to output event files to.",
     )
     parser.add_argument(
+        "--temp_dir",
+        dest="temp_dir",
+        required=False,
+        default=None,
+        help="Path to a temporary directory to use.",
+    )
+    parser.add_argument(
         "--task",
         dest="task",
         required=True,
@@ -59,14 +65,6 @@ def _filter_log_files(log_files, subjects):
         ]
     else:
         return log_files
-
-
-def _filter_subject_ids(subjects):
-    return (
-        [str(subject).removeprefix("sub-") for subject in subjects]
-        if subjects
-        else None
-    )
 
 
 def _get_presentation_session(src_dir, subject_id, excel_file):
@@ -318,7 +316,6 @@ def _create_princess_events_files(src_dir, dst_dir, subjects):
             ]
             events["block_cue"] = extractor.extract_trial_types()
 
-            # Get final block duration based on end time of entire task
             event_df = pd.DataFrame(events)
             event_df.loc[event_df.index[-1], "duration"] = (
                 event_df.loc[event_df.index[-1], "onset"]
@@ -333,7 +330,7 @@ def _create_princess_events_files(src_dir, dst_dir, subjects):
             csv_path.unlink()
 
 
-def main(src_dir, dst_dir, task, subjects):
+def main(src_dir, dst_dir, temp_dir, task, subjects):
     func = {
         "flanker": _create_flanker_events_files,
         "nback": _create_nback_events_files,
@@ -345,18 +342,30 @@ def main(src_dir, dst_dir, task, subjects):
     if task not in func:
         raise ValueError(f"`task` must be one of the following: {func.keys()}")
 
-    subjects = _filter_subject_ids(subjects)
-
     src_dir = Path(src_dir)
     dst_dir = Path(dst_dir)
     if not dst_dir.exists():
         dst_dir.mkdir()
 
-    kwargs = {"src_dir": src_dir, "dst_dir": dst_dir, "subjects": subjects}
+    if temp_dir:
+        temp_dir = Path(temp_dir)
+
+    kwargs = {
+        "src_dir": (temp_dir or src_dir),
+        "dst_dir": dst_dir,
+        "subjects": subjects,
+    }
     if task in ["mtle", "mtlr"]:
         kwargs.update({"task": task})
 
-    func[task](**kwargs)
+    try:
+        if temp_dir:
+            temp_dir = Path(temp_dir)
+            shutil.copytree(src_dir, temp_dir)
+            func[task](**kwargs)
+    finally:
+        if temp_dir:
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
