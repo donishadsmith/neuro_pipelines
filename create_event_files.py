@@ -52,6 +52,13 @@ def _get_cmd_args():
         nargs="+",
         help="The id of the subject without 'sub-'.",
     )
+    parser.add_argument(
+        "--delete_temp_dir",
+        dest="delete_temp_dir",
+        required=False,
+        default=False,
+        help="Deletes the temporary directory.",
+    )
 
     return parser
 
@@ -330,7 +337,7 @@ def _create_princess_events_files(src_dir, dst_dir, subjects):
             csv_path.unlink()
 
 
-def main(src_dir, dst_dir, temp_dir, task, subjects):
+def main(src_dir, dst_dir, temp_dir, task, subjects, delete_temp_dir):
     func = {
         "flanker": _create_flanker_events_files,
         "nback": _create_nback_events_files,
@@ -364,7 +371,7 @@ def main(src_dir, dst_dir, temp_dir, task, subjects):
             shutil.copytree(src_dir, temp_dir)
             func[task](**kwargs)
     finally:
-        if temp_dir:
+        if temp_dir and temp_dir.exists() and delete_temp_dir:
             shutil.rmtree(temp_dir)
 
 

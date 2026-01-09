@@ -48,6 +48,13 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         help="Name of the dataset (i.e., mph and naag).",
     )
     parser.add_argument(
+        "--delete_temp_dir",
+        dest="delete_temp_dir",
+        required=False,
+        default=False,
+        help="Deletes the temporary directory.",
+    )
+    parser.add_argument(
         "--cohort",
         dest="cohort",
         required=False,
@@ -123,6 +130,7 @@ def main(
     subjects: Optional[list[str | int]],
     dataset: Literal["mph", "naag"],
     cohort: Literal["kids", "adults"],
+    delete_temp_dir: bool,
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
 ) -> None:
@@ -159,7 +167,7 @@ def main(
         # Pipeline to create JSON sidecars for NIfTI images
         _create_json_sidecar_pipeline(bids_dir)
     finally:
-        if temp_dir.exists():
+        if delete_temp_dir and temp_dir.exists():
             shutil.rmtree(temp_dir)
 
 
