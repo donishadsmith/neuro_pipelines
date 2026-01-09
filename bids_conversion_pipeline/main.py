@@ -54,6 +54,16 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         default="kids",
         help="The cohort if dataset is 'mph' (i.e., kids and adult).",
     )
+    parser.add_argument(
+        "--add_sessions_tsv",
+        dest="add_sessions_tsv",
+        required=False,
+        default=False,
+        help=(
+            "Add basic sessions TSV file containing the session "
+            "and scan date in BIDS folder for each subject."
+        ),
+    )
 
     return parser
 
@@ -106,6 +116,7 @@ def main(
     subjects: Optional[list[str | int]],
     dataset: Literal["mph", "naag"],
     cohort: Literal["kids", "adults"],
+    add_sessions_tsv: bool,
 ) -> None:
     try:
         if (dataset := dataset.lower()) not in ["naag", "mph"]:
@@ -128,7 +139,9 @@ def main(
         _standardize_task_pipeline(temp_dir, dataset, cohort)
 
         # Pipeline to move files to BIDs directory
-        _generate_bids_dir_pipeline(temp_dir, bids_dir, dataset, cohort)
+        _generate_bids_dir_pipeline(
+            temp_dir, bids_dir, dataset, cohort, add_sessions_tsv
+        )
 
         # Pipeline to create JSON sidecars for NIfTI images
         _create_json_sidecar_pipeline(bids_dir)
