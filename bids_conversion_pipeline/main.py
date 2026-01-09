@@ -55,6 +55,13 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         help="The cohort if dataset is 'mph' (i.e., kids and adult).",
     )
     parser.add_argument(
+        "--create_dataset_metadata",
+        dest="create_dataset_metadata",
+        required=False,
+        default=False,
+        help="Creates the participant TSV and the dataset description JSON.",
+    )
+    parser.add_argument(
         "--add_sessions_tsv",
         dest="add_sessions_tsv",
         required=False,
@@ -116,6 +123,7 @@ def main(
     subjects: Optional[list[str | int]],
     dataset: Literal["mph", "naag"],
     cohort: Literal["kids", "adults"],
+    create_dataset_metadata: bool,
     add_sessions_tsv: bool,
 ) -> None:
     try:
@@ -140,7 +148,12 @@ def main(
 
         # Pipeline to move files to BIDs directory
         _generate_bids_dir_pipeline(
-            temp_dir, bids_dir, dataset, cohort, add_sessions_tsv
+            temp_dir,
+            bids_dir,
+            dataset,
+            cohort,
+            create_dataset_metadata,
+            add_sessions_tsv,
         )
 
         # Pipeline to create JSON sidecars for NIfTI images

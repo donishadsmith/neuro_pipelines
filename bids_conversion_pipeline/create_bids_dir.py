@@ -5,7 +5,12 @@ from typing import Literal, Optional
 import pandas as pd
 
 from nifti2bids.io import regex_glob
-from nifti2bids.bids import create_bids_file
+from nifti2bids.bids import (
+    create_bids_file,
+    create_dataset_description,
+    save_dataset_description,
+    create_participant_tsv,
+)
 from _utils import _get_constant
 
 _TASK_NAMES = {
@@ -51,11 +56,28 @@ def _rename_file(
         create_bids_file(**kwargs, task_id=task_id, desc="bold")
 
 
+def _create_sessions_tsv(
+    bids_dir: Path, sessions_dict: dict[str, str], subject_id: str
+) -> None:
+    df = pd.DataFrame(sessions_dict)
+    filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
+    df.to_csv(filename, index=False, sep="\t")
+
+
+def _generate_dataset_metadata(bids_dir: Path, dataset: Literal["mph", "naag"]) -> None:
+    dataset_description = create_dataset_description(
+        dataset.upper(), bids_version="1.10.0"
+    )
+    save_dataset_description(dataset_description, bids_dir)
+    create_participant_tsv(bids_dir, save_df=True, return_df=False)
+
+
 def _generate_bids_dir_pipeline(
     temp_dir: Path,
     bids_dir: Path,
     dataset: Literal["mph", "naag"],
     cohort: Literal["kids", "adults"],
+    create_dataset_metadata: bool,
     add_sessions_tsv: bool,
 ) -> None:
     nifti_files = regex_glob(temp_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
@@ -103,8 +125,9 @@ def _generate_bids_dir_pipeline(
                 )
 
         if add_sessions_tsv:
-            df = pd.DataFrame(sessions_dict)
-            filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
-            df.to_csv(filename, index=False, sep="\t")
+            _create_sessions_tsv(bids_dir, sessions_dict, subject_id)
+
+    if create_dataset_metadata:
+        _generate_dataset_metadata(bids_dir, dataset)
 
     shutil.rmtree(temp_dir)
