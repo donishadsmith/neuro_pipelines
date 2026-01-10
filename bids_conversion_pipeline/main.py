@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 from nifti2bids.io import _copy_file, compress_image, regex_glob
 from nifti2bids.logging import setup_logger
+
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
@@ -66,7 +67,12 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="create_dataset_metadata",
         required=False,
         default=False,
-        help="Creates the participant TSV and the dataset description JSON.",
+        help=(
+            "Creates the participant TSV and the dataset description JSON. "
+            "If a TSV file is already present in ``bids_dir``, appends the new subject IDs to it. "
+            "Also skips the dataset description JSON if detected in ``bids_dir``."
+            "**Keep false if running pipeline in parallel to prevent race condition issues.**"
+        ),
     )
     parser.add_argument(
         "--add_sessions_tsv",
@@ -75,7 +81,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         default=False,
         help=(
             "Add basic sessions TSV file containing the session "
-            "and scan date in BIDS folder for each subject."
+            "and scan date in BIDS folder for each subject. "
         ),
     )
 
@@ -104,7 +110,7 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
             compress_image(dst_file, dst_file.parent, remove_src_file=True)
         except OSError:
             LGR.critical(
-                f"An OSError occured while compressing the following file {dst_file}. "
+                f"An OSError occured while compressing the following file: {dst_file}. "
                 "Removing file from the temporary directory."
             )
             dst_file.unlink()

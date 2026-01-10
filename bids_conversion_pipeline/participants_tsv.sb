@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --job-name=participants_tsv
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+# Outputs -------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/participants_tsv_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/participants_tsv_%A_%a.err
+# ---------------------------------------------------------------------------------
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+
+DATASET="mph-study"
+COHORT="kids"
+BIDS_DIR="/projects/bigos_lab/${DATASET}/${COHORT}/dset"
+
+CMD="$PYTHON participants_tsv.py --bids_dir $BIDS_DIR"
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?
+

@@ -1,0 +1,49 @@
+#!/bin/bash
+#SBATCH --job-name=bids_conversion
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+# Outputs ------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/bids_conversion_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/bids_conversion_%A_%a.err
+# ---------------------------------------------------------------------------------
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+
+SUBJECTS=( $@ )
+if (( ${#SUBJECTS[@]} != 0 )); then
+    SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
+fi
+
+USERNAME=${HOME#/home/}
+SRC_DIR=""
+SCRATCH_DIR="/scratch/${USERNAME}/temp_copy_data_dir"
+mkdir -p ${SCRATCH_DIR}
+
+DATASET="mph-study"
+COHORT="kids"
+BIDS_DIR="/projects/bigos_lab/${DATASET}/${COHORT}/dset"
+
+CMD="${PYTHON} main.py \
+    --src_dir $SRC_DIR \
+    --temp_dir $SCRATCH_DIR \
+    --bids_dir $BIDS_DIR \
+    --dataset ${DATASET%-study} \
+    --cohort $COHORT \
+    --create_dataset_metadata False \
+    --delete_temp_dir True \
+    --add_sessions_tsv True"
+
+if [[ -v SUBJECT ]]; then
+    CMD+=" --subjects $SUBJECT"
+fi
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?
+
