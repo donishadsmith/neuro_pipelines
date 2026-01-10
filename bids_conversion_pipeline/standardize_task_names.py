@@ -69,6 +69,7 @@ def _standardize_task_pipeline(
         _rename_mtl_filenames(temp_dir)
         _standardize_nback_filenames(temp_dir, all_desc)
 
+
 def _rename_mtl_filenames(temp_dir: Path) -> None:
     for subject_folder in temp_dir.glob("*"):
         nifti_files = regex_glob(
@@ -116,11 +117,15 @@ def _standardize_nback_filenames(temp_dir: Path, all_desc: list[str]) -> None:
         if any(variant in nifti_file.name.lower() for variant in nback_variants)
     ]
     for nifti_file in nifti_files:
-        indx = [variant in nifti_file.name.lower() for variant in nback_variants].index(True)
+        indx = [variant in nifti_file.name.lower() for variant in nback_variants].index(
+            True
+        )
         variant = nback_variants[indx]
         if variant == "nback":
             continue
 
-        new_filename = nifti_file.parent / nifti_file.name.lower().replace(variant, "nback")
+        new_filename = nifti_file.parent / nifti_file.name.lower().replace(
+            variant, "nback"
+        )
 
         nifti_file.rename(new_filename)

@@ -112,7 +112,11 @@ def _generate_bids_dir_pipeline(
                     bids_dir
                     / f"sub-{subject_id}"
                     / f"ses-{session_id}"
-                    / ("anat" if "mprage" in session_nifti_file.name.lower() else "func")
+                    / (
+                        "anat"
+                        if "mprage" in session_nifti_file.name.lower()
+                        else "func"
+                    )
                 )
 
                 task_id = (
