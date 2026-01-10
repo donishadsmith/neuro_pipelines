@@ -4,10 +4,12 @@ from typing import Literal, Optional
 
 from nifti2bids.io import _copy_file, compress_image, regex_glob
 from nifti2bids.logging import setup_logger
+from nifti2bids.metadata import is_valid_date
 
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
+
 
 LGR = setup_logger(__name__)
 
@@ -124,6 +126,13 @@ def _copy_data_to_temp_dir(
     )
 
     for subject_folder in subject_folders:
+        date_str = subject_folder.name.split("_")[-1]
+        if not is_valid_date(date_str, "%y%m%d") or len(date_str) != 6:
+            LGR.critical(
+                f"The following folder does not have the '%y%m%d' date format: {subject_folder}. "
+                "Dates are sorted and should be standardized across all folders."
+            )
+
         nifti_files = regex_glob(subject_folder, pattern=r"^.*\.(nii|nii.gz)$")
         for nifti_file in nifti_files:
             _copy_nifti_files(nifti_file, temp_dir)

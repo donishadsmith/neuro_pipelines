@@ -1,5 +1,7 @@
 Pipeline for converting non-BIDS data to BIDS data. Assumes non-BIDS data has folder names in the form of ``"{subjectID}_{scan_date}"`` (also compatable with ``"{subjectID}_{other_content}_{scan_date}"`` as long as subject ID is first and scan date is last). Also tailored for specific tasks and scan protocols.
 
+**Note:** Ensure scan dates are standardized since they are sorted.
+
 To run pipeline, in your preferred terminal, run:
 
 ```bash

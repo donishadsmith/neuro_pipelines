@@ -5,6 +5,7 @@ import pandas as pd
 
 from nifti2bids.bids import create_participant_tsv
 
+
 def _get_constant(
     object: dict[str, list[str]] | dict[str, int | float],
     dataset: Literal["mph", "naag"],
@@ -15,6 +16,7 @@ def _get_constant(
         constant = constant[cohort]
 
     return constant
+
 
 def _create_or_append_participants_tsv(bids_dir: Path) -> None:
     if not (tsv_file := list(bids_dir.glob("participants.tsv"))):
@@ -40,4 +42,3 @@ def _create_or_append_participants_tsv(bids_dir: Path) -> None:
                 [old_participants_df, new_participants_df], ignore_index=True
             )
             combined_participants_df.to_csv(bids_dir / "participants.tsv", sep="\t")
-

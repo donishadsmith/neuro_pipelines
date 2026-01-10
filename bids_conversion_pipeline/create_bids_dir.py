@@ -72,6 +72,7 @@ def _generate_dataset_metadata(bids_dir: Path, dataset: Literal["mph", "naag"]) 
 
     _create_or_append_participants_tsv(bids_dir)
 
+
 def _generate_bids_dir_pipeline(
     temp_dir: Path,
     bids_dir: Path,
