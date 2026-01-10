@@ -44,7 +44,9 @@ def _infer_file_identity(
             # Each mtl file has the acquisition number in the filename that preceeds "_1"
             # MTLE comes before the MTLR hence the acquisition number is important
             if desc.startswith("mtl"):
-                pattern = r"^.*_(\d+)_(\d)\.nii\.gz$"
+                # There are cases where there is only a single number followed by
+                # extension hence the _\d+ is optional
+                pattern = r"^.*(\d+)(?:_\d+)?\.nii\.gz$"
                 acquisition_number = re.search(pattern, nifti_file.name).group(1)
                 desc += f"_{acquisition_number}_1"
 
