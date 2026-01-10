@@ -122,7 +122,7 @@ def _copy_data_to_temp_dir(
     src_dir: Path, temp_dir: Path, subjects: Optional[list[str | int]]
 ) -> None:
     subject_folders = _filter_subjects(
-        folders=regex_glob(src_dir, pattern=r"^(\d+)_(\d+)$"), subjects=subjects
+        folders=regex_glob(src_dir, pattern=r"^\d+_\d+$"), subjects=subjects
     )
 
     for subject_folder in subject_folders:
@@ -133,7 +133,9 @@ def _copy_data_to_temp_dir(
                 "Dates are sorted and should be standardized across all folders."
             )
 
-        nifti_files = regex_glob(subject_folder, pattern=r"^.*\.(nii|nii.gz)$")
+        # Handle edge case where analyses related files placed in same folder as
+        # original nifti which has the naming {subjectID}_{scan_date}_{acqusition_number}
+        nifti_files = regex_glob(subject_folder, pattern=r"^\d+_\d+.*\.(nii|nii.gz)$")
         for nifti_file in nifti_files:
             _copy_nifti_files(nifti_file, temp_dir)
 

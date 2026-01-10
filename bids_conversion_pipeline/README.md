@@ -1,7 +1,20 @@
-Pipeline for converting non-BIDS data to BIDS data. Assumes non-BIDS data has folder names in the form of ``"{subjectID}_{scan_date}"`` (also compatable with ``"{subjectID}_{other_content}_{scan_date}"`` as long as subject ID is first and scan date is last). Also tailored for specific tasks and scan protocols.
+# Overview
+
+Pipeline for converting non-BIDS data to BIDS data. Assumes non-BIDS data has folder names in the form of ``"{subjectID}_{scan_date}"`` (also compatable with ``"{subjectID}_{other_content}_{scan_date}"`` as long as subject ID is first and scan date is last). Also tailored for specific tasks and scan protocols. Also assumes one run per task.
 
 **Note:** Ensure scan dates are standardized since they are sorted.
 
+Pipeline:
+
+- Collects files ending in ".nii" and ".nii.gz"
+- Compresses ".nii" files to "nii.gz" files
+- Identifies the identity of the NIfTI image by checking if it is 3D or 4D and by using heuristic of "x task has n number of volumes"
+- Converts data to BIDS format
+- Creates a minimal metadata JSON sidecar
+- Optionally create the participants TSV, dataset description JSON, and a sessions TSV.
+    - If participants TSV is detected, will instead append new subjects to the dataframe.
+
+# Usage
 To run pipeline, in your preferred terminal, run:
 
 ```bash

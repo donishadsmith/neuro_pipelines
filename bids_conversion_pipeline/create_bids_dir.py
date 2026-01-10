@@ -28,7 +28,6 @@ def _get_task_name(
     nifti_file: Path, dataset: Literal["mph", "naag"], cohort: Literal["kids", "adults"]
 ) -> str:
     task_names = _get_constant(_TASK_NAMES, dataset, cohort)
-
     indx = [task in nifti_file.name.lower() for task in task_names].index(True)
 
     return task_names[indx]
@@ -58,9 +57,9 @@ def _rename_file(
 def _create_sessions_tsv(
     bids_dir: Path, sessions_dict: dict[str, str], subject_id: str
 ) -> None:
-    df = pd.DataFrame(sessions_dict)
+    new_sessions_df = pd.DataFrame(sessions_dict)
     filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
-    df.to_csv(filename, index=False, sep="\t")
+    new_sessions_df.to_csv(filename, index=False, sep="\t")
 
 
 def _generate_dataset_metadata(bids_dir: Path, dataset: Literal["mph", "naag"]) -> None:
@@ -81,7 +80,7 @@ def _generate_bids_dir_pipeline(
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
 ) -> None:
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
+    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
 
     if not bids_dir.exists():
         bids_dir.mkdir()
@@ -113,7 +112,7 @@ def _generate_bids_dir_pipeline(
                     bids_dir
                     / f"sub-{subject_id}"
                     / f"ses-{session_id}"
-                    / ("anat" if "mprage" in session_nifti_file.name else "func")
+                    / ("anat" if "mprage" in session_nifti_file.name.lower() else "func")
                 )
 
                 task_id = (

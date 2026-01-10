@@ -32,7 +32,7 @@ def _infer_file_identity(
     3D (anatomical) or not. If it is a 4D image, then infer the
     task by the number of volumes.
     """
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
+    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
     for nifti_file in nifti_files:
         if not any(name in nifti_file.name.lower() for name in all_desc):
             if is_3d_img(nifti_file):
@@ -66,35 +66,13 @@ def _standardize_task_pipeline(
     _infer_file_identity(temp_dir, all_desc, task_volume_map)
 
     if dataset == "mph":
-        _standardize_mtl_filenames(temp_dir)
         _rename_mtl_filenames(temp_dir)
         _standardize_nback_filenames(temp_dir, all_desc)
-
-
-def _standardize_mtl_filenames(temp_dir: Path) -> None:
-    """
-    Renames files containing "WIPMTL" to "_mtl_".
-    """
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
-    nifti_files = [
-        nifti_file for nifti_file in nifti_files if "mtl" in nifti_file.name.lower()
-    ]
-
-    for nifti_file in nifti_files:
-        if "WIPMTL" in nifti_file.name:
-            pattern = r"^.*_(\d+)_(\d)\.nii\.gz$"
-            acquisition_number = re.search(pattern, nifti_file.name).group(1)
-            new_filename = (
-                str(nifti_file).split("_WIP")[0] + f"_mtl_{acquisition_number}_1.nii.gz"
-            )
-
-            nifti_file.rename(new_filename)
-
 
 def _rename_mtl_filenames(temp_dir: Path) -> None:
     for subject_folder in temp_dir.glob("*"):
         nifti_files = regex_glob(
-            subject_folder, pattern=r"^.*\.(nii.gz)$", recursive=True
+            subject_folder, pattern=r"^.*\.nii\.gz$", recursive=True
         )
         nifti_files = [
             nifti_file for nifti_file in nifti_files if "mtl" in nifti_file.name.lower()
@@ -107,7 +85,10 @@ def _rename_mtl_filenames(temp_dir: Path) -> None:
 
         # Note an alternative could be sorting based on modified or created time;
         # however; this may not be as reliable on Unix vs Windows
-        pattern = r"_(\d+)_1"
+
+        # There are cases where there is only a single number followed by
+        # extension hence the _\d+ is optional
+        pattern = r"^.*(\d+)(?:_\d+)?\.nii\.gz$"
         nii_tuple_list = sorted(
             [
                 (int(re.search(pattern, str(nifti_file)).group(1)), nifti_file)
@@ -119,7 +100,7 @@ def _rename_mtl_filenames(temp_dir: Path) -> None:
             _, nifti_file = nii_tuple
             task_name = "mtle" if indx == 0 else "mtlr"
             replace_name = "mtl_neu" if "mtl_neu" in nifti_file.name else "mtl"
-            new_nifti_filename = nifti_file.parent / nifti_file.name.replace(
+            new_nifti_filename = nifti_file.parent / nifti_file.name.lower().replace(
                 replace_name, task_name
             )
             nifti_file.rename(new_nifti_filename)
@@ -127,19 +108,19 @@ def _rename_mtl_filenames(temp_dir: Path) -> None:
 
 def _standardize_nback_filenames(temp_dir: Path, all_desc: list[str]) -> None:
     nback_variants = [desc for desc in all_desc if desc.endswith("back")]
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
+    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
 
     nifti_files = [
         nifti_file
         for nifti_file in nifti_files
-        if any(variant in nifti_file.name for variant in nback_variants)
+        if any(variant in nifti_file.name.lower() for variant in nback_variants)
     ]
     for nifti_file in nifti_files:
-        indx = [variant in nifti_file.name for variant in nback_variants].index(True)
+        indx = [variant in nifti_file.name.lower() for variant in nback_variants].index(True)
         variant = nback_variants[indx]
         if variant == "nback":
             continue
 
-        new_filename = nifti_file.parent / nifti_file.name.replace(variant, "nback")
+        new_filename = nifti_file.parent / nifti_file.name.lower().replace(variant, "nback")
 
         nifti_file.rename(new_filename)

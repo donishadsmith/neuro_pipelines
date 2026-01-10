@@ -46,7 +46,7 @@ EPI_FACTOR = 27
 
 
 def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
-    nifti_files = regex_glob(bids_dir, pattern=r"^.*\.(nii.gz)$", recursive=True)
+    nifti_files = regex_glob(bids_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
     for nifti_file in nifti_files:
         modality = nifti_file.parent.name
         if modality == "anat":
