@@ -76,7 +76,7 @@ CMD="${APPTAINER_CMD} \
 	/out \
 	participant \
 	--participant-label $SUBJECT \
-	-w /work/ \
+	-w /work \
 	-vv \
 	--omp-nthreads 16 \
 	--nprocs 16 \
