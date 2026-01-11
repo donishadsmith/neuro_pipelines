@@ -48,7 +48,7 @@ def _rename_file(
         "run_id": "01",
         "remove_src_file": True,
     }
-    if nifti_file.parent.name == "anat":
+    if bids_dir.parent.name == "anat":
         create_bids_file(**kwargs, desc="T1w")
     else:
         create_bids_file(**kwargs, task_id=task_id, desc="bold")
