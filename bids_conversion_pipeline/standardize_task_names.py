@@ -46,15 +46,16 @@ def _infer_file_identity(
             if desc.startswith("mtl"):
                 # There are cases where there is only a single number followed by
                 # extension hence the _\d+ is optional
-                pattern = r"^.*(\d+)(?:_\d+)?\.nii\.gz$"
-                acquisition_number = re.search(pattern, nifti_file.name).group(1)
-                desc += f"_{acquisition_number}_1"
+                pattern = r"_(\d+)(?:_\d+)?\.nii\.gz$"
+                # Can be _{acquisition_number}_1.nii.gz or _{acquisition_number}.nii.gz
+                match_str = re.search(pattern, nifti_file.name).group(0)
+                desc += match_str
 
                 # Get the name before the acquisition number
-                prefix_filename = str(nifti_file).split(f"_{acquisition_number}_1")[0]
-                new_filename = f"{prefix_filename}_{desc}.nii.gz"
+                prefix_filename = str(nifti_file).split(match_str)[0]
+                new_filename = f"{prefix_filename}_{desc}"
             else:
-                new_filename = f"{str(nifti_file).split('.nii.gz')[0]}_{desc}.nii.gz"
+                new_filename = f"{str(nifti_file).replace('nii.gz', desc)}"
 
             nifti_file.rename(new_filename)
 
@@ -91,7 +92,7 @@ def _rename_mtl_filenames(temp_dir: Path) -> None:
 
         # There are cases where there is only a single number followed by
         # extension hence the _\d+ is optional
-        pattern = r"^.*(\d+)(?:_\d+)?\.nii\.gz$"
+        pattern = r"_(\d+)(?:_\d+)?\.nii\.gz$"
         nii_tuple_list = sorted(
             [
                 (int(re.search(pattern, str(nifti_file)).group(1)), nifti_file)

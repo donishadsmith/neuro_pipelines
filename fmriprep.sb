@@ -50,7 +50,7 @@ TMP_DIR="${SCRATCH_DIR}/tmp"
 mkdir -p ${TMP_DIR}
 
 # Directory within the container templateflow will be in
-APPTAINERENV_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/templateflow/"
+APPTAINERENV_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/templateflow"
 export APPTAINERENV_TEMPLATEFLOW_HOME
 
 APPTAINER_CMD="apptainer run --containall --writable-tmpfs --cleanenv \
