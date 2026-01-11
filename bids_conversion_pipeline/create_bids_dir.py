@@ -58,6 +58,10 @@ def _create_sessions_tsv(
     bids_dir: Path, sessions_dict: dict[str, str], subject_id: str
 ) -> None:
     new_sessions_df = pd.DataFrame(sessions_dict)
+    new_sessions_df["session_id"] = [
+        f"ses-{session_id}" if not session_id.startswith("ses-") else session_id
+        for session_id in new_sessions_df["session_id"].values
+    ]
     filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
     new_sessions_df.to_csv(filename, index=False, sep="\t")
 
