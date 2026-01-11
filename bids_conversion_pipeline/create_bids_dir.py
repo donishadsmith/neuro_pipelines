@@ -39,6 +39,7 @@ def _rename_file(
     subject_id: str,
     session_id: str,
     task_id: Optional[str] = None,
+    remove_src_file: bool = True,
 ) -> None:
     kwargs = {
         "src_file": nifti_file,
@@ -46,9 +47,10 @@ def _rename_file(
         "sub_id": subject_id,
         "ses_id": session_id,
         "run_id": "01",
-        "remove_src_file": True,
+        "remove_src_file": remove_src_file,
     }
-    if bids_dir.parent.name == "anat":
+
+    if bids_dir.name == "anat":
         create_bids_file(**kwargs, desc="T1w")
     else:
         create_bids_file(**kwargs, task_id=task_id, desc="bold")
@@ -83,6 +85,7 @@ def _generate_bids_dir_pipeline(
     cohort: Literal["kids", "adults"],
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
+    delete_temp_dir: bool,
 ) -> None:
     nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
 
@@ -107,6 +110,7 @@ def _generate_bids_dir_pipeline(
 
         sessions_dict = {"session_id": [], "acq_time": []}
         for session, scan_date in enumerate(scan_dates, start=1):
+            # Max three sessions
             session_id = f"0{session}"
             session_nifti_files = _filter_nifti_files(subject_nifti_files, scan_date)
             sessions_dict["session_id"].append(session_id)
@@ -129,7 +133,12 @@ def _generate_bids_dir_pipeline(
                     else None
                 )
                 _rename_file(
-                    session_nifti_file, dst_path, subject_id, session_id, task_id
+                    session_nifti_file,
+                    dst_path,
+                    subject_id,
+                    session_id,
+                    task_id,
+                    delete_temp_dir,
                 )
 
         if add_sessions_tsv:
@@ -138,4 +147,5 @@ def _generate_bids_dir_pipeline(
     if create_dataset_metadata:
         _generate_dataset_metadata(bids_dir, dataset)
 
-    shutil.rmtree(temp_dir)
+    if delete_temp_dir:
+        shutil.rmtree(temp_dir)

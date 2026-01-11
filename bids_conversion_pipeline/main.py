@@ -55,6 +55,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="delete_temp_dir",
         required=False,
         default=False,
+        type=_convert_to_bool,
         help="Deletes the temporary directory.",
     )
     parser.add_argument(
@@ -69,6 +70,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="create_dataset_metadata",
         required=False,
         default=False,
+        type=_convert_to_bool,
         help=(
             "Creates the participant TSV and the dataset description JSON. "
             "If a TSV file is already present in ``bids_dir``, appends the new subject IDs to it. "
@@ -81,6 +83,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="add_sessions_tsv",
         required=False,
         default=False,
+        type=_convert_to_bool,
         help=(
             "Add basic sessions TSV file containing the session "
             "and scan date in BIDS folder for each subject. "
@@ -88,6 +91,15 @@ def _get_cmd_args() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _convert_to_bool(arg: bool | str) -> bool:
+    if str(arg).lower() == "true":
+        return True
+    elif str(arg).lower() == "false":
+        return False
+    else:
+        raise ValueError("For booleans only True and False are valid.")
 
 
 def _filter_subjects(
@@ -171,7 +183,7 @@ def main(
         # Pipeline to identify un-named NIfTI images and standardize task names
         _standardize_task_pipeline(temp_dir, dataset, cohort)
 
-        # Pipeline to move files to BIDs directory
+        # Pipeline to move files to BIDS directory
         _generate_bids_dir_pipeline(
             temp_dir,
             bids_dir,
@@ -179,12 +191,13 @@ def main(
             cohort,
             create_dataset_metadata,
             add_sessions_tsv,
+            delete_temp_dir,
         )
 
         # Pipeline to create JSON sidecars for NIfTI images
         _create_json_sidecar_pipeline(bids_dir)
     finally:
-        if delete_temp_dir and temp_dir.exists():
+        if delete_temp_dir:
             shutil.rmtree(temp_dir)
 
 

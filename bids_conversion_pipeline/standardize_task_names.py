@@ -2,8 +2,9 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from nifti2bids.io import regex_glob
+from nifti2bids.io import regex_glob, get_nifti_header
 from nifti2bids.metadata import is_3d_img, infer_task_from_image
+from nifti2bids.logging import setup_logger
 
 from _utils import _get_constant
 
@@ -23,6 +24,8 @@ _TASK_VOLUME_MAP = {
     "naag": None,
 }
 
+LGR = setup_logger(__name__)
+
 
 def _infer_file_identity(
     temp_dir: Path, all_desc: list[str], task_volume_map: dict[str, int]
@@ -36,7 +39,22 @@ def _infer_file_identity(
     for nifti_file in nifti_files:
         if not any(name in nifti_file.name.lower() for name in all_desc):
             if is_3d_img(nifti_file):
-                desc = "mprage32"
+                # Safety identity check based on voxel size
+                thresh = 1.5
+                if all(
+                    vox_size <= thresh
+                    for vox_size in get_nifti_header(nifti_file).get_zooms()
+                ):
+                    desc = "mprage32"
+                else:
+                    LGR.critical(
+                        f"Voxel sizes greater than {thresh} mm for the following file: {nifti_file}. "
+                        "Check original file in the source directory since the temp file will be deleted."
+                    )
+
+                    nifti_file.unlink()
+
+                    continue
             else:
                 desc = infer_task_from_image(nifti_file, task_volume_map)
 
@@ -55,7 +73,7 @@ def _infer_file_identity(
                 prefix_filename = str(nifti_file).split(match_str)[0]
                 new_filename = f"{prefix_filename}_{desc}"
             else:
-                new_filename = f"{str(nifti_file).replace('nii.gz', desc)}"
+                new_filename = f"{str(nifti_file).split('.nii.gz')[0]}_{desc}.nii.gz"
 
             nifti_file.rename(new_filename)
 
