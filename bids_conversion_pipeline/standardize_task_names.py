@@ -45,8 +45,7 @@ def _infer_file_identity(
                 max_thresh = 1.1
                 voxel_sizes = get_nifti_header(nifti_file).get_zooms()
                 if all(
-                    min_thresh <= vox_size <= max_thresh
-                    for vox_size in voxel_sizes
+                    min_thresh <= vox_size <= max_thresh for vox_size in voxel_sizes
                 ):
                     desc = "mprage32"
                 else:
