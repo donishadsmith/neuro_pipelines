@@ -39,16 +39,20 @@ def _infer_file_identity(
     for nifti_file in nifti_files:
         if not any(name in nifti_file.name.lower() for name in all_desc):
             if is_3d_img(nifti_file):
-                # Safety identity check based on voxel size
-                thresh = 1.5
+                # Safety identity check based on voxel sizes for near isotropic mprage32
+                # Note: Protocol doesn't collect fmaps
+                min_thresh = 0.8
+                max_thresh = 1.1
+                voxel_sizes = get_nifti_header(nifti_file).get_zooms()
                 if all(
-                    vox_size <= thresh
-                    for vox_size in get_nifti_header(nifti_file).get_zooms()
+                    min_thresh <= vox_size <= max_thresh
+                    for vox_size in voxel_sizes
                 ):
                     desc = "mprage32"
                 else:
                     LGR.critical(
-                        f"Voxel sizes greater than {thresh} mm for the following file: {nifti_file}. "
+                        f"Voxel sizes out of bounds ({min_thresh} mm, {max_thresh} mm). "
+                        f"Actual voxels sizes are {voxel_sizes} for the following file: {nifti_file}. "
                         "Check original file in the source directory since the temp file will be deleted "
                         "to allow the conversion to continue for the remaining files."
                     )
