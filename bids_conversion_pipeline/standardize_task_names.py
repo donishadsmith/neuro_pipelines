@@ -49,9 +49,9 @@ def _infer_file_identity(
                 else:
                     LGR.critical(
                         f"Voxel sizes greater than {thresh} mm for the following file: {nifti_file}. "
-                        "Check original file in the source directory since the temp file will be deleted."
+                        "Check original file in the source directory since the temp file will be deleted "
+                        "to allow the conversion to continue for the remaining files."
                     )
-
                     nifti_file.unlink()
 
                     continue
