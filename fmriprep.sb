@@ -35,7 +35,7 @@ done
 
 # slurm job value; essentially extracting sub-{id}
 if (( ARR_LEN == 0 )); then
-	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line {print $1}' ${BIDS_DIR}/participants.tsv)
+	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line {print $1}' ${BIDS_DIR}/participants.tsv | tr -d "\r")
 else
 	SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
