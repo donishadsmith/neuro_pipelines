@@ -1,4 +1,4 @@
-import argparse, shutil, tempfile
+import argparse, os, shutil, tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -14,7 +14,10 @@ from nifti2bids.bids import (
     EPrimeBlockExtractor,
     add_instruction_timing,
 )
-from nifti2bids.metadata import parse_date_from_path
+from nifti2bids.io import _copy_file
+from nifti2bids.logging import setup_logger
+
+LGR = setup_logger(__name__)
 
 
 def _get_cmd_args():
@@ -34,8 +37,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--temp_dir",
         dest="temp_dir",
-        required=False,
-        default=None,
+        required=True,
         help="Path to a temporary directory to use.",
     )
     parser.add_argument(
@@ -50,14 +52,14 @@ def _get_cmd_args():
         required=False,
         default=None,
         nargs="+",
-        help="The id of the subject without 'sub-'.",
+        help="The ID of the subject without 'sub-'.",
     )
     parser.add_argument(
-        "--delete_temp_dir",
-        dest="delete_temp_dir",
+        "--minimum_file_size",
+        dest="minimum_file_size",
         required=False,
-        default=False,
-        help="Deletes the temporary directory.",
+        default=None,
+        help="The minimum file size in bytes to ignore error files.",
     )
 
     return parser
@@ -74,10 +76,39 @@ def _filter_log_files(log_files, subjects):
         return log_files
 
 
-def _get_presentation_session(src_dir, subject_id, excel_file):
+def _get_minimum_file_size(task, minimum_file_size):
+    file_size_minimum_kb = {
+        "flanker": 40,
+        "mtle": 5,
+        "mtlr": 5,
+        "princess": 50,
+        "nback": 40,
+    }
+
+    if not minimum_file_size:
+        minimum_file_size = file_size_minimum_kb[task] * 1024
+
+    return minimum_file_size
+
+
+def _copy_event_files(src_dir, temp_dir, task, minimum_file_size):
+    for event_file in src_dir.glob("*"):
+        minimum_file_size = _get_minimum_file_size(task, minimum_file_size)
+
+        if os.path.getsize(event_file) < minimum_file_size:
+            LGR.critical(
+                f"The following file is smaller than {minimum_file_size} bytes "
+                f"and will not be copied to the temporary directory: {event_file}."
+            )
+
+            continue
+
+        _copy_file(event_file, temp_dir / event_file.name, remove_src_file=False)
+
+
+def _get_presentation_session(temp_dir, subject_id, excel_file):
     file_dates = [
-        parse_date_from_path(path, "%Y%m%d")
-        for path in list(src_dir.glob(f"*{subject_id}*"))
+        path.name.split("_")[-2] for path in list(temp_dir.glob(f"*{subject_id}*"))
     ]
     session_id = [date in str(excel_file.name) for date in file_dates].index(True) + 1
 
@@ -91,8 +122,8 @@ def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
     event_df.to_csv(tsv_filename, sep="\t", index=False)
 
 
-def _create_flanker_events_files(src_dir, dst_dir, subjects):
-    excel_files = _filter_log_files(src_dir.glob("*.xls"), subjects)
+def _create_flanker_events_files(temp_dir, dst_dir, subjects):
+    excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects)
     for excel_file in excel_files:
         extractor = PresentationEventExtractor(
             excel_file,
@@ -151,13 +182,13 @@ def _create_flanker_events_files(src_dir, dst_dir, subjects):
 
         # Getting subject ID and organising files to get subject ID
         subject_id = str(excel_file.name).split("_")[0]
-        session_id = _get_presentation_session(src_dir, subject_id, excel_file)
+        session_id = _get_presentation_session(temp_dir, subject_id, excel_file)
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="flanker")
 
 
-def _create_nback_events_files(src_dir, dst_dir, subjects):
-    edat_files = _filter_log_files(src_dir.glob("*.edat3"), subjects)
+def _create_nback_events_files(temp_dir, dst_dir, subjects):
+    edat_files = _filter_log_files(temp_dir.glob("*.edat3"), subjects)
     for edat_file in edat_files:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False
@@ -220,12 +251,12 @@ def _create_nback_events_files(src_dir, dst_dir, subjects):
             csv_path.unlink()
 
 
-def _create_mtl_events_files(src_dir, dst_dir, subjects, task):
+def _create_mtl_events_files(temp_dir, dst_dir, subjects, task):
     # MTLE and MTLR are separate tasks but can be processed in one function
     filename = "_PEARencN" if task == "mtle" else "_PEARretN"
     task_name = "indoor" if task == "mtle" else "seen"
 
-    excel_files = _filter_log_files(src_dir.glob(f"*{filename}*.xls"), subjects)
+    excel_files = _filter_log_files(temp_dir.glob(f"*{filename}*.xls"), subjects)
     for excel_file in excel_files:
         input_df = load_presentation_log(excel_file)
         # Add quit code, some log files did not record the quit event type
@@ -257,13 +288,13 @@ def _create_mtl_events_files(src_dir, dst_dir, subjects, task):
         )
 
         subject_id = str(excel_file.name).split("_")[0]
-        session_id = _get_presentation_session(src_dir, subject_id, excel_file)
+        session_id = _get_presentation_session(temp_dir, subject_id, excel_file)
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
 
-def _create_princess_events_files(src_dir, dst_dir, subjects):
-    edat_files = _filter_log_files(src_dir.glob("*.edat3"), subjects)
+def _create_princess_events_files(temp_dir, dst_dir, subjects):
+    edat_files = _filter_log_files(temp_dir.glob("*.edat3"), subjects)
     for edat_file in edat_files:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False
@@ -337,7 +368,7 @@ def _create_princess_events_files(src_dir, dst_dir, subjects):
             csv_path.unlink()
 
 
-def main(src_dir, dst_dir, temp_dir, task, subjects, delete_temp_dir):
+def main(src_dir, dst_dir, temp_dir, task, subjects, minimum_file_size):
     func = {
         "flanker": _create_flanker_events_files,
         "nback": _create_nback_events_files,
@@ -354,25 +385,19 @@ def main(src_dir, dst_dir, temp_dir, task, subjects, delete_temp_dir):
     if not dst_dir.exists():
         dst_dir.mkdir()
 
-    if temp_dir:
-        temp_dir = Path(temp_dir)
+    temp_dir = Path(temp_dir)
+    if not temp_dir.exists():
+        temp_dir.mkdir()
 
-    kwargs = {
-        "src_dir": (temp_dir or src_dir),
-        "dst_dir": dst_dir,
-        "subjects": subjects,
-    }
+    kwargs = {"temp_dir": temp_dir, "dst_dir": dst_dir, "subjects": subjects}
     if task in ["mtle", "mtlr"]:
         kwargs.update({"task": task})
 
     try:
-        if temp_dir:
-            temp_dir = Path(temp_dir)
-            shutil.copytree(src_dir, temp_dir)
-            func[task](**kwargs)
+        _copy_event_files(src_dir, temp_dir, task, minimum_file_size)
+        func[task](**kwargs)
     finally:
-        if temp_dir and temp_dir.exists() and delete_temp_dir:
-            shutil.rmtree(temp_dir)
+        shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
