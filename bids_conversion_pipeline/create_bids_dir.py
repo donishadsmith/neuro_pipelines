@@ -71,7 +71,7 @@ def _create_sessions_tsv(
 def _generate_dataset_metadata(bids_dir: Path, dataset: Literal["mph", "naag"]) -> None:
     if not list(bids_dir.glob("dataset_description.json")):
         dataset_description = create_dataset_description(
-            dataset.upper(), bids_version="1.10.0"
+            dataset.upper(), bids_version="1.4.0"
         )
         save_dataset_description(dataset_description, bids_dir)
 

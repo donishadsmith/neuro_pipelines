@@ -11,9 +11,10 @@
 # ----------------------------------------------------------------------------
 module load afni
 
-CODE_DIR="/projects/bigos_lab/code"
-DSET_DIR="/projects/bigos_lab/mph-study/kids"
-BIDS_DIR="${DSET_DIR}/dset"
+FMRIPREP_VERSION="25.2.3"
+
+BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+DERIV_DIR="${BIDS_DIR}/derivatives/fmriprep-${FMRIPREP_VERSION}"
 DST_DIR="${BIDS_DIR}/derivatives/firstlevel"
 mkdir -p ${DST_DIR}
 
@@ -33,14 +34,16 @@ SUBJECTS=( $@ )
 
 # slurm job value; essentially extracting sub-{id}
 if [ ${#SUBJECTS[@]} -eq 0 ]; then
-	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line {print $1}' ${BIDS_DIR}/participants.tsv | tr -d "\r")
+	# https://catonmat.net/awk-one-liners-explained-part-two
+	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line { sub(/\r$/,""); print $1 }' "$BIDS_DIR/participants.tsv")
 else
-        SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
+    SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-CMD="${PYTHON} ${CODE_DIR}/first_level.py \
+CMD="${PYTHON} first_level.py \
 	--bids_dir ${BIDS_DIR} \
 	--afni_img_path ${AFNI_IMG_PATH} \
+	--deriv_dir ${DERIV_DIR} \
 	--dst_dir ${DST_DIR} \
 	--subject ${SUBJECT#sub-} \
 	--task ${TASK}"

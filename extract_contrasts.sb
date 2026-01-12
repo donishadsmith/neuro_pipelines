@@ -14,7 +14,6 @@
 module load afni
 
 ANALYSIS_DIR="/projects/bigos_lab/mph-study/kids/dset/derivatives/firstlevel"
-CODE_DIR="/projects/bigos_lab/code"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 TASK="nback" # nback, mtle, mtlr, princess, flanker
@@ -25,12 +24,13 @@ ARR_LEN=${#SUBJECTS[@]}
 
 # slurm job value; essentially extracting sub-{id}
 if [ ${ARR_LEN} -eq 0]; then
-	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line {print $1}' ${BIDS_DIR}/participants.tsv | tr -d "\r")
+	# https://catonmat.net/awk-one-liners-explained-part-two
+	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line { sub(/\r$/,""); print $1 }' "$BIDS_DIR/participants.tsv")
 else
-        SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
+    SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-cmd="${PYTHON} ${CODE_DIR}/extract_contrasts.py \
+cmd="${PYTHON} extract_contrasts.py \
 	--analysis_dir ${ANALYSIS_DIR} \
 	--afni_img_path ${AFNI_IMG_PATH} \
 	--subject ${SUBJECT} \
