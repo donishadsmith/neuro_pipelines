@@ -106,10 +106,18 @@ def _copy_event_files(src_dir, temp_dir, task, minimum_file_size):
         _copy_file(event_file, temp_dir / event_file.name, remove_src_file=False)
 
 
-def _get_presentation_session(temp_dir, subject_id, excel_file):
-    file_dates = [
-        path.name.split("_")[-2] for path in list(temp_dir.glob(f"*{subject_id}*"))
-    ]
+def _get_presentation_session(temp_dir, subject_id, excel_file, task=None):
+    if task in ["mtle", "mtlr"]:
+        identifier = "_PEARencN" if task == "mtle" else "_PEARretN"
+        file_dates = [
+            path.name.split("_")[-2]
+            for path in list(temp_dir.glob(f"*{subject_id}*{identifier}*"))
+        ]
+    else:
+        file_dates = [
+            path.name.split("_")[-2] for path in list(temp_dir.glob(f"*{subject_id}*"))
+        ]
+
     session_id = [date in str(excel_file.name) for date in file_dates].index(True) + 1
 
     return session_id
@@ -288,7 +296,7 @@ def _create_mtl_events_files(temp_dir, dst_dir, subjects, task):
         )
 
         subject_id = str(excel_file.name).split("_")[0]
-        session_id = _get_presentation_session(temp_dir, subject_id, excel_file)
+        session_id = _get_presentation_session(temp_dir, subject_id, excel_file, task)
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
