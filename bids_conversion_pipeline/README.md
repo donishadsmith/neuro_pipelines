@@ -16,7 +16,7 @@ Pipeline:
 - Optionally create the participants TSV, dataset description JSON, and a sessions TSV.
     - If participants TSV is detected, will instead append new subjects to the dataframe.
 
-# Usage
+## Usage
 To run pipeline, in your preferred terminal, run:
 
 ```bash
@@ -45,3 +45,19 @@ To run on HPC with SLURM:
 sbatch --array=0-1 main.sb 100 101
 sbatch participants_tsv.sb
 ```
+
+## Subjects Visits File
+When entire sessions are missing, to ensure the dates are mapped to the correct session ID, pass ``--subjects_sessions_file``:
+
+```bash
+python main.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --create_dataset_metadata True --add_sessions_tsv True --subjects 100 101 --subjects_sessions_file /path/to/session/file.csv --subjects_visits_date_fmt %m/%d/%Y --src_data_date_fmt %y%m%d
+```
+
+Ensure each partcipant ID in the file has all of their dates or NaN for missing dates:
+
+| subject | scan_date  |
+|---------|------------|
+| 101     | 01/02/2022 |
+| 101     | NaN        |
+| 101     | 03/02/2022 |
+| 102     | 01/02/2024 |

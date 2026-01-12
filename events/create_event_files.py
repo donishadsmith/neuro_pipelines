@@ -1,8 +1,8 @@
 import argparse, os, shutil, tempfile
 from pathlib import Path
+from datetime import datetime
 
-import pandas as pd
-import numpy as np
+import numpy as np, pandas as pd
 
 from nifti2bids.parsers import (
     load_presentation_log,
@@ -16,6 +16,7 @@ from nifti2bids.bids import (
 )
 from nifti2bids.io import _copy_file
 from nifti2bids.logging import setup_logger
+from nifti2bids.metadata import is_valid_date
 
 LGR = setup_logger(__name__)
 
@@ -60,6 +61,35 @@ def _get_cmd_args():
         required=False,
         default=None,
         help="The minimum file size in bytes to ignore error files.",
+    )
+    # Extracting the file creation or modification date may not be very reliable
+    parser.add_argument(
+        "--subjects_visits_file",
+        dest="subjects_visits_file",
+        required=False,
+        default=None,
+        help=(
+            "A text file, where the first column is the subject ID and the "
+            "second column is the date of visit. Using this parameter is recommended "
+            "when data is missing. Ensure all dates have a consistent format. "
+            "**All subject visit dates should be listed.**"
+        ),
+    )
+    parser.add_argument(
+        "--subjects_visits_date_fmt",
+        dest="subjects_visits_date_fmt",
+        required=False,
+        default=r"%m/%d/%Y",
+        help=("The format of the date in the ``subjects_visits`` file."),
+    )
+    parser.add_argument(
+        "--src_data_date_fmt",
+        dest="src_data_date_fmt",
+        required=False,
+        default=r"%Y%m%d",
+        help=(
+            "The format of the dates in the filenames that are in the source directory."
+        ),
     )
 
     return parser
@@ -106,21 +136,84 @@ def _copy_event_files(src_dir, temp_dir, task, minimum_file_size):
         _copy_file(event_file, temp_dir / event_file.name, remove_src_file=False)
 
 
-def _get_presentation_session(temp_dir, subject_id, excel_file, task=None):
+def _get_subjects_visits(
+    subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt
+):
+    # Don't sort to keep the order of the NaNs
+    visit_dates = (
+        subjects_visits_df[subjects_visits_df.iloc[:, 0].astype(str) == subject_id]
+        .iloc[:, 1]
+        .values.tolist()
+    )
+
+    if not visit_dates or all(
+        isinstance(date, float) and np.isnan(date) for date in visit_dates
+    ):
+        LGR.critical(f"Subject {subject_id} has no visit dates.")
+
+        return None
+
+    check_dates = [
+        date for date in visit_dates if not (isinstance(date, float) and np.isnan(date))
+    ]
+    if not all(
+        is_valid_date(visit_date, subjects_visits_date_fmt)
+        for visit_date in check_dates
+    ):
+        LGR.critical(
+            f"Visit dates will be ignored for subject {subject_id} because not all dates have a consistent format: "
+            f"{check_dates}."
+        )
+
+        return None
+
+    # Format of the event files are hardcoded into the presentation script
+    convert_date = lambda date: datetime.strptime(
+        date, subjects_visits_date_fmt
+    ).strftime(src_data_date_fmt)
+
+    return {
+        date: session_id
+        for session_id, date in enumerate(list(map(convert_date, visit_dates)), start=1)
+    }
+
+
+def _get_presentation_session(
+    temp_dir,
+    subject_id,
+    excel_file,
+    task=None,
+    subjects_visits_df=None,
+    subjects_visits_date_fmt=None,
+    src_data_date_fmt=None,
+):
     if task in ["mtle", "mtlr"]:
         identifier = "_PEARencN" if task == "mtle" else "_PEARretN"
-        file_dates = [
-            path.name.split("_")[-2]
-            for path in list(temp_dir.glob(f"*{subject_id}*{identifier}*"))
-        ]
+        file_dates = sorted(
+            [
+                path.name.split("_")[-2]
+                for path in list(temp_dir.glob(f"*{subject_id}*{identifier}*"))
+            ]
+        )
     else:
-        file_dates = [
-            path.name.split("_")[-2] for path in list(temp_dir.glob(f"*{subject_id}*"))
-        ]
+        file_dates = sorted(
+            [
+                path.name.split("_")[-2]
+                for path in list(temp_dir.glob(f"*{subject_id}*"))
+            ]
+        )
 
-    session_id = [date in str(excel_file.name) for date in file_dates].index(True) + 1
+    visit_session_map = (
+        _get_subjects_visits(subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt)
+        if subjects_visits_df is not None
+        else None
+    )
+    if visit_session_map:
+        curr_date = [date for date in file_dates if date in excel_file.name][0]
 
-    return session_id
+        return visit_session_map[curr_date]
+    else:
+        return [date in excel_file.name for date in file_dates].index(True) + 1
 
 
 def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
@@ -130,7 +223,14 @@ def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
     event_df.to_csv(tsv_filename, sep="\t", index=False)
 
 
-def _create_flanker_events_files(temp_dir, dst_dir, subjects):
+def _create_flanker_events_files(
+    temp_dir,
+    dst_dir,
+    subjects,
+    subjects_visits_df,
+    subjects_visits_date_fmt,
+    src_data_date_fmt,
+):
     excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects)
     for excel_file in excel_files:
         extractor = PresentationEventExtractor(
@@ -178,19 +278,26 @@ def _create_flanker_events_files(temp_dir, dst_dir, subjects):
         )
         event_df = pd.DataFrame(events)
 
-        # Specific accuracy case for nogo
+        # Specific accuracy case for miss
         event_df.loc[
-            (event_df["trial_type"] == "nogo") & (event_df["response"] == "miss"),
+            (event_df["trial_type"] != "nogo") & (event_df["response"] == "miss"),
             "accuracy",
-        ] = "correct"
+        ] = "incorrect"
 
         event_df["trial_type_accuracy"] = (
             event_df["trial_type"].astype(str) + "_" + event_df["accuracy"].astype(str)
         )
 
         # Getting subject ID and organising files to get subject ID
-        subject_id = str(excel_file.name).split("_")[0]
-        session_id = _get_presentation_session(temp_dir, subject_id, excel_file)
+        subject_id = excel_file.name.split("_")[0]
+        session_id = _get_presentation_session(
+            temp_dir,
+            subject_id,
+            excel_file,
+            subjects_visits_df=subjects_visits_df,
+            subjects_visits_date_fmt=subjects_visits_date_fmt,
+            src_data_date_fmt=src_data_date_fmt,
+        )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="flanker")
 
@@ -250,16 +357,24 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
                 }
             )
 
-            subject_id, session_id = (
-                str(edat_file.name).removesuffix(".edat3").split("-")[1:]
-            )
+            subject_id, session_id = edat_file.name.removesuffix(".edat3").split("-")[
+                1:
+            ]
 
             save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
         finally:
             csv_path.unlink()
 
 
-def _create_mtl_events_files(temp_dir, dst_dir, subjects, task):
+def _create_mtl_events_files(
+    temp_dir,
+    dst_dir,
+    subjects,
+    task,
+    subjects_visits_df,
+    subjects_visits_date_fmt,
+    src_data_date_fmt,
+):
     # MTLE and MTLR are separate tasks but can be processed in one function
     filename = "_PEARencN" if task == "mtle" else "_PEARretN"
     task_name = "indoor" if task == "mtle" else "seen"
@@ -295,8 +410,17 @@ def _create_mtl_events_files(temp_dir, dst_dir, subjects, task):
             {f"{task_name}_instruction": "instruction"}
         )
 
-        subject_id = str(excel_file.name).split("_")[0]
-        session_id = _get_presentation_session(temp_dir, subject_id, excel_file, task)
+        # Special case for subject 10308 to get subject and session
+        subject_id = excel_file.name.split("_")[0]
+        session_id = _get_presentation_session(
+            temp_dir,
+            subject_id,
+            excel_file,
+            task,
+            subjects_visits_df,
+            subjects_visits_date_fmt,
+            src_data_date_fmt,
+        )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
@@ -368,15 +492,32 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
                 - input_df["eind.OnsetTime"].values[0] / 1e3
             )
 
-            subject_id, session_id = (
-                str(edat_file.name).removesuffix(".edat3").split("-")[1:]
-            )
+            subject_id, session_id = edat_file.name.removesuffix(".edat3").split("-")[
+                1:
+            ]
             save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="princess")
         finally:
             csv_path.unlink()
 
 
-def main(src_dir, dst_dir, temp_dir, task, subjects, minimum_file_size):
+def _get_dataframe(subjects_visits_file):
+    if not subjects_visits_file:
+        return None
+
+    return pd.read_csv(subjects_visits_file, sep=None, engine="python")
+
+
+def main(
+    src_dir,
+    dst_dir,
+    temp_dir,
+    task,
+    subjects,
+    minimum_file_size,
+    subjects_visits_file,
+    subjects_visits_date_fmt,
+    src_data_date_fmt,
+):
     func = {
         "flanker": _create_flanker_events_files,
         "nback": _create_nback_events_files,
@@ -400,6 +541,15 @@ def main(src_dir, dst_dir, temp_dir, task, subjects, minimum_file_size):
     kwargs = {"temp_dir": temp_dir, "dst_dir": dst_dir, "subjects": subjects}
     if task in ["mtle", "mtlr"]:
         kwargs.update({"task": task})
+
+    if task in ["mtle", "mtlr", "flanker"]:
+        kwargs.update(
+            {
+                "subjects_visits_df": _get_dataframe(subjects_visits_file),
+                "subjects_visits_date_fmt": subjects_visits_date_fmt,
+                "src_data_date_fmt": src_data_date_fmt,
+            }
+        )
 
     try:
         _copy_event_files(src_dir, temp_dir, task, minimum_file_size)

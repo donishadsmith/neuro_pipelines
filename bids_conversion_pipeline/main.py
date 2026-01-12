@@ -89,6 +89,35 @@ def _get_cmd_args() -> argparse.ArgumentParser:
             "and scan date in BIDS folder for each subject. "
         ),
     )
+    # Extracting the file creation or modification date may not be very reliable
+    parser.add_argument(
+        "--subjects_visits_file",
+        dest="subjects_visits_file",
+        required=False,
+        default=None,
+        help=(
+            "A text file, where the first column is the subject ID and the "
+            "second column is the date of visit. Using this parameter is recommended "
+            "when entire sessions are missing. Ensure all dates have a consistent format. "
+            "**All subject visit dates should be listed.**"
+        ),
+    )
+    parser.add_argument(
+        "--subjects_visits_date_fmt",
+        dest="subjects_visits_date_fmt",
+        required=False,
+        default=r"%m/%d/%Y",
+        help=("The format of the date in the ``subjects_visits`` file."),
+    )
+    parser.add_argument(
+        "--src_data_date_fmt",
+        dest="src_data_date_fmt",
+        required=False,
+        default=r"%y%m%d",
+        help=(
+            "The format of the dates in the filenames that are in the source directory."
+        ),
+    )
 
     return parser
 
@@ -162,6 +191,9 @@ def main(
     delete_temp_dir: bool,
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
+    subjects_visits_file: str,
+    subjects_visits_date_fmt: str,
+    src_data_date_fmt: str,
 ) -> None:
     try:
         if (dataset := dataset.lower()) not in ["naag", "mph"]:
@@ -192,6 +224,9 @@ def main(
             create_dataset_metadata,
             add_sessions_tsv,
             delete_temp_dir,
+            subjects_visits_file,
+            subjects_visits_date_fmt,
+            src_data_date_fmt,
         )
 
         # Pipeline to create JSON sidecars for NIfTI images
