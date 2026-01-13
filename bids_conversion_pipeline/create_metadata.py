@@ -5,6 +5,7 @@ import nifti2bids.metadata as bids_meta
 from nifti2bids.io import regex_glob
 from nifti2bids.bids import get_entity_value
 
+# Note: Metadata obtained from the Philips Exam Cards
 _BASE_JSON = {
     "Modality": "MR",
     "MagneticFieldStrength": 3,
