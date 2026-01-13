@@ -203,6 +203,11 @@ def _get_presentation_session(
             ]
         )
 
+
+    if not all(is_valid_date(date, src_data_date_fmt) for date in file_dates):
+        LGR.warning(f"Not all dates have the following format ({src_data_date_fmt}) "
+                    f"for subject {subject_id}: {file_dates}.")
+
     visit_session_map = (
         _get_subjects_visits(subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt)
         if subjects_visits_df is not None

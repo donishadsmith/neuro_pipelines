@@ -171,6 +171,10 @@ def _generate_bids_dir_pipeline(
             )
         )
 
+        if not all(is_valid_date(date, src_data_date_fmt) for date in scan_dates):
+            LGR.warning(f"Not all dates have the following format ({src_data_date_fmt}) "
+                        f"for subject {subject_id}: {scan_dates}.")
+
         visit_session_map = (
             _get_subjects_visits(
                 subject_id,
