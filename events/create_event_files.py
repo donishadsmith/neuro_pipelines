@@ -491,9 +491,11 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
 
             events = {}
             # Best guess of scanner time would be the first fixpunt which appears after
-            # scanner sends trigger
+            # scanner sends trigger, two image displays appear but only second image time recorded
+            # first fixpunt has a duration of ~60 seconds, the second appears three seconds
+            # before cue
             scanner_start_time = (
-                input_df["fixpunt.OnsetTime"].dropna().unique()[0] / 1e3
+                input_df["fixpunt.OnsetTime"].dropna().unique()[0] / 1e3 - 60
             )
             events["onset"] = extractor.extract_onsets(
                 scanner_start_time=scanner_start_time
@@ -512,13 +514,14 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
 
             event_df = pd.DataFrame(events)
             event_df.loc[event_df.index[-1], "duration"] = (
-                event_df.loc[event_df.index[-1], "onset"]
-                - input_df["eind.OnsetTime"].values[0] / 1e3
+                input_df["eind.OnsetTime"].values[0] / 1e3 -
+                event_df.loc[event_df.index[-1], "onset"] - scanner_start_time
             )
 
             subject_id, session_id = edat_file.name.removesuffix(".edat3").split("-")[
                 1:
             ]
+
             save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="princess")
         finally:
             csv_path.unlink()
