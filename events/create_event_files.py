@@ -69,8 +69,8 @@ def _get_cmd_args():
         required=False,
         default=None,
         help=(
-            "A text file, where the first column is the subject ID and the "
-            "second column is the date of visit. Using this parameter is recommended "
+            "A text file, where the 'subject_id' contains the subject ID and the "
+            "'date' column is the date of visit. Using this parameter is recommended "
             "when data is missing. Ensure all dates have a consistent format. "
             "**All subject visit dates should be listed.**"
         ),
@@ -93,6 +93,12 @@ def _get_cmd_args():
     )
 
     return parser
+
+
+class SubjectsVisitsFileError(Exception):
+    """Exception for issues with the subjects sessions file."""
+
+    pass
 
 
 def _filter_log_files(log_files, subjects):
@@ -136,13 +142,23 @@ def _copy_event_files(src_dir, temp_dir, task, minimum_file_size):
         _copy_file(event_file, temp_dir / event_file.name, remove_src_file=False)
 
 
+def _check_subjects_visits_file(subjects_visits_file: str | Path) -> None:
+    required_colnames = ["subject_id", "date"]
+    colnames = pd.read_csv(subjects_visits_file, sep=None, engine="python").columns
+    if not all(required_colname in colnames for required_colname in required_colnames):
+        raise SubjectsVisitsFileError(
+            f"The following columns are required in {subjects_visits_file}: "
+            f"{required_colnames}."
+        )
+
+
 def _get_subjects_visits(
     subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt
 ):
     # Don't sort to keep the order of the NaNs
     visit_dates = (
-        subjects_visits_df[subjects_visits_df.iloc[:, 0].astype(str) == subject_id]
-        .iloc[:, 1]
+        subjects_visits_df[subjects_visits_df["subject_id"].astype(str) == subject_id]
+        .loc[:, "date"]
         .values.tolist()
     )
 
@@ -203,13 +219,16 @@ def _get_presentation_session(
             ]
         )
 
-
     if not all(is_valid_date(date, src_data_date_fmt) for date in file_dates):
-        LGR.warning(f"Not all dates have the following format ({src_data_date_fmt}) "
-                    f"for subject {subject_id}: {file_dates}.")
+        LGR.warning(
+            f"Not all dates have the following format ({src_data_date_fmt}) "
+            f"for subject {subject_id}: {file_dates}."
+        )
 
     visit_session_map = (
-        _get_subjects_visits(subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt)
+        _get_subjects_visits(
+            subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt
+        )
         if subjects_visits_df is not None
         else None
     )
@@ -533,6 +552,9 @@ def main(
 
     if task not in func:
         raise ValueError(f"`task` must be one of the following: {func.keys()}")
+
+    if subjects_visits_file:
+        _check_subjects_visits_file(subjects_visits_file)
 
     src_dir = Path(src_dir)
     dst_dir = Path(dst_dir)

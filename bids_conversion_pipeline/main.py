@@ -9,7 +9,7 @@ from nifti2bids.metadata import is_valid_date
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
-
+from _utils import _check_subjects_visits_file, _strip_entity
 
 LGR = setup_logger(__name__)
 
@@ -54,7 +54,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         "--delete_temp_dir",
         dest="delete_temp_dir",
         required=False,
-        default=False,
+        default=True,
         type=_convert_to_bool,
         help="Deletes the temporary directory.",
     )
@@ -93,13 +93,13 @@ def _get_cmd_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--subjects_visits_file",
         dest="subjects_visits_file",
-        required=False,
-        default=None,
+        required=True,
         help=(
-            "A text file, where the first column is the subject ID and the "
-            "second column is the date of visit. Using this parameter is recommended "
-            "when entire sessions are missing. Ensure all dates have a consistent format. "
-            "**All subject visit dates should be listed.**"
+            "A text file, where the 'subject_id' contaims the subject ID and the "
+            "'date' column is the date of visit. Using this parameter is recommended "
+            "when data is missing. Ensure all dates have a consistent format. "
+            "**All subject visit dates should be listed.** If a 'dose' column is included, "
+            "then dosages will be included in the sessions TSV file."
         ),
     )
     parser.add_argument(
@@ -107,7 +107,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="subjects_visits_date_fmt",
         required=False,
         default=r"%m/%d/%Y",
-        help=("The format of the date in the ``subjects_visits`` file."),
+        help=("The format of the date in the ``subjects_visits_file`` file."),
     )
     parser.add_argument(
         "--src_data_date_fmt",
@@ -202,6 +202,11 @@ def main(
         if (cohort := cohort.lower()) not in ["kids", "adults"]:
             raise ValueError("'--cohort' must be 'kids' or 'adults'.")
 
+        if subjects_visits_file:
+            _check_subjects_visits_file(
+                subjects_visits_file, dose_column_required=False
+            )
+
         # Create temporary directory with compressed files
         temp_dir = temp_dir or tempfile.TemporaryDirectory().name
         temp_dir: Path = Path(temp_dir)
@@ -210,6 +215,7 @@ def main(
 
         bids_dir = Path(bids_dir)
 
+        subjects = _strip_entity(subjects)
         _copy_data_to_temp_dir(Path(src_dir), temp_dir, subjects)
 
         # Pipeline to identify un-named NIfTI images and standardize task names
@@ -232,10 +238,10 @@ def main(
         # Pipeline to create JSON sidecars for NIfTI images
         _create_json_sidecar_pipeline(bids_dir)
     finally:
-        if delete_temp_dir:
+        if delete_temp_dir and (isinstance(temp_dir, Path) and temp_dir.exists()):
             shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
-    _args = _get_cmd_args().parse_args()
-    main(**vars(_args))
+    args = _get_cmd_args().parse_args()
+    main(**vars(args))

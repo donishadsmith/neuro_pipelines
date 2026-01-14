@@ -14,7 +14,12 @@ from nifti2bids.bids import (
 from nifti2bids.metadata import is_valid_date
 from nifti2bids.logging import setup_logger
 
-from _utils import _get_constant, _create_or_append_participants_tsv
+from _utils import (
+    _get_constant,
+    _create_or_append_participants_tsv,
+    _extract_subjects_visits_data,
+    _standardize_dates,
+)
 
 LGR = setup_logger(__name__)
 
@@ -62,18 +67,6 @@ def _rename_file(
         create_bids_file(**kwargs, task_id=task_id, desc="bold")
 
 
-def _create_sessions_tsv(
-    bids_dir: Path, sessions_dict: dict[str, str], subject_id: str
-) -> None:
-    new_sessions_df = pd.DataFrame(sessions_dict)
-    new_sessions_df["session_id"] = [
-        f"ses-{session_id}" if not session_id.startswith("ses-") else session_id
-        for session_id in new_sessions_df["session_id"].values
-    ]
-    filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
-    new_sessions_df.to_csv(filename, index=False, sep="\t")
-
-
 def _generate_dataset_metadata(bids_dir: Path, dataset: Literal["mph", "naag"]) -> None:
     if not list(bids_dir.glob("dataset_description.json")):
         dataset_description = create_dataset_description(
@@ -91,17 +84,28 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
     return pd.read_csv(subjects_visits_file, sep=None, engine="python")
 
 
-def _get_subjects_visits(
+def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
+    return sorted(
+        list(
+            set(
+                [
+                    subject_nifti_files.parent.name.split("_")[-1]
+                    for subject_nifti_files in subject_nifti_files
+                ]
+            )
+        )
+    )
+
+
+def _get_subject_visits(
     subject_id: str,
     subjects_visits_df: pd.DataFrame,
     subjects_visits_date_fmt: str,
     src_data_date_fmt: str,
 ) -> dict[str, str]:
     # Don't sort to keep the order of the NaNs
-    visit_dates = (
-        subjects_visits_df[subjects_visits_df.iloc[:, 0].astype(str) == subject_id]
-        .iloc[:, 1]
-        .values.tolist()
+    visit_dates = _extract_subjects_visits_data(
+        subject_id, subjects_visits_df, column_name="date"
     )
 
     if not visit_dates or all(
@@ -119,21 +123,90 @@ def _get_subjects_visits(
         for visit_date in check_dates
     ):
         LGR.critical(
-            f"Visit dates will be ignored for subject {subject_id} because not all dates have a consistent format: "
-            f"{check_dates}."
+            f"Visit dates will be ignored for subject {subject_id} because "
+            f"not all dates have a consistent format: {check_dates}."
         )
 
         return None
 
-    # Format of the event files are hardcoded into the presentation script
-    convert_date = lambda date: datetime.strptime(
-        date, subjects_visits_date_fmt
-    ).strftime(src_data_date_fmt)
+    visit_dates = _standardize_dates(visit_dates, subjects_visits_date_fmt)
 
+    convert_date = lambda date: (
+        datetime.strptime(date, subjects_visits_date_fmt).strftime(src_data_date_fmt)
+        if isinstance(date, str)
+        else float("NaN")
+    )
+
+    visit_dates = [
+        str(date) if not isinstance(date, float) else date for date in visit_dates
+    ]
     return {
-        f"0{session_id}": date
+        f"0{session_id}": str(date)
         for session_id, date in enumerate(list(map(convert_date, visit_dates)), start=1)
     }
+
+
+def _get_subject_dosages(
+    subject_id: str,
+    subjects_visits_df: pd.DataFrame,
+) -> dict[str, str] | None:
+    dosages = (
+        _extract_subjects_visits_data(
+            subject_id, subjects_visits_df, column_name="dose"
+        )
+        if "dose" in subjects_visits_df.columns
+        else None
+    )
+    if dosages is None:
+        return None
+    else:
+        return {
+            f"0{session_id}": dosage
+            for session_id, dosage in enumerate(dosages, start=1)
+        }
+
+
+def _combine_session_data(
+    visit_session_map: dict[str, str] | None,
+    scan_dates: list[str],
+    visit_dosage_map: dict[str, str] | None,
+) -> list[tuple[str, str, float]]:
+    if visit_session_map:
+        session_scan_date_map = {
+            session_id: date
+            for session_id, date in visit_session_map.items()
+            if date in scan_dates
+        }
+    else:
+        session_scan_date_map = {
+            f"0{session_id}": date
+            for session_id, date in enumerate(scan_dates, start=1)
+        }
+
+    if visit_dosage_map:
+        filtered_dosages = [
+            float(dosage)
+            for session_id, dosage in visit_dosage_map.items()
+            if session_id in session_scan_date_map
+        ]
+    else:
+        filtered_dosages = [float("NaN")] * len(session_scan_date_map)
+
+    return zip(
+        session_scan_date_map.keys(), session_scan_date_map.values(), filtered_dosages
+    )
+
+
+def _create_sessions_tsv(
+    bids_dir: Path, subject_id: str, sessions_dict: dict[str, str]
+) -> None:
+    new_sessions_df = pd.DataFrame(sessions_dict)
+    new_sessions_df["session_id"] = [
+        f"ses-{session_id}" if not session_id.startswith("ses-") else session_id
+        for session_id in new_sessions_df["session_id"].values
+    ]
+    filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
+    new_sessions_df.to_csv(filename, index=False, sep="\t")
 
 
 def _generate_bids_dir_pipeline(
@@ -160,49 +233,42 @@ def _generate_bids_dir_pipeline(
     )
     for subject_id in subject_ids:
         subject_nifti_files = _filter_nifti_files(nifti_files, subject_id)
-        scan_dates = sorted(
-            list(
-                set(
-                    [
-                        subject_nifti_files.parent.name.split("_")[-1]
-                        for subject_nifti_files in subject_nifti_files
-                    ]
-                )
-            )
-        )
+        scan_dates = _get_folder_scan_dates(subject_nifti_files)
+        if scan_dates:
+            scan_dates = _standardize_dates(scan_dates, src_data_date_fmt)
 
         if not all(is_valid_date(date, src_data_date_fmt) for date in scan_dates):
-            LGR.warning(f"Not all dates have the following format ({src_data_date_fmt}) "
-                        f"for subject {subject_id}: {scan_dates}.")
+            LGR.warning(
+                f"Not all dates have the following format ({src_data_date_fmt}) "
+                f"for subject {subject_id}: {scan_dates}."
+            )
 
-        visit_session_map = (
-            _get_subjects_visits(
+        if subjects_visits_df is not None:
+            visit_session_map = _get_subject_visits(
                 subject_id,
                 subjects_visits_df,
                 subjects_visits_date_fmt,
                 src_data_date_fmt,
             )
-            if subjects_visits_df is not None
-            else None
-        )
-        if visit_session_map:
-            session_scan_date_map = {
-                session_id: date
-                for session_id, date in visit_session_map.items()
-                if date in scan_dates
-            }
+            visit_dosage_map = (
+                _get_subject_dosages(subject_id, subjects_visits_df)
+                if dataset == "mph"
+                else None
+            )
         else:
-            session_scan_date_map = {
-                f"0{session_id}": date
-                for session_id, date in enumerate(scan_dates, start=1)
-            }
+            visit_session_map, visit_dosage_map = None, None
 
-        sessions_dict = {"session_id": [], "acq_time": []}
-        for session_id, scan_date in session_scan_date_map.items():
+        session_data_tuple = _combine_session_data(
+            visit_session_map, scan_dates, visit_dosage_map
+        )
+
+        sessions_dict = {"session_id": [], "acq_time": [], "dose": []}
+        for session_id, scan_date, dose in session_data_tuple:
             # Max three sessions
             session_nifti_files = _filter_nifti_files(subject_nifti_files, scan_date)
             sessions_dict["session_id"].append(session_id)
             sessions_dict["acq_time"].append(scan_date)
+            sessions_dict["dose"].append(dose)
             for session_nifti_file in session_nifti_files:
                 dst_path = (
                     bids_dir
@@ -229,8 +295,15 @@ def _generate_bids_dir_pipeline(
                     delete_temp_dir,
                 )
 
-        if add_sessions_tsv:
-            _create_sessions_tsv(bids_dir, sessions_dict, subject_id)
+        if dataset != "mph":
+            del sessions_dict["doses"]
+
+        if add_sessions_tsv or subjects_visits_file:
+            _create_sessions_tsv(
+                bids_dir,
+                subject_id,
+                sessions_dict,
+            )
 
     if create_dataset_metadata:
         _generate_dataset_metadata(bids_dir, dataset)

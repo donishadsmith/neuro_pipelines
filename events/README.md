@@ -29,9 +29,9 @@ When entire sessions are missing, to ensure the dates are mapped to the correct 
 python create_event_files.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --task nback --subjects 101 102 --subjects_visits_date_fmt %m/%d/%Y --src_data_date_fmt %Y%m%d
 ```
 
-Ensure each partcipant ID in the file has all of their dates or NaN for missing dates:
+Ensure each participant ID in the file has all of their dates or NaN for missing dates:
 
-| subject | scan_date  |
+| subject | date       |
 |---------|------------|
 | 101     | 01/02/2022 |
 | 101     | NaN        |

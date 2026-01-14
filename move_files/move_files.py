@@ -5,14 +5,16 @@ from nifti2bids.bids import get_entity_value
 
 
 def _get_cmd_args():
-    parser = argparse.ArgumentParser(description="Move event files to BIDS directory.")
+    parser = argparse.ArgumentParser(
+        description="Move events or sessions files to BIDS directory."
+    )
     parser.add_argument(
         "--src_dir",
         dest="src_dir",
         required=True,
         help=(
-            "Path containing the event files in the first level. "
-            "Event file naming should be BIDS compliant"
+            "Path containing the files in the first level. "
+            "File naming should be BIDS compliant."
         ),
     )
     parser.add_argument(
@@ -33,7 +35,12 @@ def main(src_dir, bids_dir):
         subject = get_entity_value(src_file, "sub", return_entity_prefix=True)
         session = get_entity_value(src_file, "ses", return_entity_prefix=True)
 
-        dst_dir = bids_dir / subject / (session or "") / "func"
+        dst_dir = (
+            bids_dir
+            / subject
+            / (session or "")
+            / ("" if src_file.name.endswith("sessions.tsv") else "func")
+        )
 
         try:
             dst_file = dst_dir / src_file.name

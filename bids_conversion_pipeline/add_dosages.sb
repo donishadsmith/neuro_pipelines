@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --job-name=add_dosages
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+# Outputs -------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/add_dosages_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/add_dosages_%A_%a.err
+# ---------------------------------------------------------------------------
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+
+DATASET="mph-study"
+COHORT="kids"
+BIDS_DIR="/projects/bigos_lab/${DATASET}/${COHORT}/dset"
+SUBJECTS_VISITS_FILE=""
+
+CMD="$PYTHON add_dosages.py --bids_dir $BIDS_DIR --subjects_visits_file $SUBJECTS_VISITS_FILE"
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?
+
