@@ -338,7 +338,10 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             csv_path = convert_edat3_to_text(edat_file, dst_path=tmpfile.name)
 
             input_df = pd.read_csv(csv_path, sep=",")
-            input_df["StimDisplay.OffsetTime"] = input_df["StimDisplay.OnsetTime"].values + input_df["StimDisplay.OnsetToOnsetTime"].values
+            input_df["StimDisplay.OffsetTime"] = (
+                input_df["StimDisplay.OnsetTime"].values
+                + input_df["StimDisplay.OnsetToOnsetTime"].values
+            )
             input_df["Procedure[Block]"] = input_df["Procedure[Block]"].map(
                 {"ExpBloc": "1-back", "ContBloc": "0-back", "Exp2Bloc": "2-back"}
             )
@@ -366,11 +369,15 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             events["onset"] = extractor.extract_onsets(
                 scanner_start_time=scanner_onset_time
             )
-            events["duration"] = extractor.extract_durations(offset_column_name="StimDisplay.OffsetTime")
+            events["duration"] = extractor.extract_durations(
+                offset_column_name="StimDisplay.OffsetTime"
+            )
             events["trial_type"] = extractor.extract_trial_types()
             event_df = pd.DataFrame(events)
 
-            event_df["duration"] = event_df["duration"].apply(lambda x: x if not np.isnan(x) else 34.0)
+            event_df["duration"] = event_df["duration"].apply(
+                lambda x: x if not np.isnan(x) else 34.0
+            )
 
             # Split instruction block, which is 2 seconds before each stimulus
             event_df = add_instruction_timing(event_df, instruction_duration=2)
@@ -472,7 +479,10 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
             # Based on original paper, trials blocks should be ~52 seconds each
             # Still derive to check if timing is padded
             # Note, offset times were not recorded but paper states trials include the feedback
-            input_df["feedback.OffsetTime"] =  input_df["feedback.OnsetTime"].values + input_df["feedback.OnsetToOnsetTime"].values
+            input_df["feedback.OffsetTime"] = (
+                input_df["feedback.OnsetTime"].values
+                + input_df["feedback.OnsetToOnsetTime"].values
+            )
 
             huizens = []
             for huizen in input_df["huizen"].astype(str).values:
@@ -491,7 +501,11 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
                 procedure_column_name="huizen",
                 trigger_column_name="eind.OnsetTime",
                 block_cue_names=dutch_to_english.values(),
-                convert_to_seconds=["dagnacht.OnsetTime", "eind.OnsetTime", "feedback.OffsetTime"],
+                convert_to_seconds=[
+                    "dagnacht.OnsetTime",
+                    "eind.OnsetTime",
+                    "feedback.OffsetTime",
+                ],
                 split_cue_as_instruction=True,
             )
 
@@ -506,7 +520,9 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
             events["onset"] = extractor.extract_onsets(
                 scanner_start_time=scanner_start_time
             )
-            events["duration"] = extractor.extract_durations(offset_column_name="feedback.OffsetTime")
+            events["duration"] = extractor.extract_durations(
+                offset_column_name="feedback.OffsetTime"
+            )
             trial_name_dict = {
                 "daynight": "switch",
                 "day": "nonswitch",
