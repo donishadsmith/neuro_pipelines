@@ -338,17 +338,20 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             csv_path = convert_edat3_to_text(edat_file, dst_path=tmpfile.name)
 
             input_df = pd.read_csv(csv_path, sep=",")
+            input_df["StimDisplay.OffsetTime"] = input_df["StimDisplay.OnsetTime"].values + input_df["StimDisplay.OnsetToOnsetTime"].values
             input_df["Procedure[Block]"] = input_df["Procedure[Block]"].map(
                 {"ExpBloc": "1-back", "ContBloc": "0-back", "Exp2Bloc": "2-back"}
             )
+            input_df.loc[input_df.index[-1], "Procedure[Block]"] = "Quit"
 
             extractor = EPrimeBlockExtractor(
                 input_df,
                 onset_column_name="StimDisplay.OnsetTime",
                 procedure_column_name="Procedure[Block]",
                 block_cue_names=("1-back", "0-back", "2-back"),
-                convert_to_seconds=["StimDisplay.OnsetTime", "StimDisplay.RT"],
+                convert_to_seconds=["StimDisplay.OnsetTime", "StimDisplay.OffsetTime"],
                 rest_block_code="Rest",
+                quit_code="Quit",
                 rest_code_frequency="variable",
             )
             events = {}
@@ -363,13 +366,11 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             events["onset"] = extractor.extract_onsets(
                 scanner_start_time=scanner_onset_time
             )
-            events["duration"] = extractor.extract_durations()
+            events["duration"] = extractor.extract_durations(offset_column_name="StimDisplay.OffsetTime")
             events["trial_type"] = extractor.extract_trial_types()
             event_df = pd.DataFrame(events)
-            # No quit code and time of rest block is never recorded so clip to 37.0 duration
-            event_df["duration"] = event_df["duration"].apply(
-                lambda x: x if x < 38.0 and x > 35.0 and not np.isnan(x) else 37.0
-            )
+
+            event_df["duration"] = event_df["duration"].apply(lambda x: x if not np.isnan(x) else 34.0)
 
             # Split instruction block, which is 2 seconds before each stimulus
             event_df = add_instruction_timing(event_df, instruction_duration=2)
@@ -412,7 +413,7 @@ def _create_mtl_events_files(
 
         extractor = PresentationBlockExtractor(
             input_df,
-            convert_to_seconds=["Time"],
+            convert_to_seconds=["Time", "Duration"],
             block_cue_names=(task_name),
             scanner_event_type="Pulse",
             scanner_trigger_code="30",
@@ -468,6 +469,11 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
                 ~input_df["indicatie.OnsetTime"].isna(), "indicatie.OnsetTime"
             ]
 
+            # Based on original paper, trials blocks should be ~52 seconds each
+            # Still derive to check if timing is padded
+            # Note, offset times were not recorded but paper states trials include the feedback
+            input_df["feedback.OffsetTime"] =  input_df["feedback.OnsetTime"].values + input_df["feedback.OnsetToOnsetTime"].values
+
             huizens = []
             for huizen in input_df["huizen"].astype(str).values:
                 huizen = huizen.removesuffix(".bmp")
@@ -485,7 +491,7 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
                 procedure_column_name="huizen",
                 trigger_column_name="eind.OnsetTime",
                 block_cue_names=dutch_to_english.values(),
-                convert_to_seconds=["dagnacht.OnsetTime", "eind.OnsetTime"],
+                convert_to_seconds=["dagnacht.OnsetTime", "eind.OnsetTime", "feedback.OffsetTime"],
                 split_cue_as_instruction=True,
             )
 
@@ -500,7 +506,7 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
             events["onset"] = extractor.extract_onsets(
                 scanner_start_time=scanner_start_time
             )
-            events["duration"] = extractor.extract_durations()
+            events["duration"] = extractor.extract_durations(offset_column_name="feedback.OffsetTime")
             trial_name_dict = {
                 "daynight": "switch",
                 "day": "nonswitch",
@@ -513,15 +519,14 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
             events["block_cue"] = extractor.extract_trial_types()
 
             event_df = pd.DataFrame(events)
-            event_df.loc[event_df.index[-1], "duration"] = (
-                input_df["eind.OnsetTime"].values[0] / 1e3 -
-                event_df.loc[event_df.index[-1], "onset"] - scanner_start_time
-            )
 
             subject_id, session_id = edat_file.name.removesuffix(".edat3").split("-")[
                 1:
             ]
 
+            # Note, duration of all trials in block without cue is 48-50 seconds and duration of cue is ~3
+            # seconds with above implementation: Paper says each block has 8 trials which lasts 6500 ms:
+            # Paper: https://pubmed.ncbi.nlm.nih.gov/20604616/
             save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="princess")
         finally:
             csv_path.unlink()
