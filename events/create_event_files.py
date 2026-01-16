@@ -293,7 +293,7 @@ def _create_flanker_events_files(
         events["accuracy"] = extractor.extract_accuracies(
             {
                 "hit": "correct",
-                "miss": "correct",
+                "miss": "incorrect",
                 "incorrect": "incorrect",
                 "other": "correct",
                 "false_alarm": "incorrect",
@@ -304,9 +304,9 @@ def _create_flanker_events_files(
 
         # Specific accuracy case for miss
         event_df.loc[
-            (event_df["trial_type"] != "nogo") & (event_df["response"] == "miss"),
+            (event_df["trial_type"] == "nogo") & (event_df["response"] == "miss"),
             "accuracy",
-        ] = "incorrect"
+        ] = "correct"
 
         event_df["trial_type_accuracy"] = (
             event_df["trial_type"].astype(str) + "_" + event_df["accuracy"].astype(str)
@@ -555,6 +555,10 @@ def _get_dataframe(subjects_visits_file):
     return pd.read_csv(subjects_visits_file, sep=None, engine="python")
 
 
+def _strip_entity(subjects):
+    return [str(subject).removeprefix("sub-") for subject in subjects]
+
+
 def main(
     src_dir,
     dst_dir,
@@ -589,10 +593,14 @@ def main(
     if not temp_dir.exists():
         temp_dir.mkdir()
 
+    if subjects:
+        subjects = _strip_entity(subjects)
+
     kwargs = {"temp_dir": temp_dir, "dst_dir": dst_dir, "subjects": subjects}
     if task in ["mtle", "mtlr"]:
         kwargs.update({"task": task})
 
+    # Only Presentation files contain date in filename
     if task in ["mtle", "mtlr", "flanker"]:
         kwargs.update(
             {

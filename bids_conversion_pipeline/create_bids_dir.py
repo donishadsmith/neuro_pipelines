@@ -141,7 +141,7 @@ def _get_subject_visits(
         str(date) if not isinstance(date, float) else date for date in visit_dates
     ]
     return {
-        f"0{session_id}": str(date)
+        f"0{session_id}": date
         for session_id, date in enumerate(list(map(convert_date, visit_dates)), start=1)
     }
 
@@ -265,35 +265,31 @@ def _generate_bids_dir_pipeline(
         sessions_dict = {"session_id": [], "acq_time": [], "dose": []}
         for session_id, scan_date, dose in session_data_tuple:
             # Max three sessions
-            session_nifti_files = _filter_nifti_files(subject_nifti_files, scan_date)
+            session_nifti_file = _filter_nifti_files(subject_nifti_files, scan_date)[0]
             sessions_dict["session_id"].append(session_id)
             sessions_dict["acq_time"].append(scan_date)
             sessions_dict["dose"].append(dose)
-            for session_nifti_file in session_nifti_files:
-                dst_path = (
-                    bids_dir
-                    / f"sub-{subject_id}"
-                    / f"ses-{session_id}"
-                    / (
-                        "anat"
-                        if "mprage" in session_nifti_file.name.lower()
-                        else "func"
-                    )
-                )
 
-                task_id = (
-                    _get_task_name(session_nifti_file, dataset, cohort)
-                    if dst_path.name == "func"
-                    else None
-                )
-                _rename_file(
-                    session_nifti_file,
-                    dst_path,
-                    subject_id,
-                    session_id,
-                    task_id,
-                    delete_temp_dir,
-                )
+            dst_path = (
+                bids_dir
+                / f"sub-{subject_id}"
+                / f"ses-{session_id}"
+                / ("anat" if "mprage" in session_nifti_file.name.lower() else "func")
+            )
+
+            task_id = (
+                _get_task_name(session_nifti_file, dataset, cohort)
+                if dst_path.name == "func"
+                else None
+            )
+            _rename_file(
+                session_nifti_file,
+                dst_path,
+                subject_id,
+                session_id,
+                task_id,
+                delete_temp_dir,
+            )
 
         if dataset != "mph":
             del sessions_dict["doses"]

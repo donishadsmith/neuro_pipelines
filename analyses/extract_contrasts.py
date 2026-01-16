@@ -1,4 +1,4 @@
-import argparse, subprocess, sys
+import argparse, shutil, subprocess, sys
 from pathlib import Path
 
 from nifti2bids.logging import setup_logger
@@ -30,6 +30,16 @@ def _get_cmd_args():
         help="Subject ID without the 'sub-' entity.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--out_dir",
+        dest="out_dir",
+        required=False,
+        default=None,
+        help=(
+            "Output directory to move contrast files to. "
+            "If None, contrasts are saved in the analysis directory."
+        ),
+    )
 
     return parser
 
@@ -44,12 +54,19 @@ def _task_specific_contrasts(task):
     elif task == "princess":
         contrasts = "switch_vs_nonswitch#0_Coef"
     else:
-        pass
+        contrasts = (
+            "congruent_vs_neutral#0_Coef",
+            "incongruent_vs_neutral#0_Coef",
+            "nogo_vs_neutral#0_Coef",
+            "congruent_vs_incongruent#0_Coef",
+            "congruent_vs_nogo#0_Coef",
+            "incongruent_vs_nogo#0_Coef",
+        )
 
     return contrasts
 
 
-def create_contrast_files(stats_file, contrast_dir, afni_path_img, task):
+def create_contrast_files(stats_file, contrast_dir, afni_path_img, task, out_dir):
     contrasts = _task_specific_contrasts(task)
 
     for contrast in contrasts:
@@ -66,8 +83,11 @@ def create_contrast_files(stats_file, contrast_dir, afni_path_img, task):
 
         subprocess.run(cmd, shell=True, check=True)
 
+        if out_dir:
+            shutil.move(contrast_file, out_dir)
 
-def main(analysis_dir, subject, afni_img_path, task):
+
+def main(analysis_dir, subject, afni_img_path, task, out_dir):
     subject_base_dir = Path(analysis_dir) / (
         f"sub-{subject}" if not str(subject).startswith("sub-") else subject
     )
@@ -87,7 +107,7 @@ def main(analysis_dir, subject, afni_img_path, task):
         if not contrast_dir.exists():
             contrast_dir.mkdir()
 
-        create_contrast_files(stats_file, contrast_dir, afni_img_path, task)
+        create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir)
 
 
 if __name__ == "__main__":

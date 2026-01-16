@@ -143,6 +143,13 @@ def create_regressor_file(subject_dir, *regressor_arrays):
     return regressor_file
 
 
+def save_event_file(timing_dir, trial_type, timing_data):
+    filename = timing_dir / f"{trial_type}.1D"
+    timing_str = " ".join(timing_data.values)
+    with open(filename, "w") as f:
+        f.write(timing_str)
+
+
 def create_timing_files(subject_dir, event_file, task):
     timing_dir = subject_dir / "timing_files" / task
     timing_dir.mkdir(parents=True, exist_ok=True)
@@ -153,17 +160,34 @@ def create_timing_files(subject_dir, event_file, task):
     trial_column = "trial_type" if task != "flanker" else "trial_type_accuracy"
     for trial_type in trial_types:
         trial_df = event_df[event_df[trial_column] == trial_type]
-        if task != "flanker":
-            timing_data = (
-                trial_df["onset"].astype(str) + ":" + trial_df["duration"].astype(str)
-            )
-        else:
-            timing_data = trial_df["onset"].astype(str)
+        row_mask = (
+            np.full(len(trial_df), True, dtype=bool)
+            if task != "flanker"
+            else trial_df["accuracy"] == "correct"
+        )
+        timing_data = (
+            trial_df.loc[
+                row_mask,
+                "onset",
+            ].astype(str)
+            + ":"
+            + trial_df.loc[row_mask, "duration"].astype(str)
+        )
 
-        filename = timing_dir / f"{trial_type}.1D"
-        timing_str = " ".join(timing_data.values)
-        with open(filename, "w") as f:
-            f.write(timing_str)
+        save_event_file(timing_dir, trial_type, timing_data)
+
+    # Get errors
+    if task == "flanker":
+        timing_data = (
+            trial_df.loc[
+                ~row_mask,
+                "onset",
+            ].astype(str)
+            + ":"
+            + trial_df.loc[~row_mask, "duration"].astype(str)
+        )
+
+        save_event_file(timing_dir, trial_type="errors", timing_data=timing_data)
 
     return timing_dir
 
@@ -223,7 +247,6 @@ def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file,
     return smoothed_nifti_file
 
 
-# TODO: Update contrasts
 def get_task_contrast_cmd(task, timing_dir, regressors_file):
     # Using stim_times_AM1 and dmUBLOCK so that duration doesn't need to passed
     # and is instead paired with the onset time for block designs
@@ -264,7 +287,22 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
     else:
-        pass
+        # Note: simply multiply the coefficient image by -1 to get the opposite contast
+        contrast_cmd = {
+            "num_stimts": "-num_stimts 5 ",
+            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'congruent.1D'} 'dmUBLOCK' -stim_label 1 congruent "
+            f"-stim_times_AM1 2 {timing_dir / 'incongruent.1D'} 'dmUBLOCK' -stim_label 1 incongruent "
+            f"-stim_times_AM1 3 {timing_dir / 'nogo.1D'} 'dmUBLOCK' -stim_label 2 nogo "
+            f"-stim_times_AM1 3 {timing_dir / 'neutral.1D'} 'dmUBLOCK' -stim_label 2 neutral "
+            f"-stim_times_AM1 3 {timing_dir / 'errors.1D'} 'dmUBLOCK' -stim_label 2 errors "
+            f"-ortvec {regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label 1 congruent_vs_neutral "
+            "-gltsym 'SYM: +1*incongruent-1*neutral' -glt_label 1 incongruent_vs_neutral "
+            "-gltsym 'SYM: +1*nogo-1*neutral' -glt_label 1 nogo_vs_neutral "
+            "-gltsym 'SYM: +1*congruent-1*incongruent' -glt_label 1 congruent_vs_incongruent "
+            "-gltsym 'SYM: +1*congruent-1*nogo' -glt_label 1 congruent_vs_nogo "
+            "-gltsym 'SYM: +1*incongruent-1*nogo' -glt_label 1 incongruent_vs_nogo ",
+        }
 
     return contrast_cmd
 
