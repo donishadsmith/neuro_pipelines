@@ -215,7 +215,9 @@ def main(
 
         bids_dir = Path(bids_dir)
 
-        subjects = _strip_entity(subjects)
+        if subjects:
+            subjects = _strip_entity(subjects)
+
         _copy_data_to_temp_dir(Path(src_dir), temp_dir, subjects)
 
         # Pipeline to identify un-named NIfTI images and standardize task names

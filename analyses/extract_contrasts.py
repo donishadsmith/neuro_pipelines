@@ -44,7 +44,14 @@ def _task_specific_contrasts(task):
     elif task == "princess":
         contrasts = "switch_vs_nonswitch#0_Coef"
     else:
-        pass
+        contrasts = (
+            "congruent_vs_neutral#0_Coef",
+            "incongruent_vs_neutral#0_Coef",
+            "nogo_vs_neutral#0_Coef",
+            "congruent_vs_incongruent#0_Coef",
+            "congruent_vs_nogo#0_Coef",
+            "incongruent_vs_nogo#0_Coef",
+        )
 
     return contrasts
 
