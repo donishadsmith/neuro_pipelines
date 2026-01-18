@@ -5,15 +5,17 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
-# Outputs ------------------------------------------------------------------
+# Outputs -------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/move_files_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/move_files_%A_%a.err
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 
-SRC_DIR=""
+SRC_DIR="$HOME/event_files"
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 
 CMD="${PYTHON} move_files.py --src_dir $SRC_DIR --bids_dir $BIDS_DIR"
+
+echo $CMD
 eval $CMD
