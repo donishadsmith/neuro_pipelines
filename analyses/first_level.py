@@ -3,6 +3,7 @@ from pathlib import Path
 
 import bids, numpy as np, pandas as pd
 
+from nifti2bids._helpers import iterable_to_str
 from nifti2bids.logging import setup_logger
 
 LGR = setup_logger(__name__)
@@ -435,6 +436,12 @@ def main(
     n_acompcor,
     fwhm,
 ):
+    tasknames = ["princess", "flanker", "nback", "mtle", "mtlr"]
+    if task not in ["princess", "flanker", "nback", "mtle", "mtlr"]:
+        LGR.critical(
+            f"The task must be one of the following: {iterable_to_str(tasknames)}"
+        )
+        sys.exit()
 
     layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or True)
 
