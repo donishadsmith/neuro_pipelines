@@ -296,11 +296,11 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
             f"-stim_times_AM1 5 {timing_dir / 'errors.1D'} 'dmUBLOCK' -stim_label 5 errors "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label 1 congruent_vs_neutral "
-            "-gltsym 'SYM: +1*incongruent-1*neutral' -glt_label 2 incongruent_vs_neutral "
-            "-gltsym 'SYM: +1*nogo-1*neutral' -glt_label 3 nogo_vs_neutral "
-            "-gltsym 'SYM: +1*congruent-1*incongruent' -glt_label 4 congruent_vs_incongruent "
-            "-gltsym 'SYM: +1*congruent-1*nogo' -glt_label 5 congruent_vs_nogo "
-            "-gltsym 'SYM: +1*incongruent-1*nogo' -glt_label 6 incongruent_vs_nogo ",
+            "-gltsym 'SYM: +1*incongruent -1*neutral' -glt_label 2 incongruent_vs_neutral "
+            "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label 3 nogo_vs_neutral "
+            "-gltsym 'SYM: +1*congruent -1*incongruent' -glt_label 4 congruent_vs_incongruent "
+            "-gltsym 'SYM: +1*congruent -1*nogo' -glt_label 5 congruent_vs_nogo "
+            "-gltsym 'SYM: +1*incongruent -1*nogo' -glt_label 6 incongruent_vs_nogo ",
         }
 
     return contrast_cmd
