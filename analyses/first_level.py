@@ -437,7 +437,7 @@ def main(
     fwhm,
 ):
     tasknames = ["princess", "flanker", "nback", "mtle", "mtlr"]
-    if task not in ["princess", "flanker", "nback", "mtle", "mtlr"]:
+    if task not in tasknames:
         LGR.critical(
             f"The task must be one of the following: {iterable_to_str(tasknames)}"
         )
