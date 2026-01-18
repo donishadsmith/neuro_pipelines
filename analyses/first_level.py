@@ -165,27 +165,28 @@ def create_timing_files(subject_dir, event_file, task):
             if task != "flanker"
             else trial_df["accuracy"] == "correct"
         )
-        timing_data = (
-            trial_df.loc[
-                row_mask,
-                "onset",
-            ].astype(str)
-            + ":"
-            + trial_df.loc[row_mask, "duration"].astype(str)
-        )
+
+        if task == "flanker":
+            timing_data =  trial_df.loc[
+                    row_mask,
+                    "onset",
+                ].astype(str)
+        else:
+            timing_data = (
+                trial_df.loc[
+                    row_mask,
+                    "onset",
+                ].astype(str)
+                + ":"
+                + trial_df.loc[row_mask, "duration"].astype(str)
+            )
 
         save_event_file(timing_dir, trial_type, timing_data)
 
     # Get errors
     if task == "flanker":
-        timing_data = (
-            trial_df.loc[
-                ~row_mask,
-                "onset",
-            ].astype(str)
-            + ":"
-            + trial_df.loc[~row_mask, "duration"].astype(str)
-        )
+        timing_data = trial_df.loc[~row_mask, "onset"].astype(str)
+
 
         save_event_file(timing_dir, trial_type="errors", timing_data=timing_data)
 
@@ -289,11 +290,11 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
         contrast_cmd = {
             "num_stimts": "-num_stimts 5 ",
-            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'congruent.1D'} 'dmUBLOCK' -stim_label 1 congruent "
-            f"-stim_times_AM1 2 {timing_dir / 'incongruent.1D'} 'dmUBLOCK' -stim_label 2 incongruent "
-            f"-stim_times_AM1 3 {timing_dir / 'nogo.1D'} 'dmUBLOCK' -stim_label 3 nogo "
-            f"-stim_times_AM1 4 {timing_dir / 'neutral.1D'} 'dmUBLOCK' -stim_label 4 neutral "
-            f"-stim_times_AM1 5 {timing_dir / 'errors.1D'} 'dmUBLOCK' -stim_label 5 errors "
+            "contrasts": f"-stim_times 1 {timing_dir / 'congruent.1D'} 'GAM' -stim_label 1 congruent "
+            f"-stim_times 2 {timing_dir / 'incongruent.1D'} 'GAM' -stim_label 2 incongruent "
+            f"-stim_times 3 {timing_dir / 'nogo.1D'} 'GAM' -stim_label 3 nogo "
+            f"-stim_times 4 {timing_dir / 'neutral.1D'} 'GAM' -stim_label 4 neutral "
+            f"-stim_times 5 {timing_dir / 'errors.1D'} 'GAM' -stim_label 5 errors "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label 1 congruent_vs_neutral "
             "-gltsym 'SYM: +1*incongruent -1*neutral' -glt_label 2 incongruent_vs_neutral "
