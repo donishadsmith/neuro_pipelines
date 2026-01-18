@@ -81,9 +81,12 @@ def create_contrast_files(stats_file, contrast_dir, afni_path_img, task, out_dir
         )
         LGR.info(f"Extracting {contrast} contrast: {cmd}")
 
-        subprocess.run(cmd, shell=True, check=True)
+        try:
+            subprocess.run(cmd, shell=True, check=True)
+        except Exception:
+            LGR.critical(f"The following command failed: {cmd}", exc_info=True)
 
-        if out_dir:
+        if out_dir and contrast_file.exists():
             shutil.move(contrast_file, out_dir)
 
 

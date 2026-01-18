@@ -166,10 +166,10 @@ def create_timing_files(subject_dir, event_file, task):
         )
 
         if task == "flanker":
-            timing_data =  trial_df.loc[
-                    row_mask,
-                    "onset",
-                ].astype(str)
+            timing_data = trial_df.loc[
+                row_mask,
+                "onset",
+            ].astype(str)
         else:
             timing_data = (
                 trial_df.loc[
@@ -185,7 +185,6 @@ def create_timing_files(subject_dir, event_file, task):
     # Get errors
     if task == "flanker":
         timing_data = trial_df.loc[~row_mask, "onset"].astype(str)
-
 
         save_event_file(timing_dir, trial_type="errors", timing_data=timing_data)
 
@@ -254,9 +253,9 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
         contrast_cmd = {
             "num_stimts": "-num_stimts 4 ",
             "contrasts": f"-stim_times_AM1 1 {timing_dir / 'instruction.1D'} 'dmUBLOCK' -stim_label 1 instruction "
-            f"-stim_times_AM1 2 {timing_dir / '0-back.1D'} 'dmUBLOCK' -stim_label 1 0-back "
-            f"-stim_times_AM1 3 {timing_dir / '1-back.1D'} 'dmUBLOCK' -stim_label 2 1-back "
-            f"-stim_times_AM1 4 {timing_dir / '2-back.1D'} 'dmUBLOCK' -stim_label 3 2-back "
+            f"-stim_times_AM1 2 {timing_dir / '0-back.1D'} 'dmUBLOCK' -stim_label 2 0-back "
+            f"-stim_times_AM1 3 {timing_dir / '1-back.1D'} 'dmUBLOCK' -stim_label 3 1-back "
+            f"-stim_times_AM1 4 {timing_dir / '2-back.1D'} 'dmUBLOCK' -stim_label 4 2-back "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*1-back -1*0-back' -glt_label 1 1-back_vs_0-back "
             "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back ",
@@ -265,7 +264,7 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
         contrast_cmd = {
             "num_stimts": "-num_stimts 2 ",
             "contrasts": f"-stim_times_AM1 1 {timing_dir / 'instruction.1D'} 'dmUBLOCK' -stim_label 1 instruction "
-            f"-stim_times_AM1 2 {timing_dir / 'indoor.1D'} 'dmUBLOCK' -stim_label 1 indoor "
+            f"-stim_times_AM1 2 {timing_dir / 'indoor.1D'} 'dmUBLOCK' -stim_label 2 indoor "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*indoor' -glt_label 1 indoor ",
         }
@@ -273,7 +272,7 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
         contrast_cmd = {
             "num_stimts": "-num_stimts 2 ",
             "contrasts": f"-stim_times_AM1 1 {timing_dir / 'instruction.1D'} 'dmUBLOCK' -stim_label 1 instruction "
-            f"-stim_times_AM1 2 {timing_dir / 'seen.1D'} 'dmUBLOCK' -stim_label 1 seen "
+            f"-stim_times_AM1 2 {timing_dir / 'seen.1D'} 'dmUBLOCK' -stim_label 2 seen "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*seen' -glt_label 1 seen ",
         }
@@ -287,21 +286,83 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
-        contrast_cmd = {
-            "num_stimts": "-num_stimts 5 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'congruent.1D'} 'GAM' -stim_label 1 congruent "
-            f"-stim_times 2 {timing_dir / 'incongruent.1D'} 'GAM' -stim_label 2 incongruent "
-            f"-stim_times 3 {timing_dir / 'nogo.1D'} 'GAM' -stim_label 3 nogo "
-            f"-stim_times 4 {timing_dir / 'neutral.1D'} 'GAM' -stim_label 4 neutral "
-            f"-stim_times 5 {timing_dir / 'errors.1D'} 'GAM' -stim_label 5 errors "
-            f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label 1 congruent_vs_neutral "
-            "-gltsym 'SYM: +1*incongruent -1*neutral' -glt_label 2 incongruent_vs_neutral "
-            "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label 3 nogo_vs_neutral "
-            "-gltsym 'SYM: +1*congruent -1*incongruent' -glt_label 4 congruent_vs_incongruent "
-            "-gltsym 'SYM: +1*congruent -1*nogo' -glt_label 5 congruent_vs_nogo "
-            "-gltsym 'SYM: +1*incongruent -1*nogo' -glt_label 6 incongruent_vs_nogo ",
-        }
+        contrast_cmd = _create_flanker_contrast(timing_dir, regressors_file)
+
+    return contrast_cmd
+
+
+def _create_flanker_contrast(timing_dir, regressors_file):
+    # Dynamically create the flanker contrast to avoid including contrasts that
+    # have no data
+    contrast_cmd = {
+        "num_stimts": "-num_stimts {num_labels} ",
+        "contrasts": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
+    }
+
+    labels_dict = {
+        "stims": (
+            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} congruent ",
+            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} incongruent ",
+            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
+            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} neutral ",
+            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
+        ),
+        "gltsyms": (
+            "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label {label} congruent_vs_neutral ",
+            "-gltsym 'SYM: +1*incongruent -1*neutral' -glt_label {label} incongruent_vs_neutral ",
+            "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label {label} nogo_vs_neutral ",
+            "-gltsym 'SYM: +1*congruent -1*incongruent' -glt_label {label} congruent_vs_incongruent ",
+            "-gltsym 'SYM: +1*congruent -1*nogo' -glt_label {label} congruent_vs_nogo ",
+            "-gltsym 'SYM: +1*incongruent -1*nogo' -glt_label {label} incongruent_vs_nogo ",
+        ),
+    }
+
+    files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
+    empty_mask = np.array(
+        [np.loadtxt(timing_dir / file, delimiter=" ").size == 0 for file in files]
+    )
+
+    nonempty_files = np.array(files)[~empty_mask]
+    keep_trial_types = [file.removesuffix(".1D") for file in nonempty_files]
+
+    # Length of the stims
+    contrast_cmd["num_stimts"] = contrast_cmd["num_stimts"].format(
+        num_labels=len(nonempty_files)
+    )
+
+    # Only keep stims without empty files
+    stims = ""
+    for label, trial_type in enumerate(keep_trial_types, start=1):
+        bool_list = [
+            trial_type == stim_string.rstrip().split(" ")[-1]
+            for stim_string in labels_dict["stims"]
+        ]
+
+        stim_string = labels_dict["stims"][bool_list.index(True)]
+        if label == len(keep_trial_types):
+            stim_string = stim_string.rstrip()
+
+        stims += stim_string.format(
+            label=label, timing_file=timing_dir / f"{trial_type}.1D"
+        )
+
+    # Only keep gltsym with two
+    kept_gltsyms = []
+    for gltsym in labels_dict["gltsyms"]:
+        glt_label = gltsym.rstrip().split(" ")[-1]
+        glt_label_parts = glt_label.split("_vs_")
+        if all(
+            glt_label_part in keep_trial_types for glt_label_part in glt_label_parts
+        ):
+            kept_gltsyms.append(gltsym)
+
+    gltsyms = ""
+    for label, gltsym in enumerate(kept_gltsyms, start=1):
+        gltsyms += gltsym.format(label=label)
+
+    contrast_cmd["contrasts"] = contrast_cmd["contrasts"].format(
+        stims=stims, regressors_file=regressors_file, gltsyms=gltsyms
+    )
 
     return contrast_cmd
 
