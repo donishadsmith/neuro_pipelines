@@ -18,23 +18,30 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 TASK="nback" # nback, mtle, mtlr, princess, flanker
 
+OUT_DIR=""
+
 # Check values passed to script to process specific subjects
 SUBJECTS=( $@ )
 ARR_LEN=${#SUBJECTS[@]}
 
 # slurm job value; essentially extracting sub-{id}
-if [ ${ARR_LEN} -eq 0]; then
+if [ ${ARR_LEN} -eq 0 ]; then
 	# https://catonmat.net/awk-one-liners-explained-part-two
 	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line { sub(/\r$/,""); print $1 }' "$BIDS_DIR/participants.tsv")
 else
     SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-cmd="${PYTHON} extract_contrasts.py \
+CMD="${PYTHON} extract_contrasts.py \
 	--analysis_dir ${ANALYSIS_DIR} \
 	--afni_img_path ${AFNI_IMG_PATH} \
 	--subject ${SUBJECT} \
 	--task ${TASK}"
+
+if [[ -n $OUT_DIR ]]; then
+	mkdir -p $OUT_DIR
+	CMD+=" --out_dir ${OUT_DIR}"
+fi
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD

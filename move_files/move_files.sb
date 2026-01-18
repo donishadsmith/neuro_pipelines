@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
 # Outputs ------------------------------------------------------------------
-#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/move_files%A_%a.out
-#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/move_files%A_%a.err
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/move_files_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/move_files_%A_%a.err
 # --------------------------------------------------------------------------
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"

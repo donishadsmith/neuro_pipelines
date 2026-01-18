@@ -8,6 +8,7 @@ Files related to:
 - Preprocessing data
 - Performing first level analyses
 - Extracting contrasts
+- Checking for availability of various files
 
 To get the required packages on local workstation. In your preferred terminal:
 

@@ -506,7 +506,7 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
                     "eind.OnsetTime",
                     "feedback.OffsetTime",
                 ],
-                split_cue_as_instruction=True,
+                split_cue_as_instruction=False,
             )
 
             events = {}

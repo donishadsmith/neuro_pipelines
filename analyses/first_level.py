@@ -279,10 +279,9 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
         }
     elif task == "princess":
         contrast_cmd = {
-            "num_stimts": "-num_stimts 3 ",
-            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'cue.1D'} 'dmUBLOCK' -stim_label 1 cue "
-            f"-stim_times_AM1 2 {timing_dir / 'switch.1D'} 'dmUBLOCK' -stim_label 1 switch "
-            f"-stim_times_AM1 3 {timing_dir / 'nonswitch.1D'} 'dmUBLOCK' -stim_label 2 nonswitch "
+            "num_stimts": "-num_stimts 2 ",
+            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'switch.1D'} 'dmUBLOCK' -stim_label 1 switch "
+            f"-stim_times_AM1 2 {timing_dir / 'nonswitch.1D'} 'dmUBLOCK' -stim_label 2 nonswitch "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
