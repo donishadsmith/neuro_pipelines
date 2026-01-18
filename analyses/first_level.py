@@ -157,9 +157,8 @@ def create_timing_files(subject_dir, event_file, task):
     event_df = pd.read_csv(event_file, sep="\t")
     trial_types = event_df["trial_type"].unique()
 
-    trial_column = "trial_type" if task != "flanker" else "trial_type_accuracy"
     for trial_type in trial_types:
-        trial_df = event_df[event_df[trial_column] == trial_type]
+        trial_df = event_df[event_df["trial_type"] == trial_type]
         row_mask = (
             np.full(len(trial_df), True, dtype=bool)
             if task != "flanker"
