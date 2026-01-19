@@ -52,11 +52,11 @@ def _task_specific_contrasts(task):
             "2-back_vs_1-back#0_Coef",
         )
     elif task == "mtle":
-        contrasts = "indoor#0_Coef"
+        contrasts = ("indoor#0_Coef",)
     elif task == "mtlr":
-        contrasts = "seen#0_Coef"
+        contrasts = ("seen#0_Coef",)
     elif task == "princess":
-        contrasts = "switch_vs_nonswitch#0_Coef"
+        contrasts = ("switch_vs_nonswitch#0_Coef",)
     else:
         contrasts = (
             "congruent_vs_neutral#0_Coef",
