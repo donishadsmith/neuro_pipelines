@@ -9,11 +9,9 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_betas_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_betas_%A_%a.err
 # ----------------------------------------------------------------------------------
-
 # Use --array to process multiple subjects at the same time
-module load afni
-
-ANALYSIS_DIR="/projects/bigos_lab/mph-study/kids/dset/derivatives/firstlevel"
+BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/firstlevel"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 TASK="nback" # nback, mtle, mtlr, princess, flanker
