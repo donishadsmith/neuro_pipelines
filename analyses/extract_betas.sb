@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=extract_contrasts
+#SBATCH --job-name=extract_betas
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=16G
 # Outputs --------------------------------------------------------------------------
-#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_contrasts_%A_%a.out
-#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_contrasts_%A_%a.err
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_betas_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_betas_%A_%a.err
 # ----------------------------------------------------------------------------------
 
 # Use --array to process multiple subjects at the same time
@@ -18,7 +18,7 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 TASK="nback" # nback, mtle, mtlr, princess, flanker
 
-OUT_DIR=""
+OUT_DIR="$HOME/contrasts/$TASK"
 
 # Check values passed to script to process specific subjects
 SUBJECTS=( $@ )
@@ -32,7 +32,7 @@ else
     SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-CMD="${PYTHON} extract_contrasts.py \
+CMD="${PYTHON} extract_betas.py \
 	--analysis_dir ${ANALYSIS_DIR} \
 	--afni_img_path ${AFNI_IMG_PATH} \
 	--subject ${SUBJECT} \
