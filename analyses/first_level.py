@@ -259,7 +259,8 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
             f"-stim_times_AM1 4 {timing_dir / '2-back.1D'} 'dmUBLOCK' -stim_label 4 2-back "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*1-back -1*0-back' -glt_label 1 1-back_vs_0-back "
-            "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back ",
+            "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back "
+            "-gltsym 'SYM: +1*2-back -1*1-back' -glt_label 3 2-back_vs_1-back ",
         }
     elif task == "mtle":
         contrast_cmd = {

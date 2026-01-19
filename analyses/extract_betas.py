@@ -46,7 +46,11 @@ def _get_cmd_args():
 
 def _task_specific_contrasts(task):
     if task == "nback":
-        contrasts = ("1-back_vs_0-back#0_Coef", "2-back_vs_0-back#0_Coef")
+        contrasts = (
+            "1-back_vs_0-back#0_Coef",
+            "2-back_vs_0-back#0_Coef",
+            "2-back_vs_1-back#0_Coef",
+        )
     elif task == "mtle":
         contrasts = "indoor#0_Coef"
     elif task == "mtlr":
