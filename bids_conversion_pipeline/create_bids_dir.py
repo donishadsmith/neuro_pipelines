@@ -193,7 +193,7 @@ def _combine_session_data(
         filtered_dosages = [float("NaN")] * len(session_scan_date_map)
 
     return zip(
-        session_scan_date_map.keys(), session_scan_date_map.to_numpy(copy=True), filtered_dosages
+        session_scan_date_map.keys(), session_scan_date_map.values(), filtered_dosages
     )
 
 
