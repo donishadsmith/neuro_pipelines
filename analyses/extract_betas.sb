@@ -11,7 +11,7 @@
 # ----------------------------------------------------------------------------------
 # Use --array to process multiple subjects at the same time
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
-ANALYSIS_DIR="$BIDS_DIR/derivatives/firstlevel"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 TASK="nback" # nback, mtle, mtlr, princess, flanker

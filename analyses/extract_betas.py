@@ -70,7 +70,7 @@ def _task_specific_contrasts(task):
     return contrasts
 
 
-def create_contrast_files(stats_file, contrast_dir, afni_path_img, task, out_dir):
+def create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir):
     contrasts = _task_specific_contrasts(task)
 
     for contrast in contrasts:
@@ -78,7 +78,7 @@ def create_contrast_files(stats_file, contrast_dir, afni_path_img, task, out_dir
             "stats", contrast.replace("#0_Coef", "_betas")
         )
         cmd = (
-            f"singularity exec -B /projects:/projects {afni_path_img} 3dbucket "
+            f"singularity exec -B /projects:/projects {afni_img_path} 3dbucket "
             f"{stats_file}'[{contrast}]' "
             f"-prefix {contrast_file} "
             "-overwrite"
@@ -91,7 +91,9 @@ def create_contrast_files(stats_file, contrast_dir, afni_path_img, task, out_dir
             LGR.critical(f"The following command failed: {cmd}", exc_info=True)
 
         if out_dir and contrast_file.exists():
-            shutil.move(contrast_file, out_dir)
+            path = Path(out_dir) / contrast_file
+            if not path.exists():
+                shutil.move(contrast_file, out_dir)
 
 
 def main(analysis_dir, subject, afni_img_path, task, out_dir):

@@ -15,7 +15,7 @@ FMRIPREP_VERSION="25.2.3"
 
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="${BIDS_DIR}/derivatives/fmriprep-${FMRIPREP_VERSION}"
-DST_DIR="${BIDS_DIR}/derivatives/firstlevel"
+DST_DIR="${BIDS_DIR}/derivatives/glm"
 mkdir -p ${DST_DIR}
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
