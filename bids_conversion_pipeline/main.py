@@ -93,7 +93,8 @@ def _get_cmd_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--subjects_visits_file",
         dest="subjects_visits_file",
-        required=True,
+        required=False,
+        default=None,
         help=(
             "A text file, where the 'subject_id' contaims the subject ID and the "
             "'date' column is the date of visit. Using this parameter is recommended "

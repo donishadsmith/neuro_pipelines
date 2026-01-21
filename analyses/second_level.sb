@@ -17,6 +17,7 @@ ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm"
 CONTRAST_DIR=""
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+EXCLUDE_NIFTI_FILE=""
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
@@ -42,6 +43,9 @@ CMD="${PYTHON} second_level.py \
 	--task ${TASK} \
     --n_cores $SLURM_CPUS_PER_TASK"
 
+if [[ -n $EXCLUDE_NIFTI_FILE ]]; then
+	CMD+=" --exclude_niftis_file ${EXCLUDE_NIFTI_FILE}"
+fi
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD

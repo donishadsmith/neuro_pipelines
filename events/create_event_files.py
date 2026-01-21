@@ -159,7 +159,8 @@ def _get_subjects_visits(
     visit_dates = (
         subjects_visits_df[subjects_visits_df["subject_id"].astype(str) == subject_id]
         .loc[:, "date"]
-        .to_numpy(copy=True).tolist()
+        .to_numpy(copy=True)
+        .tolist()
     )
 
     if not visit_dates or all(
@@ -338,9 +339,10 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             csv_path = convert_edat3_to_text(edat_file, dst_path=tmpfile.name)
 
             input_df = pd.read_csv(csv_path, sep=",")
-            input_df["StimDisplay.OffsetTime"] = (
-                input_df["StimDisplay.OnsetTime"].to_numpy(copy=True)
-                + input_df["StimDisplay.OnsetToOnsetTime"].to_numpy(copy=True)
+            input_df["StimDisplay.OffsetTime"] = input_df[
+                "StimDisplay.OnsetTime"
+            ].to_numpy(copy=True) + input_df["StimDisplay.OnsetToOnsetTime"].to_numpy(
+                copy=True
             )
             input_df["Procedure[Block]"] = input_df["Procedure[Block]"].map(
                 {"ExpBloc": "1-back", "ContBloc": "0-back", "Exp2Bloc": "2-back"}
@@ -362,7 +364,10 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             # immediately starts at the first rest block which occures 16 seconds prior to the
             # first experimental block
             first_stim_onset_time = (
-                input_df["StimDisplay.OnsetTime"].dropna(inplace=False).to_numpy(copy=True)[0] / 1e3
+                input_df["StimDisplay.OnsetTime"]
+                .dropna(inplace=False)
+                .to_numpy(copy=True)[0]
+                / 1e3
             )
             scanner_onset_time = first_stim_onset_time - 16
 
@@ -479,10 +484,9 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
             # Based on original paper, trials blocks should be ~52 seconds each
             # Still derive to check if timing is padded
             # Note, offset times were not recorded but paper states trials include the feedback
-            input_df["feedback.OffsetTime"] = (
-                input_df["feedback.OnsetTime"].to_numpy(copy=True)
-                + input_df["feedback.OnsetToOnsetTime"].to_numpy(copy=True)
-            )
+            input_df["feedback.OffsetTime"] = input_df["feedback.OnsetTime"].to_numpy(
+                copy=True
+            ) + input_df["feedback.OnsetToOnsetTime"].to_numpy(copy=True)
 
             huizens = []
             for huizen in input_df["huizen"].astype(str).to_numpy(copy=True):

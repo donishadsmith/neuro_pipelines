@@ -71,6 +71,16 @@ def _get_cmd_args():
         required=False,
         help="Number of cores to use.",
     )
+    parser.add_argument(
+        "--exclude_niftis_file",
+        dest="exclude_niftis_file",
+        default=None,
+        required=False,
+        help=(
+            "File containing the names of the NIfTI images to exclude from contrast. "
+            "Should contain a single column named 'nifti_filename'."
+        ),
+    )
 
     return parser
 
@@ -103,6 +113,22 @@ def get_task_contrasts(task):
 
 def get_contrast_files(contrast_dir, task, contrast):
     return sorted(list(Path(contrast_dir).rglob(f"*{task}*{contrast}*.nii.gz")))
+
+
+def filter_contrasts_files(contrast_files, exclude_niftis_file):
+    if not exclude_niftis_file:
+        return contrast_files
+
+    df = pd.read_csv(exclude_niftis_file, sep=None, engine="python")
+    exlcuded_niftis_filenames = [
+        Path(nifti_filename).name for nifti_filename in df["nifti_filename"].to_numpy()
+    ]
+
+    return [
+        contrast_file
+        for contrast_file in contrast_files
+        if Path(contrast_file).name not in exlcuded_niftis_filenames
+    ]
 
 
 def get_subjects(contrast_files):
@@ -153,10 +179,12 @@ def create_data_table(bids_dir, subject_list, contrast_files):
     return data_table
 
 
-@lru_cache(maxsize=6)
-def create_group_mask(bids_dir, deriv_dir, task, space, mask_threshold, contrast_files):
-    layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or None)
+@lru_cache()
+def get_layout(bids_dir, deriv_dir):
+    return bids.BIDSLayout(bids_dir, derivatives=deriv_dir or None)
 
+
+def create_group_mask(layout, task, space, mask_threshold, contrast_files):
     subject_mask_files = []
     for contrast_file in contrast_files:
         sub_id = get_entity_value(contrast_file, "sub")
@@ -238,6 +266,7 @@ def main(
     mask_threshold,
     afni_img_path,
     n_cores,
+    exclude_niftis_file,
 ):
     bids_dir = Path(bids_dir)
     deriv_dir = Path(deriv_dir)
@@ -249,22 +278,32 @@ def main(
     contrasts = get_task_contrasts(task)
     for contrast in contrasts:
         LGR.info(f"Current contrast: {contrast}")
-        contrast_files = get_contrast_files(contrast_dir, task, contrast)
+        contrast_files = filter_contrasts_files(
+            get_contrast_files(contrast_dir, task, contrast), exclude_niftis_file
+        )
         subject_list = get_subjects(contrast_files)
 
         LGR.info("Creating datatable")
         data_table = create_data_table(bids_dir, subject_list, contrast_files)
         glt_str = get_glt_codes_str(data_table)
 
-        data_table_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-data_table.txt"
+        data_table_filename = (
+            dst_dir / f"task-{task}_contrast-{contrast}_desc-data_table.txt"
+        )
         LGR.info(f"Saving datatable to: {data_table_filename}")
         data_table.to_csv(data_table_filename, sep=" ", index=False)
 
         LGR.info(f"Creating group mask with the current threshold: {mask_threshold}")
         group_mask = create_group_mask(
-            bids_dir, deriv_dir, task, space, mask_threshold, tuple(contrast_files)
+            get_layout(bids_dir, deriv_dir),
+            task,
+            space,
+            mask_threshold,
+            contrast_files,
         )
-        group_mask_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"
+        group_mask_filename = (
+            dst_dir / f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"
+        )
         LGR.info(f"Saving group mask to: {group_mask_filename}")
         nib.save(group_mask, group_mask_filename)
 
@@ -278,7 +317,6 @@ def main(
             n_cores,
             glt_str,
         )
-
 
 if __name__ == "__main__":
     cmd_args = _get_cmd_args()

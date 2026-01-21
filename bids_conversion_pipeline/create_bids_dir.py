@@ -108,16 +108,12 @@ def _get_subject_visits(
         subject_id, subjects_visits_df, column_name="date"
     )
 
-    if not visit_dates or all(
-        not pd.notna(date) for date in visit_dates
-    ):
+    if not visit_dates or all(not pd.notna(date) for date in visit_dates):
         LGR.critical(f"Subject {subject_id} has no visit dates.")
 
         return None
 
-    check_dates = [
-        date for date in visit_dates if not pd.notna(date)
-    ]
+    check_dates = [date for date in visit_dates if not pd.notna(date)]
     if not all(
         is_valid_date(visit_date, subjects_visits_date_fmt)
         for visit_date in check_dates
@@ -171,25 +167,29 @@ def _combine_session_data(
     scan_dates: list[str],
     visit_dosage_map: dict[str, str] | None,
 ) -> list[tuple[str, str, float]]:
+    session_scan_date_map = {}
     if visit_session_map:
         session_scan_date_map = {
             session_id: date
             for session_id, date in visit_session_map.items()
             if date in scan_dates
         }
-    else:
+
+    if not session_scan_date_map:
         session_scan_date_map = {
             f"0{session_id}": date
             for session_id, date in enumerate(scan_dates, start=1)
         }
 
+    filtered_dosages = []
     if visit_dosage_map:
         filtered_dosages = [
             float(dosage)
             for session_id, dosage in visit_dosage_map.items()
             if session_id in session_scan_date_map
         ]
-    else:
+    
+    if not filtered_dosages:
         filtered_dosages = [float("NaN")] * len(session_scan_date_map)
 
     return zip(
