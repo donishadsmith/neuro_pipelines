@@ -207,8 +207,8 @@ def perform_3dlmer(
     n_cores,
     glt_str,
 ):
-    output_filename = dst_dir / f"second_level_task-{task}_desc-{contrast}_stats.nii.gz"
-    residual_filename = str(output_filename).replace("_stats", "_residuals")
+    output_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-stats.nii.gz"
+    residual_filename = str(output_filename).replace("-stats", "-residuals")
 
     cmd = (
         f"singularity exec -B /projects:/projects {afni_img_path} 3dLMEr "
@@ -256,7 +256,7 @@ def main(
         data_table = create_data_table(bids_dir, subject_list, contrast_files)
         glt_str = get_glt_codes_str(data_table)
 
-        data_table_filename = dst_dir / f"data_table_task-{task}_desc-{contrast}.txt"
+        data_table_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-data_table.txt"
         LGR.info(f"Saving datatable to: {data_table_filename}")
         data_table.to_csv(data_table_filename, sep=" ", index=False)
 
@@ -264,7 +264,7 @@ def main(
         group_mask = create_group_mask(
             bids_dir, deriv_dir, task, space, mask_threshold, tuple(contrast_files)
         )
-        group_mask_filename = dst_dir / f"group_mask_task-{task}_desc-{contrast}.nii.gz"
+        group_mask_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"
         LGR.info(f"Saving group mask to: {group_mask_filename}")
         nib.save(group_mask, group_mask_filename)
 
