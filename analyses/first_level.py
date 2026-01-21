@@ -108,14 +108,14 @@ def get_motion_regressors(confounds_df):
     all_params = motion_params + derivatives + power
     LGR.info(f"Using motion parameters: {all_params}")
 
-    return confounds_df[all_params].values
+    return confounds_df[all_params].to_numpy(copy=True)
 
 
 def get_global_signal_regressors(confounds_df):
     global_params = ["global_signal", "global_signal_derivative1"]
     LGR.info(f"Using global signal parameters: {global_params}")
 
-    return confounds_df[global_params].values
+    return confounds_df[global_params].to_numpy(copy=True)
 
 
 def get_censor_mask(confounds_df, n_dummy_scans, fd):
@@ -123,7 +123,7 @@ def get_censor_mask(confounds_df, n_dummy_scans, fd):
     if n_dummy_scans > 0:
         censor_mask[:n_dummy_scans] = 0
     if fd:
-        fd_arr = confounds_df["framewise_displacement"].fillna(0).values
+        fd_arr = confounds_df["framewise_displacement"].fillna(0).to_numpy(copy=True)
         censor_mask[fd_arr > fd] = 0
 
     return censor_mask
@@ -146,7 +146,7 @@ def create_regressor_file(subject_dir, *regressor_arrays):
 
 def save_event_file(timing_dir, trial_type, timing_data):
     filename = timing_dir / f"{trial_type}.1D"
-    timing_str = " ".join(timing_data.values)
+    timing_str = " ".join(timing_data.to_numpy(copy=True))
     with open(filename, "w") as f:
         f.write(timing_str)
 
@@ -549,7 +549,7 @@ def main(
         global_regs = get_global_signal_regressors(confounds_df)
 
         acompcor_names = get_acompcor_component_names(confounds_meta, n_acompcor)
-        acompcor_regs = confounds_df[acompcor_names].values
+        acompcor_regs = confounds_df[acompcor_names].to_numpy(copy=True)
 
         regressors_file = create_regressor_file(
             subject_dir, motion_regs, global_regs, acompcor_regs

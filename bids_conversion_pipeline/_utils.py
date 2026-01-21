@@ -71,7 +71,7 @@ def _extract_subjects_visits_data(
     if scan_date:
         mask &= subjects_visits_df["date"].astype(str) == str(scan_date)
 
-    return subjects_visits_df[mask].loc[:, column_name].astype(str).values.tolist()
+    return subjects_visits_df[mask].loc[:, column_name].astype(str).to_numpy(copy=True).tolist()
 
 
 def _strip_entity(subjects: list[str | int]) -> list[str]:

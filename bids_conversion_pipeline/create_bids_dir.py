@@ -109,14 +109,14 @@ def _get_subject_visits(
     )
 
     if not visit_dates or all(
-        isinstance(date, float) and np.isnan(date) for date in visit_dates
+        not pd.notna(date) for date in visit_dates
     ):
         LGR.critical(f"Subject {subject_id} has no visit dates.")
 
         return None
 
     check_dates = [
-        date for date in visit_dates if not (isinstance(date, float) and np.isnan(date))
+        date for date in visit_dates if not pd.notna(date)
     ]
     if not all(
         is_valid_date(visit_date, subjects_visits_date_fmt)
@@ -193,7 +193,7 @@ def _combine_session_data(
         filtered_dosages = [float("NaN")] * len(session_scan_date_map)
 
     return zip(
-        session_scan_date_map.keys(), session_scan_date_map.values(), filtered_dosages
+        session_scan_date_map.keys(), session_scan_date_map.to_numpy(copy=True), filtered_dosages
     )
 
 
@@ -203,7 +203,7 @@ def _create_sessions_tsv(
     new_sessions_df = pd.DataFrame(sessions_dict)
     new_sessions_df["session_id"] = [
         f"ses-{session_id}" if not session_id.startswith("ses-") else session_id
-        for session_id in new_sessions_df["session_id"].values
+        for session_id in new_sessions_df["session_id"].to_numpy(copy=True)
     ]
     filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
     new_sessions_df.to_csv(filename, index=False, sep="\t")

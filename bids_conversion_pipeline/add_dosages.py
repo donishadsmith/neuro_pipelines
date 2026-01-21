@@ -106,7 +106,7 @@ def add_dosages_to_sessions_tsv(
         sessions_tsv_df["dose"] = sessions_tsv_df["dose"].astype(str)
         cleaned_sessions_tsv_df = sessions_tsv_df.dropna(subset="acq_time")
         original_dates = [
-            str(val) for val in cleaned_sessions_tsv_df["acq_time"].values
+            str(val) for val in cleaned_sessions_tsv_df["acq_time"].to_numpy(copy=True)
         ]
         for original_date, converted_date in zip(
             original_dates, map(change_date_fmt, original_dates)
