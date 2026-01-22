@@ -30,7 +30,6 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-
 DST_DIR="$ANALYSIS_DIR/$TASK"
 mkdir -p ${DST_DIR}
 

@@ -3,6 +3,8 @@ from pathlib import Path
 
 from nifti2bids.logging import setup_logger
 
+from _utils import get_task_contrasts
+
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
 
@@ -44,34 +46,8 @@ def _get_cmd_args():
     return parser
 
 
-def _task_specific_contrasts(task):
-    if task == "nback":
-        contrasts = (
-            "1-back_vs_0-back#0_Coef",
-            "2-back_vs_0-back#0_Coef",
-            "2-back_vs_1-back#0_Coef",
-        )
-    elif task == "mtle":
-        contrasts = ("indoor#0_Coef",)
-    elif task == "mtlr":
-        contrasts = ("seen#0_Coef",)
-    elif task == "princess":
-        contrasts = ("switch_vs_nonswitch#0_Coef",)
-    else:
-        contrasts = (
-            "congruent_vs_neutral#0_Coef",
-            "incongruent_vs_neutral#0_Coef",
-            "nogo_vs_neutral#0_Coef",
-            "congruent_vs_incongruent#0_Coef",
-            "congruent_vs_nogo#0_Coef",
-            "incongruent_vs_nogo#0_Coef",
-        )
-
-    return contrasts
-
-
 def create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir):
-    contrasts = _task_specific_contrasts(task)
+    contrasts = get_task_contrasts(task, caller="extract_betas")
 
     for contrast in contrasts:
         contrast_file = contrast_dir / stats_file.name.replace(

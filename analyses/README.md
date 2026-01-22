@@ -15,3 +15,9 @@ For specific subjects:
 sbatch --array=0-1 first_level.sb 101 102 # Runs these two subjects in parallel
 sbatch --array=0-1 extract_contrasts.sb 101 102 # Runs these two subjects in parallel
 ```
+
+## Order
+1. first_level.sb
+2. extract_betas.sb
+3. second_level.sb
+4. compute_cluster_correction.sb

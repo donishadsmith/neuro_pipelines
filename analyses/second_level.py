@@ -8,6 +8,8 @@ from nilearn.masking import intersect_masks
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
 
+from _utils import get_task_contrasts
+
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
 
@@ -39,8 +41,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--dst_dir",
         dest="dst_dir",
-        required=False,
-        default=None,
+        required=True,
         help="The destination directory for analysis.",
     )
     parser.add_argument(
@@ -83,32 +84,6 @@ def _get_cmd_args():
     )
 
     return parser
-
-
-def get_task_contrasts(task):
-    if task == "nback":
-        contrasts = (
-            "1-back_vs_0-back",
-            "2-back_vs_0-back",
-            "2-back_vs_1-back",
-        )
-    elif task == "mtle":
-        contrasts = ("indoor",)
-    elif task == "mtlr":
-        contrasts = ("seen",)
-    elif task == "princess":
-        contrasts = ("switch_vs_nonswitch",)
-    else:
-        contrasts = (
-            "congruent_vs_neutral",
-            "incongruent_vs_neutral",
-            "nogo_vs_neutral",
-            "congruent_vs_incongruent",
-            "congruent_vs_nogo",
-            "incongruent_vs_nogo",
-        )
-
-    return contrasts
 
 
 def get_contrast_files(contrast_dir, task, contrast):
@@ -275,7 +250,7 @@ def main(
 
     LGR.info(f"Task Name: {task}")
 
-    contrasts = get_task_contrasts(task)
+    contrasts = get_task_contrasts(task, caller="second_level")
     for contrast in contrasts:
         LGR.info(f"Current contrast: {contrast}")
         contrast_files = filter_contrasts_files(
@@ -317,6 +292,7 @@ def main(
             n_cores,
             glt_str,
         )
+
 
 if __name__ == "__main__":
     cmd_args = _get_cmd_args()

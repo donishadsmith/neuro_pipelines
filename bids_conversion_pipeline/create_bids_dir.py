@@ -188,7 +188,7 @@ def _combine_session_data(
             for session_id, dosage in visit_dosage_map.items()
             if session_id in session_scan_date_map
         ]
-    
+
     if not filtered_dosages:
         filtered_dosages = [float("NaN")] * len(session_scan_date_map)
 
