@@ -181,6 +181,9 @@ def create_timing_files(subject_dir, event_file, task):
                 + trial_df.loc[row_mask, "duration"].astype(str)
             )
 
+        if isinstance(timing_data, pd.Series):
+            timing_data = timing_data.to_list()
+
         save_event_file(timing_dir, trial_type, timing_data)
 
     # Get errors

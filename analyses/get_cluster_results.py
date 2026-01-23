@@ -145,30 +145,74 @@ def identify_clusters(
     cluster_table_filename = (
         analysis_dir
         / "cluster_results"
-        / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-cluster_results.txt"
+        / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
     if not clusters_table.empty:
-        clusters_table.to_csv(cluster_table_filename, sep=" ", index=False)
+        # Add interpretation
+        first_label, second_label = glt_code.split("_vs_")
 
         clusters_table["Cluster ID"] = clusters_table["Cluster ID"].astype(str)
 
+        peaks = clusters_table["Peak Stat"].astype(float).to_numpy(copy=True)
+        mask_primary = clusters_table["Cluster ID"].str.isdigit()
+        mask_pos = mask_primary & (peaks > 0)
+        mask_neg = mask_primary & (peaks < 0)
+
+        clusters_table.loc[mask_pos, "Interpretation"] = (
+            f"{first_label} mg MPH > {second_label} mg MPH"
+        )
+        clusters_table.loc[mask_neg, "Interpretation"] = (
+            f"{second_label} mg MPH > {first_label} mg MPH"
+        )
+
+        clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
+
+        # Get label map
         # Make no assumption about labels_map order,
         # one map is positive, the other is negative
         label_base_dir = analysis_dir / "cluster_masks"
         label_base_dir.mkdir(parents=True, exist_ok=True)
         for label_map in labels_map_list:
-            # Note: returns sorted array, first label always background
-            if (label_ids := np.unique(label_map.get_fdata())[1:]).shape[0] == 0:
+            # Note: returns sorted array
+            label_ids = np.unique(label_map.get_fdata()[label_map.get_fdata() != 0])
+            if label_ids.shape[0] == 0:
                 continue
 
+            # Label ids may not correspond to cluster ids in the table
+            label_map_fdata = label_map.get_fdata()
+            thresholded_img_fdata = thresholded_img.get_fdata()
+
+            voxel_data = thresholded_img_fdata[label_map_fdata != 0].ravel()
+            voxel_stats = voxel_data[voxel_data != 0]
+            peak_voxel_val = voxel_stats[np.argmax(np.abs(voxel_stats))]
+            tail = "positive" if peak_voxel_val > 0 else "negative"
+
+            peak_stats = clusters_table["Peak Stat"].to_numpy(copy=True)
+            if tail == "positive":
+                peak_stats_indices = clusters_table.loc[
+                    np.where(peak_stats > 0), "Peak Stat"
+                ].index.tolist()
+            else:
+                peak_stats_indices = clusters_table.loc[
+                    np.where(peak_stats < 0), "Peak Stat"
+                ].index.tolist()
+
+            cluster_ids = clusters_table.loc[peak_stats_indices, "Cluster ID"].to_numpy(
+                copy=True
+            )
+            # The cluster IDs are integers or an integer with a letter, if changed possibly use
+            # not any(e.isalpha() for e in str(label)
+            cluster_ids = [label for label in cluster_ids if label.isdigit()]
+            # In source code, ids in label map go from 1 to N with 1 being the highest peak
+            # DataFrame is sorted in highest abolute peak for positive and negative tail
+            cluster_id_map = {
+                index: label for index, label in enumerate(cluster_ids, start=1)
+            }
+
             for label_id in label_ids:
-                peak_value = float(
-                    clusters_table.loc[
-                        clusters_table["Cluster ID"] == str(int(label_id)), "Peak Stat"
-                    ].to_numpy(copy=True)[0]
-                )
-                tail = "positive" if peak_value > 0 else "negative"
+                cluster_id = cluster_id_map[int(label_id)]
+
                 label_mask_fdata = np.zeros_like(label_map.get_fdata())
                 label_mask_fdata[label_map.get_fdata() == label_id] = 1
 
@@ -176,7 +220,7 @@ def identify_clusters(
                     label_mask_fdata, label_map.affine, label_map.header
                 )
                 label_mask_filename = label_base_dir / (
-                    f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_clusterid-{int(label_id)}"
+                    f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_clusterid-{cluster_id}"
                     f"_tail-{tail}_desc-cluster_mask.nii.gz"
                 )
 
@@ -232,7 +276,7 @@ def main(
     LGR.info(f"TASK: {task}")
 
     glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-    contrasts = get_task_contrasts(task, caller="apply_cluster_correction")
+    contrasts = get_task_contrasts(task, caller="get_cluster_results")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
     for contrast, glt_code in contrasts_glts_list:
         LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")

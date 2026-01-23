@@ -44,7 +44,7 @@ fi
 DERIVS_DIR="${BIDS_DIR}/derivatives/fmriprep-${FMRIPREP_VERSION}"
 mkdir -p ${DERIVS_DIR}
 
-SCRATCH_DIR="/scratch/${USERNAME}/mph/fmriprep-${FMRIPREP_VERSION}/${SUBJECT}"
+SCRATCH_DIR="/scratch/${USERNAME}/mph/${COHORT}/fmriprep-${FMRIPREP_VERSION}/${SUBJECT}"
 mkdir -p ${SCRATCH_DIR}
 
 TMP_DIR="${SCRATCH_DIR}/tmp"
