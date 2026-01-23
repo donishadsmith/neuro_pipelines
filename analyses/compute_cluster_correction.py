@@ -88,11 +88,11 @@ def perform_cluster_simulation(
 def main(analysis_dir, afni_img_path, task):
     analysis_dir = Path(analysis_dir)
 
-    LGR.info(f"Task Name: {task}")
+    LGR.info(f"TASK: {task}")
 
     contrasts = get_task_contrasts(task, caller="compute_cluster_correction")
     for contrast in contrasts:
-        LGR.info(f"Contrast Name: {contrast}")
+        LGR.info(f"CONTRAST: {contrast}")
 
         group_mask_filename = next(
             analysis_dir.rglob(

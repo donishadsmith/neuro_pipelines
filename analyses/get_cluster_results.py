@@ -70,7 +70,9 @@ def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_cod
     stats_filename = next(
         analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-stats.nii.gz")
     )
-    zcore_map_filename = str(stats_filename).replace("-stats", f"-{glt_code}_Z")
+    zcore_map_filename = str(stats_filename).replace(
+        "_desc-stats", f"_gltcode-{glt_code}_desc-z_map"
+    )
 
     cmd = (
         f"singularity exec -B /projects:/projects {afni_img_path} 3dbucket "
@@ -118,7 +120,7 @@ def get_cluster_size(
         np.ceil(
             cluster_correction_table.loc[
                 cluster_correction_table["pthr"] == voxel_correction_p, cluster_p_str
-            ]
+            ].to_numpy(copy=True)[0]
         )
     )
 
@@ -132,22 +134,53 @@ def identify_clusters(
     contrast,
     glt_code,
 ):
-    # TODO: Do return_label_maps=True to get label masks
-    clusters_table_output = get_clusters_table(
+    clusters_table, labels_map_list = get_clusters_table(
         thresholded_img,
         stat_threshold=p_to_z(voxel_correction_p),
         cluster_threshold=cluster_size,
         two_sided=True,
+        return_label_maps=True,
     )
 
     cluster_table_filename = (
         analysis_dir
         / "cluster_results"
-        / f"task-{task}_contrast-{contrast}_desc-{glt_code}_cluster_results.txt"
+        / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-cluster_results.txt"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
-    if not clusters_table_output.empty:
-        clusters_table_output.to_csv(cluster_table_filename, sep=" ", index=False)
+    if not clusters_table.empty:
+        clusters_table.to_csv(cluster_table_filename, sep=" ", index=False)
+
+        clusters_table["Cluster ID"] = clusters_table["Cluster ID"].astype(str)
+
+        # Make no assumption about labels_map order,
+        # one map is positive, the other is negative
+        label_base_dir = analysis_dir / "cluster_masks"
+        label_base_dir.mkdir(parents=True, exist_ok=True)
+        for label_map in labels_map_list:
+            # Note: returns sorted array, first label always background
+            if (label_ids := np.unique(label_map.get_fdata())[1:]).shape[0] == 0:
+                continue
+
+            for label_id in label_ids:
+                peak_value = float(
+                    clusters_table.loc[
+                        clusters_table["Cluster ID"] == str(int(label_id)), "Peak Stat"
+                    ].to_numpy(copy=True)[0]
+                )
+                tail = "positive" if peak_value > 0 else "negative"
+                label_mask_fdata = np.zeros_like(label_map.get_fdata())
+                label_mask_fdata[label_map.get_fdata() == label_id] = 1
+
+                label_mask_img = nib.nifti1.Nifti1Image(
+                    label_mask_fdata, label_map.affine, label_map.header
+                )
+                label_mask_filename = label_base_dir / (
+                    f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_clusterid-{int(label_id)}"
+                    f"_tail-{tail}_desc-cluster_mask.nii.gz"
+                )
+
+                nib.save(label_mask_img, label_mask_filename)
 
     return cluster_table_filename
 
@@ -179,7 +212,7 @@ def plot_thresholded_img(
         plot_filename = (
             analysis_dir
             / "stat_plots"
-            / f"task-{task}_contrast-{contrast}_displaymode-{mode}_desc-{glt_code}_plot.png"
+            / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-plot.png"
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -196,13 +229,13 @@ def main(
 ):
     analysis_dir = Path(analysis_dir)
 
-    LGR.info(f"Task Name: {task}")
+    LGR.info(f"TASK: {task}")
 
     glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
     contrasts = get_task_contrasts(task, caller="apply_cluster_correction")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
     for contrast, glt_code in contrasts_glts_list:
-        LGR.info(f"Contrast Name: {contrast}, GLTCode Name: {glt_code}")
+        LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
         zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
             analysis_dir, afni_img_path, task, contrast, glt_code
         )
@@ -226,7 +259,7 @@ def main(
             cluster_threshold=cluster_size,
         )
         thresholded_filename = str(zcore_map_filename).replace(
-            "_Z", "_cluster_corrected"
+            "-z_map", "-cluster_corrected"
         )
         LGR.info(f"Saving thresholded image to: {thresholded_filename}")
         nib.save(thresholded_img, thresholded_filename)
@@ -241,7 +274,7 @@ def main(
             glt_code,
         )
 
-        base_str = f"Task: {task}, Contrast: {contrast} GLTCode: {glt_code}"
+        base_str = f"TASK: {task}, CONTRAST: {contrast} GLTCODE: {glt_code}"
         if not cluster_table_filename.exists():
             LGR.info(f"No significant clusters for {base_str}")
             continue

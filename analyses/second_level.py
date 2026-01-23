@@ -248,17 +248,17 @@ def main(
     contrast_dir = Path(contrast_dir)
     dst_dir = Path(dst_dir)
 
-    LGR.info(f"Task Name: {task}")
+    LGR.info(f"TASK: {task}")
 
     contrasts = get_task_contrasts(task, caller="second_level")
     for contrast in contrasts:
-        LGR.info(f"Current contrast: {contrast}")
+        LGR.info(f"CONTRAST: {contrast}")
         contrast_files = filter_contrasts_files(
             get_contrast_files(contrast_dir, task, contrast), exclude_niftis_file
         )
         subject_list = get_subjects(contrast_files)
 
-        LGR.info("Creating datatable")
+        LGR.info("Creating datatable.")
         data_table = create_data_table(bids_dir, subject_list, contrast_files)
         glt_str = get_glt_codes_str(data_table)
 
