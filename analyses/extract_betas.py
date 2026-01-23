@@ -23,7 +23,7 @@ def _get_cmd_args():
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
-        help="Path to Singularity image of Afni with R",
+        help="Path to Singularity image of Afni with R.",
     )
     parser.add_argument(
         "--subject",

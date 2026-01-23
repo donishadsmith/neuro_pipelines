@@ -22,7 +22,7 @@ def _get_cmd_args():
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
-        help="Path to Singularity image of Afni with R",
+        help="Path to Singularity image of Afni with R.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
 
@@ -92,6 +92,8 @@ def main(analysis_dir, afni_img_path, task):
 
     contrasts = get_task_contrasts(task, caller="compute_cluster_correction")
     for contrast in contrasts:
+        LGR.info(f"Contrast Name: {contrast}")
+
         group_mask_filename = next(
             analysis_dir.rglob(
                 f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"

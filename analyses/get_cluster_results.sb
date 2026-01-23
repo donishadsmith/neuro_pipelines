@@ -1,15 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=compute_cluster_correction
+#SBATCH --job-name=get_cluster_results
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --exclude=cpu149
-# Outputs ------------------------------------------------------------------------------------
-#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/compute_cluster_correction_%A_%a.out
-#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/compute_cluster_correction_%A_%a.err
-# ---------------------------------------------------------------------------------------------
+# Outputs ----------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.err
+# -------------------------------------------------------------------------------------
 
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
@@ -17,7 +17,7 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
-# sbatch --array=0 compute_cluster_correction.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array
+# sbatch --array=0 get_cluster_results.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array
 TASKS=( $@ )
 # slurm job value; essentially extracting sub-{id}
 if [ ${#TASKS[@]} -eq 0 ]; then
@@ -27,11 +27,13 @@ else
 fi
 
 ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm/$TASK"
+TEMPLATE_IMG_PATH='/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz'
 
-CMD="${PYTHON} compute_cluster_correction.py \
+CMD="${PYTHON} get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
-	--afni_img_path ${AFNI_IMG_PATH} \
-	--task ${TASK}"
+	--afni_img_path $AFNI_IMG_PATH \
+	--task $TASK \
+    --template_img_path $TEMPLATE_IMG_PATH"
 
 # hostname
 # id 
