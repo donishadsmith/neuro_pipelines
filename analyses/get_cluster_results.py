@@ -256,7 +256,7 @@ def plot_thresholded_img(
         plot_filename = (
             analysis_dir
             / "stat_plots"
-            / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-plot.png"
+            / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_displaymode-{mode}_desc-plot.png"
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
 
