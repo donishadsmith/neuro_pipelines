@@ -70,7 +70,7 @@ def _get_cmd_args():
         default=5,
         type=int,
         required=False,
-        help="Number of aCompCor components, only used when ``use_ica_components`` is False.",
+        help="Number of aCompCor components.",
     )
     parser.add_argument(
         "--fwhm",
@@ -122,6 +122,7 @@ def get_censor_mask(confounds_df, n_dummy_scans, fd):
     censor_mask = np.ones(confounds_df.shape[0])
     if n_dummy_scans > 0:
         censor_mask[:n_dummy_scans] = 0
+
     if fd:
         fd_arr = confounds_df["framewise_displacement"].fillna(0).to_numpy(copy=True)
         censor_mask[fd_arr > fd] = 0
@@ -542,6 +543,17 @@ def main(
 
         # Censor File
         censor_mask = get_censor_mask(confounds_df, n_dummy_scans, fd)
+
+        # TODO: Incorporate exclusion criteria that is appropriate given the
+        # demographics of sample
+        kept = censor_mask[n_dummy_scans:]
+        n_censored = np.sum(kept == 0)
+        LGR.critical(
+            f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
+            f"proportion of steady state volumes removed at an fd > {fd} mm: "
+            f" {n_censored / kept.size}"
+        )
+
         censor_file = create_censor_file(subject_dir, censor_mask)
 
         # Regressors

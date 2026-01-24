@@ -83,7 +83,7 @@ def _get_cmd_args():
             "(i.e. 'sub-01_ses-01_task-nback_run-01' not "
             "'sub-01_ses-01_task-nback_run-01_desc_bold.nii.gz'). Should contain a single "
             "column named 'nifti_prefix_filename' Files excluded should be determined using MRIQC or "
-            "other factors such as participant falling asleep during task."
+            "other factors such as participant falling asleep during task or too many excluded volumes."
         ),
     )
 
