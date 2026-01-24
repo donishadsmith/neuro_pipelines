@@ -78,8 +78,12 @@ def _get_cmd_args():
         default=None,
         required=False,
         help=(
-            "File containing the names of the NIfTI images to exclude from contrast. "
-            "Should contain a single column named 'nifti_filename'."
+            "Prefixes of the filename of the NIfTI images to exclude not the full filename. "
+            "Entities included should be 'sub', 'ses', 'task', and 'run' "
+            "(i.e. 'sub-01_ses-01_task-nback_run-01' not "
+            "'sub-01_ses-01_task-nback_run-01_desc_bold.nii.gz'). Should contain a single "
+            "column named 'nifti_prefix_filename' Files excluded should be determined using MRIQC or "
+            "other factors such as participant falling asleep during task."
         ),
     )
 
@@ -95,14 +99,15 @@ def filter_contrasts_files(contrast_files, exclude_niftis_file):
         return contrast_files
 
     df = pd.read_csv(exclude_niftis_file, sep=None, engine="python")
-    exlcuded_niftis_filenames = [
-        Path(nifti_filename).name for nifti_filename in df["nifti_filename"].to_numpy()
+    exlcuded_niftis_prefixes = [
+        Path(nifti_prefix_filename).name.split("_desc")[0]
+        for nifti_prefix_filename in df["nifti_prefix_filename"].to_numpy()
     ]
 
     return [
         contrast_file
         for contrast_file in contrast_files
-        if Path(contrast_file).name not in exlcuded_niftis_filenames
+        if Path(contrast_file).name.split("_space")[0] not in exlcuded_niftis_prefixes
     ]
 
 
