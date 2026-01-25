@@ -67,9 +67,12 @@ def create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir
             LGR.critical(f"The following command failed: {cmd}", exc_info=True)
 
         if out_dir and contrast_file.exists():
-            path = Path(out_dir) / contrast_file
-            if not path.exists():
-                shutil.move(contrast_file, out_dir)
+            path = Path(out_dir) / contrast_file.name
+            if path.exists():
+                LGR.info("Replacing old file with new file.")
+                path.unlink()
+
+            shutil.move(contrast_file, out_dir)
 
 
 def main(analysis_dir, subject, afni_img_path, task, out_dir):
