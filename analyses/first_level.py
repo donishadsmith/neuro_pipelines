@@ -147,7 +147,7 @@ def create_regressor_file(subject_dir, *regressor_arrays):
 
 def save_event_file(timing_dir, trial_type, timing_data):
     filename = timing_dir / f"{trial_type}.1D"
-    timing_str = " ".join(timing_data.to_numpy(copy=True))
+    timing_str = " ".join(timing_data)
     with open(filename, "w") as f:
         f.write(timing_str)
 
@@ -168,10 +168,14 @@ def create_timing_files(subject_dir, event_file, task):
         )
 
         if task == "flanker":
-            timing_data = trial_df.loc[
-                row_mask,
-                "onset",
-            ].astype(str)
+            timing_data = (
+                trial_df.loc[
+                    row_mask,
+                    "onset",
+                ]
+                .astype(str)
+                .to_numpy(copy=True)
+            )
         else:
             timing_data = (
                 trial_df.loc[
@@ -179,7 +183,7 @@ def create_timing_files(subject_dir, event_file, task):
                     "onset",
                 ].astype(str)
                 + ":"
-                + trial_df.loc[row_mask, "duration"].astype(str)
+                + trial_df.loc[row_mask, "duration"].astype(str).to_numpy(copy=True)
             )
 
         if isinstance(timing_data, pd.Series):
