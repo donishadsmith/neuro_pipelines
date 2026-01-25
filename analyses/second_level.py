@@ -216,8 +216,15 @@ def perform_3dlmer(
     glt_str,
 ):
     output_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-stats.nii.gz"
-    residual_filename = str(output_filename).replace("-stats", "-residuals")
+    if output_filename.exists():
+        LGR.info("Replacing stats file")
+        output_filename.unlink()
 
+    residual_filename = Path(str(output_filename).replace("-stats", "-residuals"))
+    if residual_filename.exists():
+        LGR.info("Replacing residual file")
+        residual_filename.unlink()
+    
     cmd = (
         f"singularity exec -B /projects:/projects {afni_img_path} 3dLMEr "
         f"-mask {group_mask_filename} "
