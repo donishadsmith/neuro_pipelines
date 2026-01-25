@@ -101,7 +101,7 @@ def filter_contrasts_files(contrast_files, exclude_niftis_file):
     df = pd.read_csv(exclude_niftis_file, sep=None, engine="python")
     exlcuded_niftis_prefixes = [
         Path(nifti_prefix_filename).name.split("_desc")[0]
-        for nifti_prefix_filename in df["nifti_prefix_filename"].to_numpy()
+        for nifti_prefix_filename in df["nifti_prefix_filename"].tolist()
     ]
 
     return [
