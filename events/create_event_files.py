@@ -261,16 +261,7 @@ def _create_flanker_events_files(
         extractor = PresentationEventExtractor(
             excel_file,
             convert_to_seconds=["Time", "Duration"],
-            trial_types=(
-                "congruentleft",
-                "congruentright",
-                "incongruentright",
-                "incongruentleft",
-                "nogoleft",
-                "nogoright",
-                "neutralleft",
-                "neutralright",
-            ),
+            trial_types=".*(left|right)$",
             scanner_event_type="Pulse",
             scanner_trigger_code="99",
         )
@@ -490,7 +481,7 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
 
             huizens = []
             for huizen in input_df["huizen"].astype(str).to_numpy(copy=True):
-                huizen = huizen.removesuffix(".bmp")
+                huizen = str(huizen).removesuffix(".bmp")
                 if huizen[-1].isdigit():
                     huizen = huizen[:-1]
                 huizens.append(huizen)
@@ -504,7 +495,7 @@ def _create_princess_events_files(temp_dir, dst_dir, subjects):
                 onset_column_name="dagnacht.OnsetTime",
                 procedure_column_name="huizen",
                 trigger_column_name="eind.OnsetTime",
-                block_cue_names=dutch_to_english.to_numpy(copy=True)(),
+                block_cue_names=dutch_to_english.values(),
                 convert_to_seconds=[
                     "dagnacht.OnsetTime",
                     "eind.OnsetTime",
