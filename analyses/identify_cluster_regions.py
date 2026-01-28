@@ -1,7 +1,7 @@
 import argparse, itertools, subprocess
 from pathlib import Path
 
-import numpy as np, pandas as pd
+import pandas as pd
 
 from nifti2bids.logging import setup_logger
 
@@ -34,7 +34,7 @@ def _get_cmd_args():
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
-        help="Path to Singularity image of Afni with R.",
+        help="Path to Apptainer image of Afni with R.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
@@ -57,7 +57,7 @@ def _get_cmd_args():
 
 def identify_mni_regions(afni_img_path, coord_filename, orient, atlas):
     cmd = (
-        f"singularity exec -B /scratch:/scratch -B /projects:/projects {afni_img_path} whereami "
+        f"apptainer exec -B /scratch:/scratch -B /projects:/projects {afni_img_path} whereami "
         f"-{orient.lower()} -coord_file {coord_filename} -space MNI -atlas {atlas}"
     )
     std_output = subprocess.run(

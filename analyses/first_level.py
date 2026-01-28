@@ -19,7 +19,7 @@ def _get_cmd_args():
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
-        help="Path to Singularity image of Afni with R.",
+        help="Path to Apptainer image of Afni with R.",
     )
     parser.add_argument(
         "--dst_dir",
@@ -49,6 +49,17 @@ def _get_cmd_args():
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
+        "--n_motion_parameters",
+        dest="n_motion_parameters",
+        default=24,
+        type=int,
+        required=False,
+        help=(
+            "Number of motion parameters to use: 6 (base trans + rot), "
+            "12 (base + derivatives), 24 (base + derivatives + power)"
+        ),
+    )
+    parser.add_argument(
         "--fd",
         dest="fd",
         default=0.9,
@@ -57,12 +68,25 @@ def _get_cmd_args():
         help="Framewise displacement threshold.",
     )
     parser.add_argument(
+        "--exclusion_criteria",
+        dest="exclusion_criteria",
+        default=0.30,
+        type=float,
+        required=False,
+        help=(
+            "Threshold to exclude entire run if more than the specified "
+            "percentage of steady-state volumes are removed."
+        ),
+    )
+    parser.add_argument(
         "--n_dummy_scans",
         dest="n_dummy_scans",
-        default=0,
-        type=int,
+        default="auto",
         required=False,
-        help="Number of dummy scans to remove.",
+        help=(
+            "Number of dummy scans to remove. If 'auto' computes number of dummy scans "
+            "by the numnber of 'non_steady_state_outlier_XX' columns."
+        ),
     )
     parser.add_argument(
         "--n_acompcor",
@@ -71,6 +95,16 @@ def _get_cmd_args():
         type=int,
         required=False,
         help="Number of aCompCor components.",
+    )
+    parser.add_argument(
+        "--remove_global_signal",
+        dest="remove_global_signal",
+        default=True,
+        required=False,
+        help=(
+            "Global signal regression. If True, ``n_motion_regressors`` is used "
+            "to include derivative if 16, and power if 24"
+        ),
     )
     parser.add_argument(
         "--fwhm",
@@ -101,21 +135,43 @@ def get_acompcor_component_names(confounds_json_data, n_components):
     return components_list
 
 
-def get_motion_regressors(confounds_df):
+def get_motion_regressors(confounds_df, n_motion_parameters):
     motion_params = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
-    derivatives = [f"{param}_derivative1" for param in motion_params]
-    power = [f"{param}_power2" for param in motion_params]
-    all_params = motion_params + derivatives + power
-    LGR.info(f"Using motion parameters: {all_params}")
+    if n_motion_parameters in [12, 24]:
+        derivatives = [f"{param}_derivative1" for param in motion_params]
+        motion_params += derivatives
 
-    return confounds_df[all_params].to_numpy(copy=True)
+    if n_motion_parameters == 24:
+        power = [f"{param}_power2" for param in motion_params]
+        motion_params += power
+
+    LGR.info(f"Using motion parameters: {motion_params}")
+
+    return confounds_df[motion_params].to_numpy(copy=True)
 
 
-def get_global_signal_regressors(confounds_df):
-    global_params = ["global_signal", "global_signal_derivative1"]
+def get_global_signal_regressors(confounds_df, n_motion_parameters):
+    global_params = ["global_signal"]
+    if n_motion_parameters in [12, 24]:
+        global_params += ["global_signal_derivative1"]
+
+    if n_motion_parameters == 24:
+        global_params += ["global_signal_power2"]
+
     LGR.info(f"Using global signal parameters: {global_params}")
 
     return confounds_df[global_params].to_numpy(copy=True)
+
+
+def get_n_dummy(confounds_df, n_dummy_scans):
+    if n_dummy_scans == "auto":
+        n_dummy_scans = len(
+            [col.startswith("non_steady_state_outlier") for col in confounds_df.columns]
+        )
+
+    LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
+
+    return n_dummy_scans
 
 
 def get_censor_mask(confounds_df, n_dummy_scans, fd):
@@ -137,9 +193,16 @@ def create_censor_file(subject_dir, censor_mask):
     return censor_file
 
 
-def create_regressor_file(subject_dir, *regressor_arrays):
+def create_regressor_file(subject_dir, censor_mask, *regressor_arrays):
     regressor_file = subject_dir / "regressors.1D"
-    data = np.column_stack(regressor_arrays)
+    valid_arrays = [arr for arr in regressor_arrays if arr is not None]
+    data = np.column_stack(valid_arrays)
+
+    mean = data[censor_mask.astype(bool)].mean(axis=0)
+    std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)
+    std[std < np.finfo(np.float64).eps] = 1.0
+    data[censor_mask.astype(bool)] = (data[censor_mask.astype(bool)] - mean) / std
+
     np.savetxt(regressor_file, data, fmt="%.6f")
 
     return regressor_file
@@ -242,7 +305,7 @@ def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file,
 
     if not smoothed_nifti_file.exists():
         cmd = (
-            f"singularity exec -B /projects:/projects {afni_img_path} 3dBlurToFWHM "
+            f"apptainer exec -B /projects:/projects {afni_img_path} 3dBlurToFWHM "
             f"-input {nifti_file} "
             f"-mask {mask_file} "
             f"-FWHM {fwhm} "
@@ -416,7 +479,7 @@ def perform_first_level(
     )
 
     cmd = (
-        f"singularity exec -B /projects:/projects {afni_img_path} 3dREMLfit "
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dREMLfit "
         f"-matrix {design_matrix_file} "
         f"-input {smoothed_nifti_file} "
         f"-mask {mask_file} "
@@ -440,7 +503,10 @@ def main(
     space,
     subject,
     task,
+    n_motion_parameters,
+    remove_global_signal,
     fd,
+    exclusion_criteria,
     n_dummy_scans,
     n_acompcor,
     fwhm,
@@ -545,6 +611,7 @@ def main(
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
+        n_dummy_scans = get_n_dummy(confounds_df, n_dummy_scans)
         # Censor File
         censor_mask = get_censor_mask(confounds_df, n_dummy_scans, fd)
 
@@ -552,11 +619,20 @@ def main(
         # demographics of sample
         kept = censor_mask[n_dummy_scans:]
         n_censored = np.sum(kept == 0)
+        percent_censored = n_censored / kept.size
         LGR.critical(
             f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
             f"proportion of steady state volumes removed at an fd > {fd} mm: "
-            f" {n_censored / kept.size}"
+            f" {percent_censored}"
         )
+
+        if percent_censored > exclusion_criteria:
+            LGR.critical(
+                f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
+                "run excluded because the percent censored is greater than the "
+                f"exclusion criteria: {exclusion_criteria}"
+            )
+            continue
 
         censor_file = create_censor_file(subject_dir, censor_mask)
 
@@ -564,14 +640,22 @@ def main(
         with open(confounds_json_file, "r") as f:
             confounds_meta = json.load(f)
 
-        motion_regs = get_motion_regressors(confounds_df)
-        global_regs = get_global_signal_regressors(confounds_df)
+        motion_regressors = get_motion_regressors(confounds_df, n_motion_parameters)
+        global_regressors = (
+            get_global_signal_regressors(confounds_df, n_motion_parameters)
+            if remove_global_signal
+            else None
+        )
 
         acompcor_names = get_acompcor_component_names(confounds_meta, n_acompcor)
-        acompcor_regs = confounds_df[acompcor_names].to_numpy(copy=True)
+        acompcor_regressors = confounds_df[acompcor_names].to_numpy(copy=True)
 
         regressors_file = create_regressor_file(
-            subject_dir, motion_regs, global_regs, acompcor_regs
+            subject_dir,
+            censor_mask,
+            motion_regressors,
+            acompcor_regressors,
+            global_regressors,
         )
 
         # Create timing files
