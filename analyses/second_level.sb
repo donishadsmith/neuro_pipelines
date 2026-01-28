@@ -12,38 +12,45 @@
 FMRIPREP_VERSION="25.2.3"
 
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
-DERIV_DIR="${BIDS_DIR}/derivatives/fmriprep-${FMRIPREP_VERSION}"
-ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm"
+DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
 CONTRAST_DIR="$HOME/contrasts"
-PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+METHOD="parametric"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTI_FILE=""
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
 # sbatch --array=0 second_level.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array
 TASKS=( $@ )
-# slurm job value; essentially extracting sub-{id}
-if [ ${#TASKS[@]} -eq 0 ]; then
-    TASK=${DEFAULT_TASKS[${SLURM_ARRAY_TASK_ID}]}
+# slurm job value; essentially extracting sub-id
+if [ $#TASKS[@] -eq 0 ]; then
+    TASK=$DEFAULT_TASKS[$SLURM_ARRAY_TASK_ID]
 else
-	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
+	TASK=$TASKS[$SLURM_ARRAY_TASK_ID]
 fi
 
 DST_DIR="$ANALYSIS_DIR/$TASK"
-mkdir -p ${DST_DIR}
+mkdir -p $DST_DIR
 
-CMD="${PYTHON} second_level.py \
-	--bids_dir ${BIDS_DIR} \
+CMD="$PYTHON second_level.py \
+	--bids_dir $BIDS_DIR \
     --contrast_dir $CONTRAST_DIR \
-	--afni_img_path ${AFNI_IMG_PATH} \
-	--deriv_dir ${DERIV_DIR} \
-	--dst_dir ${DST_DIR} \
-	--task ${TASK} \
+	--deriv_dir $DERIV_DIR \
+	--dst_dir $DST_DIR \
+	--method $METHOD \
+	--afni_img_path $AFNI_IMG_PATH \
+	--task $TASK \
     --n_cores $SLURM_CPUS_PER_TASK"
 
 if [[ -n $EXCLUDE_NIFTI_FILE ]]; then
-	CMD+=" --exclude_niftis_file ${EXCLUDE_NIFTI_FILE}"
+	CMD+=" --exclude_niftis_file $EXCLUDE_NIFTI_FILE"
+fi
+
+if [[ $METHOD == "nonparametric" ]]; then
+	PALM_IMG_PATH="/projects/bigos_lab/apptainer-images/palm.sif"
+	CMD+=" --palm_img_path $PALM_IMG_PATH"
 fi
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

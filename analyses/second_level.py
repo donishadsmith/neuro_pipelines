@@ -1,9 +1,10 @@
-import argparse, subprocess
+import argparse, subprocess, sys
 from functools import lru_cache
 from pathlib import Path
 
-import bids, pandas as pd, nibabel as nib
+import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
+from nilearn.image import new_img_like
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
@@ -12,6 +13,9 @@ from _utils import get_task_contrasts
 
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
+
+EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
+CATEGORICAL_VARS = set(["race", "education", "sex"])
 
 
 def _get_cmd_args():
@@ -26,8 +30,6 @@ def _get_cmd_args():
         default=None,
         help="Root of the derivatives directory.",
     )
-    # Doing contrasts as opposed to BRIK selection to prevent indexing errors
-    # in the event subject has the stats BRIK but not a specific contrast.
     parser.add_argument(
         "--contrast_dir",
         dest="contrast_dir",
@@ -57,20 +59,67 @@ def _get_cmd_args():
         dest="mask_threshold",
         default=0.5,
         required=False,
+        type=float,
         help="Value between 0 to 1 denoting the level of intersection for the masks.",
     )
     parser.add_argument(
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
-        help="Path to Singularity image of Afni with R.",
+        help="Path to Apptainer image of Afni with R.",
+    )
+    parser.add_argument(
+        "--palm_img_path",
+        dest="palm_img_path",
+        required=False,
+        default=None,
+        help=(
+            "Path to apptainer image of FSL Palm. "
+            "Required if method is nonparametric."
+        ),
+    )
+    parser.add_argument(
+        "--method",
+        dest="method",
+        default="parametric",
+        choices=["parametric", "nonparametric"],
+        required=False,
+        help="Whether to use 3dlmer (parametric) or Palm (nonparametric).",
+    )
+    parser.add_argument(
+        "--n_permutations",
+        dest="n_permutations",
+        default=10000,
+        type=int,
+        required=False,
+        help="If method is nonparametric, the number of permutations to pass to Palm.",
+    )
+    parser.add_argument(
+        "--voxel_threshold",
+        dest="voxel_threshold",
+        default=3.291,
+        type=float,
+        required=False,
+        help=(
+            "If method is nonparametric, the cluster-forming/voxel threshold (z-score) "
+            " to pass to Palm for two-tailed."
+        ),
+    )
+    parser.add_argument(
+        "--cluster_significance",
+        dest="cluster_significance",
+        default=0.05,
+        type=float,
+        required=False,
+        help="Significance threshold for cluster correction.",
     )
     parser.add_argument(
         "--n_cores",
         dest="n_cores",
         default=1,
+        type=int,
         required=False,
-        help="Number of cores to use.",
+        help="Number of cores to use for 3dlmer when method is parametric.",
     )
     parser.add_argument(
         "--exclude_niftis_file",
@@ -78,12 +127,8 @@ def _get_cmd_args():
         default=None,
         required=False,
         help=(
-            "Prefixes of the filename of the NIfTI images to exclude not the full filename. "
-            "Entities included should be 'sub', 'ses', 'task', and 'run' "
-            "(i.e. 'sub-01_ses-01_task-nback_run-01' not "
-            "'sub-01_ses-01_task-nback_run-01_desc_bold.nii.gz'). Should contain a single "
-            "column named 'nifti_prefix_filename' Files excluded should be determined using MRIQC or "
-            "other factors such as participant falling asleep during task or too many excluded volumes."
+            "Prefixes of the filename of the NIfTI images to exclude. "
+            "Should contain a single column named 'nifti_prefix_filename'."
         ),
     )
 
@@ -99,7 +144,7 @@ def filter_contrasts_files(contrast_files, exclude_niftis_file):
         return contrast_files
 
     df = pd.read_csv(exclude_niftis_file, sep=None, engine="python")
-    exlcuded_niftis_prefixes = [
+    excluded_niftis_prefixes = [
         Path(nifti_prefix_filename).name.split("_desc")[0]
         for nifti_prefix_filename in df["nifti_prefix_filename"].tolist()
     ]
@@ -107,12 +152,11 @@ def filter_contrasts_files(contrast_files, exclude_niftis_file):
     return [
         contrast_file
         for contrast_file in contrast_files
-        if Path(contrast_file).name.split("_space")[0] not in exlcuded_niftis_prefixes
+        if Path(contrast_file).name.split("_space")[0] not in excluded_niftis_prefixes
     ]
 
 
 def get_subjects(contrast_files):
-    # Get the available subjects from the contrasts
     return sorted([get_entity_value(file, "sub") for file in contrast_files])
 
 
@@ -142,19 +186,23 @@ def create_data_table(bids_dir, subject_list, contrast_files):
 
     all_sessions = pd.concat(sessions_dfs, ignore_index=True)
     data_table = all_sessions.merge(participants_df, on="participant_id")
+
+    if "acq_date" in data_table.columns:
+        data_table = data_table.drop("acq_date", axis=1)
+
     column_names = (
-        ["participant_id"]
+        ["participant_id", "dose"]
         + [
             name
             for name in data_table.columns
-            if name not in ["participant_id", "InputFile"]
+            if name not in ["participant_id", "dose", "InputFile"]
         ]
         + ["InputFile"]
     )
+
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna()
-
-    data_table["dose"] = data_table["dose"].astype(int).astype(str)
+    data_table["dose"] = data_table["dose"].astype(int)
 
     return data_table
 
@@ -181,7 +229,6 @@ def create_group_mask(layout, task, space, mask_threshold, contrast_files):
         )
 
         mask_files = [mask_file for mask_file in mask_files if space in str(mask_file)]
-
         subject_mask_files.extend(mask_files)
 
     return intersect_masks(subject_mask_files, threshold=mask_threshold)
@@ -205,6 +252,207 @@ def get_glt_codes_str(data_table):
     return glt_str
 
 
+def get_model_str(data_table):
+    exclude = set(EXCLUDE_COLS).difference(["dose"])
+    columns = [col for col in data_table.columns if col not in exclude]
+
+    model_str = "+".join(columns)
+    model_str += "+(1|participant_id)"
+
+    LGR.info(f"The following model will be used: {model_str}")
+
+    return model_str
+
+
+def get_centering_str(data_table):
+    exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
+    continuous_vars = set(data_table.columns).difference(exclude)
+    quoted_vars = [f"'{var}'" for var in continuous_vars]
+    quoted_zeroes = ["'0'"] * len(continuous_vars)
+
+    centering_str = (
+        f"-qVars {' '.join(quoted_vars)}  -qVarCenters {' '.join(quoted_zeroes)} "
+    )
+
+    return centering_str
+
+
+def convert_table_to_matrices(data_table, dst_dir, task, contrast):
+    """
+    Takes the data table and creates three matrices for PALM.
+
+    - design_matrix_file: Design matrix CSV
+    - eb_file: Exchangeability blocks file
+    - contrast_matrix_file: Contrast matrix CSV
+    """
+    design_matrix_file = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-design_matrix.csv"
+    )
+    eb_file = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-exchangeability_blocks.csv"
+    )
+    contrast_matrix_file = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-contrast_matrix.csv"
+    )
+
+    eb_data = data_table["participant_id"].factorize()[0] + 1
+    LGR.info(f"Saving eb file to: {eb_file}")
+    np.savetxt(eb_file, eb_data, delimiter=",", fmt="%d")
+
+    available_doses = sorted(data_table["dose"].unique())
+    LGR.info(f"Available doses: {available_doses}")
+
+    dose_dummies = pd.get_dummies(data_table["dose"], prefix="dose").astype(int)
+    design_components = [dose_dummies]
+
+    categorical_cols = list(
+        set(["race", "education", "sex"]).intersection(data_table.columns.tolist())
+    )
+
+    continuous_cols = [
+        col
+        for col in data_table.columns
+        if col not in EXCLUDE_COLS and col not in categorical_cols
+    ]
+
+    if continuous_cols:
+        covariates = data_table[continuous_cols].copy()
+        for col in continuous_cols:
+            covariates[col] = covariates[col] - covariates[col].mean()
+
+        design_components.append(covariates)
+
+    if categorical_cols:
+        # TODO: check drop_first
+        for col in categorical_cols:
+            dummies = pd.get_dummies(
+                data_table[col], prefix=col, drop_first=True
+            ).astype(int)
+            design_components.append(dummies)
+
+    design_matrix = pd.concat(design_components, axis=1)
+
+    LGR.info(f"Design matrix columns: {design_matrix.columns.tolist()}")
+    LGR.info(f"Saving design matrix file to: {design_matrix_file}")
+    design_matrix.to_csv(design_matrix_file, sep=",", header=False, index=False)
+
+    contrasts = []
+    glt_codes = []
+    dose_to_col = {dose: index for index, dose in enumerate(available_doses)}
+    for index, dose_high in enumerate(available_doses):
+        for dose_low in available_doses[:index]:
+            vector = np.zeros(design_matrix.shape[1])
+            vector[dose_to_col[dose_high]] = 1
+            vector[dose_to_col[dose_low]] = -1
+            contrasts.append(vector)
+            glt_codes.append(f"{dose_high}_vs_{dose_low}")
+
+    contrast_matrix = np.array(contrasts)
+    LGR.info(f"Contrast names: {glt_codes}")
+    LGR.info(f"Saving contrast matrix file to: {contrast_matrix_file}")
+    np.savetxt(contrast_matrix_file, contrast_matrix, delimiter=",", fmt="%d")
+
+    glt_codes_file = dst_dir / f"task-{task}_contrast-{contrast}_desc-glt_codes.txt"
+    with open(glt_codes_file, "w") as f:
+        for i, name in enumerate(glt_codes, 1):
+            f.write(f"c{i}: {name}\n")
+
+    return design_matrix_file, eb_file, contrast_matrix_file, glt_codes
+
+
+def perform_palm(
+    task,
+    contrast,
+    n_permutations,
+    voxel_threshold,
+    dst_dir,
+    contrast_files,
+    group_mask_filename,
+    design_matrix_file,
+    eb_file,
+    contrast_matrix_file,
+    afni_img_path,
+    palm_img_path,
+):
+    concatenated_filename = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-concatenated.nii.gz"
+    )
+    output_filename_prefix = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-nonparametric"
+    )
+
+    # Concatenate images using AFNI
+    cmd = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dTcat "
+        f"-prefix {concatenated_filename} "
+        f"{' '.join([str(f) for f in contrast_files])}"
+    )
+
+    LGR.info(f"Concatenating images: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+    # Run PALM
+    cmd = (
+        f"apptainer run -B /projects:/projects {palm_img_path} "
+        f"-i {concatenated_filename} "
+        f"-m {group_mask_filename} "
+        f"-d {design_matrix_file} "
+        f"-t {contrast_matrix_file} "
+        f"-eb {eb_file} "
+        "-ise "
+        "-within "
+        f"-n {n_permutations} "
+        f"-C {voxel_threshold} "
+        "-Cstat extent "
+        "-tfce_C 6 "  # NN1 connectivity (matches nilearn)
+        "-twotail "
+        "-logp "
+        "-savedof "
+        f"-o {output_filename_prefix}"
+    )
+
+    LGR.info(f"Running PALM: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+    return output_filename_prefix
+
+
+def threshold_palm_output(output_filename_prefix, glt_codes, cluster_significance):
+    output_dir = output_filename_prefix.parent
+    prefix = output_filename_prefix.name
+
+    logp_threshold = -np.log10(cluster_significance)
+    LGR.info(
+        f"Using -log10(p) threshold: {logp_threshold:.4f} (cluster_significance={cluster_significance})"
+    )
+
+    for index, glt_code in enumerate(glt_codes, 1):
+        LGR.info(f"Processing contrast {index}: {glt_code}")
+
+        # PALM output filenames (with -twotail and cluster correction)
+        # Format: {prefix}_clustere_tstat_fwep_c{#}.nii.gz
+        tstat_file = output_dir / f"{prefix}_vox_tstat_c{index}.nii.gz"
+        pval_file = output_dir / f"{prefix}_clustere_tstat_fwep_c{index}.nii.gz"
+
+        tstat_img = nib.load(tstat_file)
+        pval_img = nib.load(pval_file)
+
+        tstat_data = tstat_img.get_fdata()
+        pval_data = pval_img.get_fdata()
+
+        sig_mask = (pval_data > logp_threshold).astype(float)
+        masked_tstat = tstat_data * sig_mask
+        thresholded_img = new_img_like(tstat_img, masked_tstat)
+
+        truncated_prefix = prefix.removesuffix("_desc-nonparametric")
+        thresholded_file = (
+            output_dir
+            / f"{truncated_prefix}_gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
+        )
+        nib.save(thresholded_img, thresholded_file)
+        LGR.info(f"Saved thresholded t-map: {thresholded_file}")
+
+
 def perform_3dlmer(
     task,
     contrast,
@@ -212,8 +460,10 @@ def perform_3dlmer(
     data_table_filename,
     group_mask_filename,
     afni_img_path,
-    n_cores,
+    model_str,
+    center_str,
     glt_str,
+    n_cores,
 ):
     output_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-stats.nii.gz"
     if output_filename.exists():
@@ -224,14 +474,13 @@ def perform_3dlmer(
     if residual_filename.exists():
         LGR.info("Replacing residual file")
         residual_filename.unlink()
-    
+
     cmd = (
-        f"singularity exec -B /projects:/projects {afni_img_path} 3dLMEr "
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dLMEr "
         f"-mask {group_mask_filename} "
-        "-model 'dose+age+(1|participant_id)' "
+        f"-model '{model_str}' "
         f"-jobs {n_cores} "
-        "-qVars 'age' "
-        "-qVarCenters '0' "
+        f"{center_str}"
         "-dbgArgs "
         f"{glt_str}"
         f"-prefix {output_filename} "
@@ -252,15 +501,20 @@ def main(
     space,
     mask_threshold,
     afni_img_path,
+    palm_img_path,
+    method,
+    n_permutations,
+    voxel_threshold,
+    cluster_significance,
     n_cores,
     exclude_niftis_file,
 ):
     bids_dir = Path(bids_dir)
-    deriv_dir = Path(deriv_dir)
+    deriv_dir = Path(deriv_dir) if deriv_dir else None
     contrast_dir = Path(contrast_dir)
     dst_dir = Path(dst_dir)
 
-    LGR.info(f"TASK: {task}")
+    LGR.info(f"TASK: {task}, METHOD: {method}")
 
     contrasts = get_task_contrasts(task, caller="second_level")
     for contrast in contrasts:
@@ -268,19 +522,15 @@ def main(
         contrast_files = filter_contrasts_files(
             get_contrast_files(contrast_dir, task, contrast), exclude_niftis_file
         )
+
+        if not contrast_files:
+            LGR.warning(f"No contrast files found for {contrast}")
+            continue
+
         subject_list = get_subjects(contrast_files)
+        LGR.info(f"Found {len(contrast_files)} files from {len(subject_list)} subjects")
 
-        LGR.info("Creating datatable.")
-        data_table = create_data_table(bids_dir, subject_list, contrast_files)
-        glt_str = get_glt_codes_str(data_table)
-
-        data_table_filename = (
-            dst_dir / f"task-{task}_contrast-{contrast}_desc-data_table.txt"
-        )
-        LGR.info(f"Saving datatable to: {data_table_filename}")
-        data_table.to_csv(data_table_filename, sep=" ", index=False)
-
-        LGR.info(f"Creating group mask with the current threshold: {mask_threshold}")
+        LGR.info(f"Creating group mask with threshold: {mask_threshold}")
         group_mask = create_group_mask(
             get_layout(bids_dir, deriv_dir),
             task,
@@ -294,16 +544,67 @@ def main(
         LGR.info(f"Saving group mask to: {group_mask_filename}")
         nib.save(group_mask, group_mask_filename)
 
-        perform_3dlmer(
-            task,
-            contrast,
-            dst_dir,
-            data_table_filename,
-            group_mask_filename,
-            afni_img_path,
-            n_cores,
-            glt_str,
+        LGR.info("Creating data table.")
+        data_table = create_data_table(bids_dir, subject_list, contrast_files)
+
+        data_table_filename = (
+            dst_dir / f"task-{task}_contrast-{contrast}_desc-data_table.txt"
         )
+
+        if method == "parametric":
+            data_table["dose"] = data_table["dose"].astype(str)
+            LGR.info(f"Saving data table to: {data_table_filename}")
+            data_table.to_csv(data_table_filename, sep=" ", index=False)
+
+            glt_str = get_glt_codes_str(data_table)
+            model_str = get_model_str(data_table)
+            center_str = get_centering_str(data_table)
+
+            perform_3dlmer(
+                task,
+                contrast,
+                dst_dir,
+                data_table_filename,
+                group_mask_filename,
+                afni_img_path,
+                model_str,
+                center_str,
+                glt_str,
+                n_cores,
+            )
+        else:
+            # Nonparametric (PALM)
+            if not palm_img_path:
+                LGR.critical("palm_img_path is required when method is nonparametric.")
+                sys.exit(1)
+
+            LGR.info(f"Saving data table to: {data_table_filename}")
+            data_table.to_csv(data_table_filename, sep=" ", index=False)
+
+            design_matrix_file, eb_file, contrast_matrix_file, glt_codes = (
+                convert_table_to_matrices(data_table, dst_dir, task, contrast)
+            )
+
+            output_filename_prefix = perform_palm(
+                task,
+                contrast,
+                n_permutations,
+                voxel_threshold,
+                dst_dir,
+                contrast_files,
+                group_mask_filename,
+                design_matrix_file,
+                eb_file,
+                contrast_matrix_file,
+                afni_img_path,
+                palm_img_path,
+            )
+
+            threshold_palm_output(
+                output_filename_prefix,
+                glt_codes,
+                cluster_significance=cluster_significance,
+            )
 
 
 if __name__ == "__main__":

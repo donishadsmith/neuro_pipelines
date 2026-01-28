@@ -13,6 +13,7 @@
 
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+METHOD="parametric"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
@@ -31,9 +32,14 @@ TEMPLATE_IMG_PATH='/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-
 
 CMD="${PYTHON} get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
-	--afni_img_path $AFNI_IMG_PATH \
+    --method $METHOD \
 	--task $TASK \
     --template_img_path $TEMPLATE_IMG_PATH"
+
+if [[ $METHOD == "parametric" ]]; then
+    AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+	CMD+=" --afni_img_path $AFNI_IMG_PATH"
+fi
 
 # hostname
 # id 

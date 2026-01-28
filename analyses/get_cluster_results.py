@@ -1,4 +1,4 @@
-import argparse, itertools, subprocess
+import argparse, itertools, subprocess, sys
 from pathlib import Path
 
 import nibabel as nib, numpy as np, pandas as pd
@@ -34,23 +34,31 @@ def _get_cmd_args():
     parser.add_argument(
         "--afni_img_path",
         dest="afni_img_path",
-        required=True,
-        help="Path to Singularity image of Afni with R.",
+        required=False,
+        default=None,
+        help="Path to Apptainer image of Afni with R.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
-        "--voxel_correction_p",
-        dest="voxel_correction_p",
+        "--method",
+        dest="method",
+        required=False,
+        default="parametric",
+        help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
+    )
+    parser.add_argument(
+        "--stat_threshold",
+        dest="stat_threshold",
         required=False,
         default=0.001,
-        help="P-value for voxel correction.",
+        help="P-value for voxel correction. Only used when method is parametric.",
     )
     parser.add_argument(
         "--cluster_correction_p",
         dest="cluster_correction_p",
         required=False,
         default=0.05,
-        help="P-value for cluster correction.",
+        help="P-value for cluster correction. Only used when method is parametric.",
     )
     parser.add_argument(
         "--template_img_path",
@@ -75,7 +83,7 @@ def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_cod
     )
 
     cmd = (
-        f"singularity exec -B /projects:/projects {afni_img_path} 3dbucket "
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
         f"{stats_filename}'[{glt_code} Z]' "
         f"-prefix {zcore_map_filename} "
         "-overwrite"
@@ -108,9 +116,7 @@ def get_cluster_correction_table(analysis_dir, task, contrast):
     return cluster_correction_table.astype(float)
 
 
-def get_cluster_size(
-    cluster_correction_table, voxel_correction_p, cluster_correction_p
-):
+def get_cluster_size(cluster_correction_table, stat_threshold, cluster_correction_p):
     cluster_p_values = list(map(float, cluster_correction_table.columns[1:]))
     cluster_p_values_arr = np.array(cluster_p_values)
     clust_p_indx = np.where(cluster_p_values_arr == cluster_correction_p)[0][0] + 1
@@ -119,7 +125,7 @@ def get_cluster_size(
     return int(
         np.ceil(
             cluster_correction_table.loc[
-                cluster_correction_table["pthr"] == voxel_correction_p, cluster_p_str
+                cluster_correction_table["pthr"] == stat_threshold, cluster_p_str
             ].to_numpy(copy=True)[0]
         )
     )
@@ -128,7 +134,8 @@ def get_cluster_size(
 def identify_clusters(
     analysis_dir,
     thresholded_img,
-    voxel_correction_p,
+    method,
+    stat_threshold,
     cluster_size,
     task,
     contrast,
@@ -136,7 +143,9 @@ def identify_clusters(
 ):
     clusters_table, labels_map_list = get_clusters_table(
         thresholded_img,
-        stat_threshold=p_to_z(voxel_correction_p),
+        stat_threshold=(
+            p_to_z(stat_threshold) if method == "parametric" else stat_threshold
+        ),
         cluster_threshold=cluster_size,
         two_sided=True,
         return_label_maps=True,
@@ -191,11 +200,11 @@ def identify_clusters(
             peak_stats = clusters_table["Peak Stat"].to_numpy(copy=True)
             if tail == "positive":
                 peak_stats_indices = clusters_table.loc[
-                    np.where(peak_stats > 0), "Peak Stat"
+                    peak_stats > 0, "Peak Stat"
                 ].index.tolist()
             else:
                 peak_stats_indices = clusters_table.loc[
-                    np.where(peak_stats < 0), "Peak Stat"
+                    peak_stats < 0, "Peak Stat"
                 ].index.tolist()
 
             cluster_ids = clusters_table.loc[peak_stats_indices, "Cluster ID"].to_numpy(
@@ -262,12 +271,15 @@ def plot_thresholded_img(
 
         display.savefig(plot_filename, dpi=720)
 
+        display.close()
+
 
 def main(
     analysis_dir,
     afni_img_path,
     task,
-    voxel_correction_p,
+    method,
+    stat_threshold,
     cluster_correction_p,
     template_img_path,
 ):
@@ -279,39 +291,57 @@ def main(
     contrasts = get_task_contrasts(task, caller="get_cluster_results")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
     for contrast, glt_code in contrasts_glts_list:
-        LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
-        zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
-            analysis_dir, afni_img_path, task, contrast, glt_code
-        )
-        if not zcore_map_filename.exists():
-            LGR.warning(
-                f"Skipping the following glt code due to file not existing: {glt_code}"
+        if method == "parametric":
+            if not afni_img_path:
+                LGR.critical("palm_img_path is required when method is nonparametric.")
+                sys.exit(1)
+
+            LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
+            zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
+                analysis_dir, afni_img_path, task, contrast, glt_code
             )
-            continue
+            if not zcore_map_filename.exists():
+                LGR.warning(
+                    f"Skipping the following glt code due to file not existing: {glt_code}"
+                )
+                continue
 
-        cluster_correction_table = get_cluster_correction_table(
-            analysis_dir, task, contrast
-        )
-        cluster_size = get_cluster_size(
-            cluster_correction_table, voxel_correction_p, cluster_correction_p
-        )
+            cluster_correction_table = get_cluster_correction_table(
+                analysis_dir, task, contrast
+            )
+            cluster_size = get_cluster_size(
+                cluster_correction_table, stat_threshold, cluster_correction_p
+            )
 
-        thresholded_img = threshold_img(
-            nib.load(zcore_map_filename),
-            mask_img=nib.load(group_mask_filename),
-            threshold=p_to_z(voxel_correction_p),
-            cluster_threshold=cluster_size,
-        )
-        thresholded_filename = str(zcore_map_filename).replace(
-            "-z_map", "-cluster_corrected"
-        )
-        LGR.info(f"Saving thresholded image to: {thresholded_filename}")
-        nib.save(thresholded_img, thresholded_filename)
+            thresholded_img = threshold_img(
+                nib.load(zcore_map_filename),
+                mask_img=nib.load(group_mask_filename),
+                threshold=p_to_z(stat_threshold),
+                cluster_threshold=cluster_size,
+            )
+            thresholded_filename = str(zcore_map_filename).replace(
+                "-z_map", "-parametric_cluster_corrected"
+            )
+            LGR.info(f"Saving thresholded image to: {thresholded_filename}")
+            nib.save(thresholded_img, thresholded_filename)
+        else:
+            # For non-parametric we assume it is already thresholded, so the nilearn table will
+            # only be used for creating a table and extracting the clusters
+            cluster_size = 0
+            stat_threshold = 0.001  # Small number ensure no zeroes selected
+
+            thresholded_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
+                )
+            )
+            thresholded_img = nib.load(thresholded_filename)
 
         cluster_table_filename = identify_clusters(
             analysis_dir,
             thresholded_img,
-            voxel_correction_p,
+            method,
+            stat_threshold,
             cluster_size,
             task,
             contrast,
