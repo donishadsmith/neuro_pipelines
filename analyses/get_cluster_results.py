@@ -154,7 +154,7 @@ def identify_clusters(
     cluster_table_filename = (
         analysis_dir
         / "cluster_results"
-        / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-cluster_results.csv"
+        / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
     if not clusters_table.empty:
@@ -230,7 +230,7 @@ def identify_clusters(
                 )
                 label_mask_filename = label_base_dir / (
                     f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_clusterid-{cluster_id}"
-                    f"_tail-{tail}_desc-cluster_mask.nii.gz"
+                    f"_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
                 )
 
                 nib.save(label_mask_img, label_mask_filename)
@@ -239,7 +239,7 @@ def identify_clusters(
 
 
 def plot_thresholded_img(
-    analysis_dir, thresholded_img, template_img_path, task, contrast, glt_code
+    analysis_dir, thresholded_img, template_img_path, task, contrast, glt_code, method
 ):
     kwargs = {"stat_map_img": thresholded_img}
     if template_img_path:
@@ -265,7 +265,7 @@ def plot_thresholded_img(
         plot_filename = (
             analysis_dir
             / "stat_plots"
-            / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_displaymode-{mode}_desc-plot.png"
+            / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -362,6 +362,7 @@ def main(
             task,
             contrast,
             glt_code,
+            method,
         )
 
 
