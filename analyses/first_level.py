@@ -5,6 +5,7 @@ import bids, numpy as np, pandas as pd
 
 from nifti2bids._helpers import iterable_to_str
 from nifti2bids.logging import setup_logger
+from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
 
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
@@ -161,29 +162,6 @@ def get_global_signal_regressors(confounds_df, n_motion_parameters):
     LGR.info(f"Using global signal parameters: {global_params}")
 
     return confounds_df[global_params].to_numpy(copy=True)
-
-
-def get_n_dummy(confounds_df, n_dummy_scans):
-    if n_dummy_scans == "auto":
-        n_dummy_scans = len(
-            [col.startswith("non_steady_state_outlier") for col in confounds_df.columns]
-        )
-
-    LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
-
-    return n_dummy_scans
-
-
-def get_censor_mask(confounds_df, n_dummy_scans, fd):
-    censor_mask = np.ones(confounds_df.shape[0])
-    if n_dummy_scans > 0:
-        censor_mask[:n_dummy_scans] = 0
-
-    if fd:
-        fd_arr = confounds_df["framewise_displacement"].fillna(0).to_numpy(copy=True)
-        censor_mask[fd_arr > fd] = 0
-
-    return censor_mask
 
 
 def create_censor_file(subject_dir, censor_mask):
@@ -611,9 +589,17 @@ def main(
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
-        n_dummy_scans = get_n_dummy(confounds_df, n_dummy_scans)
+        if n_dummy_scans == "auto":
+            n_dummy_scans = compute_n_dummy_scans(confounds_df)
+            LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
+
         # Censor File
-        censor_mask = get_censor_mask(confounds_df, n_dummy_scans, fd)
+        censor_mask = create_censor_mask(
+            confounds_df,
+            column_name="framewise_displacement",
+            n_dummy_scans=n_dummy_scans,
+            threshold=fd,
+        )
 
         # TODO: Incorporate exclusion criteria that is appropriate given the
         # demographics of sample
