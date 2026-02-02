@@ -221,7 +221,7 @@ def _generate_bids_dir_pipeline(
     subjects_visits_date_fmt: str,
     src_data_date_fmt: str,
 ) -> None:
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
+    nifti_files = list(regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True))
 
     if not bids_dir.exists():
         bids_dir.mkdir()
