@@ -57,7 +57,7 @@ def _get_cmd_args():
         "--cluster_correction_p",
         dest="cluster_correction_p",
         required=False,
-        default=0.05,
+        default=0.01,
         help="P-value for cluster correction. Only used when method is parametric.",
     )
     parser.add_argument(
