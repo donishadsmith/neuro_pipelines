@@ -74,6 +74,16 @@ def p_to_z(p_value, two_sided=True):
     return norm.ppf(1 - p_value / (2 if two_sided else 1))
 
 
+def get_glt_codes_for_method(method):
+    base_glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
+    
+    if method == "nonparametric":
+        reversed_glt_codes = ["0_vs_5", "0_vs_10", "5_vs_10"]
+        return base_glt_codes + reversed_glt_codes
+    
+    return base_glt_codes
+
+
 def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_code):
     stats_filename = next(
         analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-stats.nii.gz")
@@ -131,6 +141,12 @@ def get_cluster_size(cluster_correction_table, stat_threshold, cluster_correctio
     )
 
 
+def get_interpretation_labels(glt_code):
+    first_label, second_label = glt_code.split("_vs_")
+
+    return first_label, second_label
+
+
 def identify_clusters(
     analysis_dir,
     thresholded_img,
@@ -147,7 +163,7 @@ def identify_clusters(
             p_to_z(stat_threshold) if method == "parametric" else stat_threshold
         ),
         cluster_threshold=cluster_size,
-        two_sided=True,
+        two_sided=True if method == "parametric" else False,
         return_label_maps=True,
     )
 
@@ -157,9 +173,9 @@ def identify_clusters(
         / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
+    
     if not clusters_table.empty:
-        # Add interpretation
-        first_label, second_label = glt_code.split("_vs_")
+        first_label, second_label = get_interpretation_labels(glt_code)
 
         clusters_table["Cluster ID"] = clusters_table["Cluster ID"].astype(str)
 
@@ -178,17 +194,13 @@ def identify_clusters(
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
 
         # Get label map
-        # Make no assumption about labels_map order,
-        # one map is positive, the other is negative
         label_base_dir = analysis_dir / "cluster_masks"
         label_base_dir.mkdir(parents=True, exist_ok=True)
         for label_map in labels_map_list:
-            # Note: returns sorted array
             label_ids = np.unique(label_map.get_fdata()[label_map.get_fdata() != 0])
             if label_ids.shape[0] == 0:
                 continue
 
-            # Label ids may not correspond to cluster ids in the table
             label_map_fdata = label_map.get_fdata()
             thresholded_img_fdata = thresholded_img.get_fdata()
 
@@ -210,11 +222,7 @@ def identify_clusters(
             cluster_ids = clusters_table.loc[peak_stats_indices, "Cluster ID"].to_numpy(
                 copy=True
             )
-            # The cluster IDs are integers or an integer with a letter, if changed possibly use
-            # not any(e.isalpha() for e in str(label)
             cluster_ids = [label for label in cluster_ids if label.isdigit()]
-            # In source code, ids in label map go from 1 to N with 1 being the highest peak
-            # DataFrame is sorted in highest abolute peak for positive and negative tail
             cluster_id_map = {
                 index: label for index, label in enumerate(cluster_ids, start=1)
             }
@@ -251,8 +259,9 @@ def plot_thresholded_img(
     else:
         contrast_name = contrast
 
-    group_names = [f"{dose} mg MPH" for dose in glt_code.split("_vs_")]
-    first_group, second_group = group_names
+    first_label, second_label = get_interpretation_labels(glt_code)
+    first_group = f"{first_label} mg MPH"
+    second_group = f"{second_label} mg MPH"
     title = (
         f"Task: {task} Contrast: {contrast_name} Group: {first_group} > {second_group}"
     )
@@ -285,18 +294,22 @@ def main(
 ):
     analysis_dir = Path(analysis_dir)
 
-    LGR.info(f"TASK: {task}")
+    LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
+    glt_codes = get_glt_codes_for_method(method)
+    LGR.info(f"GLT codes to process: {glt_codes}")
+    
     contrasts = get_task_contrasts(task, caller="get_cluster_results")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
+    
     for contrast, glt_code in contrasts_glts_list:
+        LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
+        
         if method == "parametric":
             if not afni_img_path:
-                LGR.critical("palm_img_path is required when method is nonparametric.")
+                LGR.critical("afni_img_path is required when method is parametric.")
                 sys.exit(1)
 
-            LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
             zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
                 analysis_dir, afni_img_path, task, contrast, glt_code
             )
@@ -325,16 +338,22 @@ def main(
             LGR.info(f"Saving thresholded image to: {thresholded_filename}")
             nib.save(thresholded_img, thresholded_filename)
         else:
-            # For non-parametric we assume it is already thresholded, so the nilearn table will
-            # only be used for creating a table and extracting the clusters
+            # For non-parametric, files are already thresholded
             cluster_size = 0
-            stat_threshold = 0.001  # Small number ensure no zeroes selected
+            stat_threshold = 0.001  # Small number to ensure no zeroes selected
 
-            thresholded_filename = next(
-                analysis_dir.rglob(
-                    f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
+            try:
+                thresholded_filename = next(
+                    analysis_dir.rglob(
+                        f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
+                    )
                 )
-            )
+            except Exception:
+                LGR.critical(
+                    f"Skipping {glt_code}: no thresholded file found"
+                )
+                continue
+                
             thresholded_img = nib.load(thresholded_filename)
 
         cluster_table_filename = identify_clusters(

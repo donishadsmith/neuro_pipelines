@@ -279,11 +279,16 @@ def get_centering_str(data_table):
 
 def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     """
-    Takes the data table and creates three matrices for PALM.
+    Takes the data table and creates matrices for PALM.
 
+    For one-tailed tests, we create separate contrast matrices for positive
+    and negative directions.
+
+    Returns:
     - design_matrix_file: Design matrix CSV
     - eb_file: Exchangeability blocks file
-    - contrast_matrix_file: Contrast matrix CSV
+    - contrast_files_dict: Dict with 'pos' and 'neg' contrast matrix files
+    - glt_codes_dict: Dict with 'pos' and 'neg' glt code lists
     """
     design_matrix_file = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-design_matrix.csv"
@@ -291,8 +296,11 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     eb_file = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-exchangeability_blocks.csv"
     )
-    contrast_matrix_file = (
-        dst_dir / f"task-{task}_contrast-{contrast}_desc-contrast_matrix.csv"
+    contrast_matrix_file_pos = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-contrast_matrix_pos.csv"
+    )
+    contrast_matrix_file_neg = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-contrast_matrix_neg.csv"
     )
 
     eb_data = data_table["participant_id"].factorize()[0] + 1
@@ -323,7 +331,6 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
         design_components.append(covariates)
 
     if categorical_cols:
-        # TODO: check drop_first
         for col in categorical_cols:
             dummies = pd.get_dummies(
                 data_table[col], prefix=col, drop_first=True
@@ -336,28 +343,61 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     LGR.info(f"Saving design matrix file to: {design_matrix_file}")
     design_matrix.to_csv(design_matrix_file, sep=",", header=False, index=False)
 
-    contrasts = []
-    glt_codes = []
+    # Build contrasts for both directions
+    contrasts_pos = []
+    contrasts_neg = []
+    glt_codes_pos = []
+    glt_codes_neg = []
+
     dose_to_col = {dose: index for index, dose in enumerate(available_doses)}
+
     for index, dose_high in enumerate(available_doses):
         for dose_low in available_doses[:index]:
-            vector = np.zeros(design_matrix.shape[1])
-            vector[dose_to_col[dose_high]] = 1
-            vector[dose_to_col[dose_low]] = -1
-            contrasts.append(vector)
-            glt_codes.append(f"{dose_high}_vs_{dose_low}")
+            # Positive direction: dose_high > dose_low (e.g., 5_vs_0)
+            vector_pos = np.zeros(design_matrix.shape[1])
+            vector_pos[dose_to_col[dose_high]] = 1
+            vector_pos[dose_to_col[dose_low]] = -1
+            contrasts_pos.append(vector_pos)
+            glt_codes_pos.append(f"{dose_high}_vs_{dose_low}")
 
-    contrast_matrix = np.array(contrasts)
-    LGR.info(f"Contrast names: {glt_codes}")
-    LGR.info(f"Saving contrast matrix file to: {contrast_matrix_file}")
-    np.savetxt(contrast_matrix_file, contrast_matrix, delimiter=",", fmt="%d")
+            # Negative direction: dose_low > dose_high (e.g., 0_vs_5)
+            vector_neg = np.zeros(design_matrix.shape[1])
+            vector_neg[dose_to_col[dose_low]] = 1
+            vector_neg[dose_to_col[dose_high]] = -1
+            contrasts_neg.append(vector_neg)
+            glt_codes_neg.append(f"{dose_low}_vs_{dose_high}")
 
+    contrast_matrix_pos = np.array(contrasts_pos)
+    contrast_matrix_neg = np.array(contrasts_neg)
+
+    LGR.info(f"Positive contrast names: {glt_codes_pos}")
+    LGR.info(f"Saving positive contrast matrix file to: {contrast_matrix_file_pos}")
+    np.savetxt(contrast_matrix_file_pos, contrast_matrix_pos, delimiter=",", fmt="%d")
+
+    LGR.info(f"Negative contrast names: {glt_codes_neg}")
+    LGR.info(f"Saving negative contrast matrix file to: {contrast_matrix_file_neg}")
+    np.savetxt(contrast_matrix_file_neg, contrast_matrix_neg, delimiter=",", fmt="%d")
+
+    # Save glt codes for reference
     glt_codes_file = dst_dir / f"task-{task}_contrast-{contrast}_desc-glt_codes.txt"
     with open(glt_codes_file, "w") as f:
-        for i, name in enumerate(glt_codes, 1):
-            f.write(f"c{i}: {name}\n")
+        f.write("# Positive direction contrasts:\n")
+        for i, name in enumerate(glt_codes_pos, 1):
+            f.write(f"c{i}_pos: {name}\n")
+        f.write("\n# Negative direction contrasts:\n")
+        for i, name in enumerate(glt_codes_neg, 1):
+            f.write(f"c{i}_neg: {name}\n")
 
-    return design_matrix_file, eb_file, contrast_matrix_file, glt_codes
+    contrast_files_dict = {
+        "pos": contrast_matrix_file_pos,
+        "neg": contrast_matrix_file_neg,
+    }
+    glt_codes_dict = {
+        "pos": glt_codes_pos,
+        "neg": glt_codes_neg,
+    }
+
+    return design_matrix_file, eb_file, contrast_files_dict, glt_codes_dict
 
 
 def perform_palm(
@@ -370,87 +410,102 @@ def perform_palm(
     group_mask_filename,
     design_matrix_file,
     eb_file,
-    contrast_matrix_file,
+    contrast_matrix_files_dict,
     afni_img_path,
     palm_img_path,
 ):
     concatenated_filename = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-concatenated.nii.gz"
     )
-    output_filename_prefix = (
-        dst_dir / f"task-{task}_contrast-{contrast}_desc-nonparametric"
-    )
 
-    # Concatenate images using AFNI
-    cmd = (
-        f"apptainer exec -B /projects:/projects {afni_img_path} 3dTcat "
-        f"-prefix {concatenated_filename} "
-        f"{' '.join([str(f) for f in contrast_files])}"
-    )
+    # Concatenate images using AFNI (only once)
+    if not concatenated_filename.exists():
+        cmd = (
+            f"apptainer exec -B /projects:/projects {afni_img_path} 3dTcat "
+            f"-prefix {concatenated_filename} "
+            f"{' '.join([str(f) for f in contrast_files])}"
+        )
+        LGR.info(f"Concatenating images: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+    else:
+        LGR.info(f"Using existing concatenated file: {concatenated_filename}")
 
-    LGR.info(f"Concatenating images: {cmd}")
-    subprocess.run(cmd, shell=True, check=True)
+    output_prefixes = {}
 
-    # Run PALM
-    cmd = (
-        f"apptainer run -B /projects:/projects {palm_img_path} "
-        f"-i {concatenated_filename} "
-        f"-m {group_mask_filename} "
-        f"-d {design_matrix_file} "
-        f"-t {contrast_matrix_file} "
-        f"-eb {eb_file} "
-        "-ise "
-        "-within "
-        f"-n {n_permutations} "
-        f"-C {voxel_threshold} "
-        "-Cstat extent "
-        "-tfce_C 6 "  # NN1 connectivity (matches nilearn)
-        "-twotail "
-        "-logp "
-        "-savedof "
-        f"-o {output_filename_prefix}"
-    )
+    for direction in ["pos", "neg"]:
+        output_prefix = (
+            dst_dir / f"task-{task}_contrast-{contrast}_desc-nonparametric_{direction}"
+        )
+        contrast_matrix_file = contrast_matrix_files_dict[direction]
 
-    LGR.info(f"Running PALM: {cmd}")
-    subprocess.run(cmd, shell=True, check=True)
+        cmd = (
+            f"apptainer run -B /projects:/projects {palm_img_path} "
+            f"-i {concatenated_filename} "
+            f"-m {group_mask_filename} "
+            f"-d {design_matrix_file} "
+            f"-t {contrast_matrix_file} "
+            f"-eb {eb_file} "
+            "-ise "
+            "-within "
+            f"-n {n_permutations} "
+            f"-C {voxel_threshold} "
+            "-Cstat extent "
+            "-logp "
+            "-savedof "
+            f"-o {output_prefix}"
+        )
 
-    return output_filename_prefix
+        LGR.info(f"Running PALM ({direction} direction): {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+
+        output_prefixes[direction] = output_prefix
+
+    return output_prefixes
 
 
-def threshold_palm_output(output_filename_prefix, glt_codes, cluster_significance):
-    output_dir = output_filename_prefix.parent
-    prefix = output_filename_prefix.name
-
+def threshold_palm_output(
+    output_prefixes, glt_codes_dict, cluster_significance, dst_dir
+):
     logp_threshold = -np.log10(cluster_significance)
     LGR.info(
-        f"Using -log10(p) threshold: {logp_threshold:.4f} (cluster_significance={cluster_significance})"
+        f"Using -log10(p) threshold: {logp_threshold:.4f} "
+        f"(cluster_significance={cluster_significance})"
     )
 
-    for index, glt_code in enumerate(glt_codes, 1):
-        LGR.info(f"Processing contrast {index}: {glt_code}")
+    for direction, prefix_path in output_prefixes.items():
+        glt_codes = glt_codes_dict[direction]
+        output_dir = prefix_path.parent
+        prefix = prefix_path.name
 
-        # PALM output filenames (with -twotail and cluster correction)
-        # Format: {prefix}_clustere_tstat_fwep_c{#}.nii.gz
-        tstat_file = output_dir / f"{prefix}_vox_tstat_c{index}.nii.gz"
-        pval_file = output_dir / f"{prefix}_clustere_tstat_fwep_c{index}.nii.gz"
+        for index, glt_code in enumerate(glt_codes, 1):
+            LGR.info(f"Processing {direction} contrast {index}: {glt_code}")
 
-        tstat_img = nib.load(tstat_file)
-        pval_img = nib.load(pval_file)
+            tstat_file = output_dir / f"{prefix}_vox_tstat_c{index}.nii.gz"
+            pval_file = output_dir / f"{prefix}_clustere_tstat_fwep_c{index}.nii.gz"
 
-        tstat_data = tstat_img.get_fdata()
-        pval_data = pval_img.get_fdata()
+            if not pval_file.exists():
+                LGR.warning(f"Missing file: {pval_file}")
+                continue
 
-        sig_mask = (pval_data > logp_threshold).astype(float)
-        masked_tstat = tstat_data * sig_mask
-        thresholded_img = new_img_like(tstat_img, masked_tstat)
+            tstat_img = nib.load(tstat_file)
+            pval_img = nib.load(pval_file)
 
-        truncated_prefix = prefix.removesuffix("_desc-nonparametric")
-        thresholded_file = (
-            output_dir
-            / f"{truncated_prefix}_gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
-        )
-        nib.save(thresholded_img, thresholded_file)
-        LGR.info(f"Saved thresholded t-map: {thresholded_file}")
+            tstat_data = tstat_img.get_fdata()
+            pval_data = pval_img.get_fdata()
+
+            sig_mask = (pval_data > logp_threshold).astype(float)
+            masked_tstat = tstat_data * sig_mask
+            thresholded_img = new_img_like(tstat_img, masked_tstat, copy_header=True)
+
+            # Use glt_code in filename (e.g., 5_vs_0 or 0_vs_5)
+            thresholded_file = (
+                dst_dir / f"task-{prefix.split('task-')[1].split('_contrast')[0]}_"
+                f"contrast-{prefix.split('contrast-')[1].split('_desc')[0]}_"
+                f"gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
+            )
+            nib.save(thresholded_img, thresholded_file)
+
+            LGR.info(f"Saved thresholded t-map: {thresholded_file}")
 
 
 def perform_3dlmer(
@@ -581,11 +636,11 @@ def main(
             LGR.info(f"Saving data table to: {data_table_filename}")
             data_table.to_csv(data_table_filename, sep=" ", index=False)
 
-            design_matrix_file, eb_file, contrast_matrix_file, glt_codes = (
+            design_matrix_file, eb_file, contrast_matrix_files_dict, glt_codes_dict = (
                 convert_table_to_matrices(data_table, dst_dir, task, contrast)
             )
 
-            output_filename_prefix = perform_palm(
+            output_prefixes = perform_palm(
                 task,
                 contrast,
                 n_permutations,
@@ -595,15 +650,16 @@ def main(
                 group_mask_filename,
                 design_matrix_file,
                 eb_file,
-                contrast_matrix_file,
+                contrast_matrix_files_dict,
                 afni_img_path,
                 palm_img_path,
             )
 
             threshold_palm_output(
-                output_filename_prefix,
-                glt_codes,
+                output_prefixes,
+                glt_codes_dict,
                 cluster_significance=cluster_significance,
+                dst_dir=dst_dir,
             )
 
 
