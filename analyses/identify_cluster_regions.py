@@ -20,8 +20,8 @@ def _get_cmd_args():
         dest="analysis_dir",
         required=True,
         help=(
-            "Root path to directory containing the files with "
-            "acluster MNI coordinated."
+            "Root path to directory containing the cluster table files "
+            "outputted by Nilearn's get_cluster_table"
         ),
     )
     parser.add_argument(

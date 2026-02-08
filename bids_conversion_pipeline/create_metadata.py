@@ -35,7 +35,7 @@ _FUNC_JSON.update(
         "EffectiveEchoSpacing": None,
         "TotalReadoutTime": None,
         "PhaseEncodingAxis": "j",
-        "PhaseEncodingDirection": "j-",
+        "PhaseEncodingDirection": "j",
         "RepetitionTime": None,
         "SliceTiming": None,
         "TaskName": None,

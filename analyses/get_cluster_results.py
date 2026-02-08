@@ -18,8 +18,8 @@ LGR.setLevel("INFO")
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Apply NN1 2-sided cluster correction to data "
-            "and identify significant clusters."
+            "If parametric, apply NN1 2-sided cluster correction to data "
+            "and identify significant clusters. If nonparametric, just identifies significant clusters."
         )
     )
     parser.add_argument(
