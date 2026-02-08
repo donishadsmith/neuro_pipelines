@@ -96,8 +96,8 @@ def _standardize_task_pipeline(
 
 def _rename_mtl_filenames(temp_dir: Path) -> None:
     for subject_folder in temp_dir.glob("*"):
-        nifti_files = regex_glob(
-            subject_folder, pattern=r"^.*\.nii\.gz$", recursive=True
+        nifti_files = list(
+            regex_glob(subject_folder, pattern=r"^.*\.nii\.gz$", recursive=True)
         )
         nifti_files = [
             nifti_file for nifti_file in nifti_files if "mtl" in nifti_file.name.lower()
@@ -133,7 +133,7 @@ def _rename_mtl_filenames(temp_dir: Path) -> None:
 
 def _standardize_nback_filenames(temp_dir: Path, all_desc: list[str]) -> None:
     nback_variants = [desc for desc in all_desc if desc.endswith("back")]
-    nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
+    nifti_files = list(regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True))
 
     nifti_files = [
         nifti_file
