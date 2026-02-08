@@ -12,7 +12,7 @@ def _get_cmd_args():
         "--src_dir",
         dest="src_dir",
         required=True,
-        help=("Path containing the files. " "File naming should be BIDS compliant."),
+        help=("Path containing the files. File naming should be BIDS compliant."),
     )
     parser.add_argument(
         "--bids_dir",
