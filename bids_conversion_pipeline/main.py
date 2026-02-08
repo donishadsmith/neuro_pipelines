@@ -99,8 +99,8 @@ def _get_cmd_args() -> argparse.ArgumentParser:
             "A text file, where the 'subject_id' contaims the subject ID and the "
             "'date' column is the date of visit. Using this parameter is recommended "
             "when data is missing. Ensure all dates have a consistent format. "
-            "**All subject visit dates should be listed.** If a 'dose' column is included, "
-            "then dosages will be included in the sessions TSV file."
+            "**All subject visit dates should be listed AND dates should be in order of earliest to lates.** "
+            "If a 'dose' column is included, then dosages will be included in the sessions TSV file."
         ),
     )
     parser.add_argument(

@@ -76,11 +76,11 @@ def p_to_z(p_value, two_sided=True):
 
 def get_glt_codes_for_method(method):
     base_glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-    
+
     if method == "nonparametric":
         reversed_glt_codes = ["0_vs_5", "0_vs_10", "5_vs_10"]
         return base_glt_codes + reversed_glt_codes
-    
+
     return base_glt_codes
 
 
@@ -173,7 +173,7 @@ def identify_clusters(
         / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
-    
+
     if not clusters_table.empty:
         first_label, second_label = get_interpretation_labels(glt_code)
 
@@ -298,13 +298,13 @@ def main(
 
     glt_codes = get_glt_codes_for_method(method)
     LGR.info(f"GLT codes to process: {glt_codes}")
-    
+
     contrasts = get_task_contrasts(task, caller="get_cluster_results")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
-    
+
     for contrast, glt_code in contrasts_glts_list:
         LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
-        
+
         if method == "parametric":
             if not afni_img_path:
                 LGR.critical("afni_img_path is required when method is parametric.")
@@ -349,11 +349,9 @@ def main(
                     )
                 )
             except Exception:
-                LGR.critical(
-                    f"Skipping {glt_code}: no thresholded file found"
-                )
+                LGR.critical(f"Skipping {glt_code}: no thresholded file found")
                 continue
-                
+
             thresholded_img = nib.load(thresholded_filename)
 
         cluster_table_filename = identify_clusters(

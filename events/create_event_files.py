@@ -235,8 +235,14 @@ def _get_presentation_session(
     )
     if visit_session_map:
         curr_date = [date for date in file_dates if date in excel_file.name][0]
+        date_in_map = curr_date in visit_session_map
+        if not date_in_map:
+            LGR.critical(
+                f"Subject {subject_id} does not have the following date: {curr_date}. "
+                "The date will be used as the session label."
+            )
 
-        return visit_session_map[curr_date]
+        return visit_session_map[curr_date] if date_in_map else curr_date
     else:
         return [date in excel_file.name for date in file_dates].index(True) + 1
 
@@ -335,8 +341,14 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             ].to_numpy(copy=True) + input_df["StimDisplay.OnsetToOnsetTime"].to_numpy(
                 copy=True
             )
+            input_df["Procedure[Block]"] = input_df["Procedure[Block]"].fillna("Rest")
             input_df["Procedure[Block]"] = input_df["Procedure[Block]"].map(
-                {"ExpBloc": "1-back", "ContBloc": "0-back", "Exp2Bloc": "2-back"}
+                {
+                    "ExpBloc": "1-back",
+                    "ContBloc": "0-back",
+                    "Exp2Bloc": "2-back",
+                    "Rest": "Rest",
+                }
             )
             input_df.loc[input_df.index[-1], "Procedure[Block]"] = "Quit"
 
@@ -346,7 +358,7 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
                 procedure_column_name="Procedure[Block]",
                 block_cue_names=("1-back", "0-back", "2-back"),
                 convert_to_seconds=["StimDisplay.OnsetTime", "StimDisplay.OffsetTime"],
-                rest_block_code="Rest",
+                rest_block_codes="Rest",
                 quit_code="Quit",
                 rest_code_frequency="variable",
             )
@@ -420,7 +432,7 @@ def _create_mtl_events_files(
             block_cue_names=(task_name),
             scanner_event_type="Pulse",
             scanner_trigger_code="30",
-            rest_block_code="rest",
+            rest_block_codes="rest",
             quit_code="quit",
             split_cue_as_instruction=True,
         )

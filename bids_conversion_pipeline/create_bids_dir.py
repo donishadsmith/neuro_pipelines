@@ -136,6 +136,7 @@ def _get_subject_visits(
     visit_dates = [
         str(date) if not isinstance(date, float) else date for date in visit_dates
     ]
+
     return {
         f"0{session_id}": date
         for session_id, date in enumerate(list(map(convert_date, visit_dates)), start=1)
@@ -163,6 +164,7 @@ def _get_subject_dosages(
 
 
 def _combine_session_data(
+    subject_id,
     visit_session_map: dict[str, str] | None,
     scan_dates: list[str],
     visit_dosage_map: dict[str, str] | None,
@@ -174,6 +176,20 @@ def _combine_session_data(
             for session_id, date in visit_session_map.items()
             if date in scan_dates
         }
+
+        missing_dates = {
+            date: date
+            for _, date in visit_session_map.items()
+            if date not in scan_dates
+        }
+        if missing_dates:
+            LGR.critical(
+                "The following dates are missing from the subject_visits_file "
+                f"for subject {subject_id} and will be used as the session id if a source "
+                f"folder has these dates: {missing_dates.keys()}"
+            )
+
+            session_scan_date_map.update(missing_dates)
 
     if not session_scan_date_map:
         session_scan_date_map = {
@@ -259,7 +275,7 @@ def _generate_bids_dir_pipeline(
             visit_session_map, visit_dosage_map = None, None
 
         session_data_tuple = _combine_session_data(
-            visit_session_map, scan_dates, visit_dosage_map
+            subject_id, visit_session_map, scan_dates, visit_dosage_map
         )
 
         sessions_dict = {"session_id": [], "acq_time": [], "dose": []}

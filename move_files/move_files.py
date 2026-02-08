@@ -12,10 +12,7 @@ def _get_cmd_args():
         "--src_dir",
         dest="src_dir",
         required=True,
-        help=(
-            "Path containing the files in the first level. "
-            "File naming should be BIDS compliant."
-        ),
+        help=("Path containing the files. " "File naming should be BIDS compliant."),
     )
     parser.add_argument(
         "--bids_dir",
@@ -31,7 +28,10 @@ def main(src_dir, bids_dir):
     src_dir = Path(src_dir)
     bids_dir = Path(bids_dir)
 
-    for src_file in src_dir.glob("*"):
+    for src_file in src_dir.rglob("*"):
+        if not src_file.name.startswith("sub-"):
+            continue
+
         subject = get_entity_value(src_file, "sub", return_entity_prefix=True)
         session = get_entity_value(src_file, "ses", return_entity_prefix=True)
 
