@@ -35,7 +35,7 @@ _FUNC_JSON.update(
         "EffectiveEchoSpacing": None,
         "TotalReadoutTime": None,
         "PhaseEncodingAxis": "j",
-        "PhaseEncodingDirection": "j",
+        "PhaseEncodingDirection": None,
         "RepetitionTime": None,
         "SliceTiming": None,
         "TaskName": None,
@@ -73,6 +73,14 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
                 slice_axis="k",
             )
             json_schema["TaskName"] = get_entity_value(nifti_file, entity="task")
+
+            _, orientation = bids_meta.get_image_orientation(nifti_file)
+            orientation = "".join(orientation)
+            # Philips fat direction is "P", phase encoding is on the "A-P" axis
+            # Assuming either RAS or LPS. Native format is LPS
+            json_schema["PhaseEncodingDirection"] = (
+                "j" if orientation == "RAS" else "j-"
+            )
 
         json_filename = str(nifti_file).replace(".nii.gz", ".json")
         with open(json_filename, "w") as f:
