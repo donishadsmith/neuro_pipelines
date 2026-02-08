@@ -15,7 +15,7 @@ LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
 
 EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
-CATEGORICAL_VARS = set(["race", "education", "sex"])
+CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
 
 
 def _get_cmd_args():
