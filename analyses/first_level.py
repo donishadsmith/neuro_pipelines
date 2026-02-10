@@ -123,7 +123,7 @@ def _get_cmd_args():
 
 def get_cosine_regressors(confounds_df):
     cosine_regressor_names = [
-        col for col in confounds_df.columns if col.startswith("cosine_")
+        col for col in confounds_df.columns if col.startswith("cosine")
     ]
 
     LGR.info(f"Name of cosine parameters: {cosine_regressor_names}")
@@ -529,18 +529,27 @@ def _create_flanker_contrast(timing_dir, regressors_file):
 
 
 def create_design_matrix(
-    subject_dir, smoothed_nifti_file, mask_file, censor_file, contrast_cmd
+    subject_dir,
+    smoothed_nifti_file,
+    mask_file,
+    censor_file,
+    contrast_cmd,
+    cosine_regressor_names,
 ):
     design_matrix_file = subject_dir / str(smoothed_nifti_file).replace(
         "smoothed.nii.gz", "design_matrix.1D"
     )
+
+    polort = -1 if cosine_regressor_names else 4
+
+    LGR.info("Using polort {polort} for 3dDeconvolve.")
 
     cmd = (
         "3dDeconvolve "
         f"-input {smoothed_nifti_file} "
         f"-mask {mask_file} "
         f"-censor {censor_file} "
-        "-polort -1 "
+        f"-polort {polort} "
         "-local_times "
         f"{contrast_cmd['num_stimts']} "
         f"{contrast_cmd['contrasts']} "
@@ -802,6 +811,7 @@ def main(
             mask_file,
             censor_file,
             contrast_cmd,
+            cosine_regressor_names,
         )
 
         # Perform first level
