@@ -18,8 +18,6 @@ sbatch --array=0-1 extract_contrasts.sb 101 102 # Runs these two subjects in par
 
 ## Order
 1. first_level.sb
-2. extract_betas.sb
-3. second_level.sb
-4. compute_cluster_correction.sb
-5. get_cluster_results.sb
-6. identify_cluster_regions.sb
+2. second_level.sb
+3. get_cluster_results.sb
+4. identify_cluster_locations.sb (uses afni whereami to auto identify peak cluster coordinate location as well as how many millimeters of the closes label is to the coordinate)

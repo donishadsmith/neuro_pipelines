@@ -9,7 +9,12 @@ from nilearn.image import new_img_like
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
 
-from _utils import get_task_contrasts
+from _utils import (
+    get_task_contrasts,
+    estimate_noise_smoothness,
+    perform_cluster_simulation,
+    get_number_of_censored_volumes,
+)
 
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
@@ -65,16 +70,19 @@ def _get_cmd_args():
     parser.add_argument(
         "--afni_img_path",
         dest="afni_img_path",
-        required=True,
-        help="Path to Apptainer image of Afni with R.",
-    )
-    parser.add_argument(
-        "--palm_img_path",
-        dest="palm_img_path",
         required=False,
         default=None,
         help=(
-            "Path to apptainer image of FSL Palm using Octave. "
+            "Path to Apptainer image of Afni with R. " "Required if using parametric."
+        ),
+    )
+    parser.add_argument(
+        "--fsl_img_path",
+        dest="fsl_img_path",
+        required=False,
+        default=None,
+        help=(
+            "Path to apptainer image of FSL with Palm using Octave. "
             "Required if method is nonparametric."
         ),
     )
@@ -84,7 +92,13 @@ def _get_cmd_args():
         default="parametric",
         choices=["parametric", "nonparametric"],
         required=False,
-        help="Whether to use 3dlmer (parametric) or Palm (nonparametric).",
+        help=(
+            "Whether to use 3dlmer (parametric) or Palm (nonparametric). "
+            "Typically better to use nonparametric, it doesn't assume the distribution of the "
+            "data and better controls false positives. If parametric is used then the "
+            "acf method method should be used on the residuals to estimate smoothness and "
+            "determine the appropriate cluster size via simulations."
+        ),
     )
     parser.add_argument(
         "--n_permutations",
@@ -95,23 +109,16 @@ def _get_cmd_args():
         help="If method is nonparametric, the number of permutations to pass to Palm.",
     )
     parser.add_argument(
-        "--voxel_threshold",
-        dest="voxel_threshold",
-        default=3.291,
-        type=float,
-        required=False,
-        help=(
-            "If method is nonparametric, the cluster-forming/voxel threshold (z-score) "
-            " to pass to Palm for two-tailed."
-        ),
-    )
-    parser.add_argument(
-        "--cluster_significance",
-        dest="cluster_significance",
+        "--cluster_correction_p",
+        dest="cluster_correction_p",
         default=0.05,
         type=float,
         required=False,
-        help="Significance threshold for cluster correction.",
+        help=(
+            "Significance threshold for cluster significance for nonparametric. "
+            "This script uses the threshold free cluster enhancement approach which "
+            "eliminates the need to select an arbritrary threshold for the voxels (cluster-forming threshold)"
+        ),
     )
     parser.add_argument(
         "--n_cores",
@@ -181,6 +188,19 @@ def create_data_table(bids_dir, subject_list, contrast_files):
                 subject_contrast_file, "ses", return_entity_prefix=True
             )
             df.loc[df["session_id"] == ses_id, "InputFile"] = subject_contrast_file
+            censor_file = ""
+            while not censor_file.name == "func":
+                if censor_file == censor_file.parents[-1]:
+                    break
+                else:
+                    censor_file = censor_file / "censor.1D"
+
+            if censor_file:
+                df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = (
+                    get_number_of_censored_volumes(censor_file)
+                )
+            else:
+                df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = np.nan
 
         sessions_dfs.append(df)
 
@@ -201,7 +221,7 @@ def create_data_table(bids_dir, subject_list, contrast_files):
     )
 
     data_table = data_table.loc[:, column_names]
-    data_table = data_table.dropna()
+    data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
     data_table["dose"] = data_table["dose"].astype(int)
 
     return data_table
@@ -287,8 +307,8 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     Returns:
     - design_matrix_file: Design matrix CSV
     - eb_file: Exchangeability blocks file
-    - contrast_files_dict: Dict with 'pos' and 'neg' contrast matrix files
-    - glt_codes_dict: Dict with 'pos' and 'neg' glt code lists
+    - contrast_files_dict: Dict with "positive" and "negative" contrast matrix files
+    - glt_codes_dict: Dict with "positive" and "negative" glt code lists
     """
     design_matrix_file = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-design_matrix.csv"
@@ -332,6 +352,8 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
 
     if categorical_cols:
         for col in categorical_cols:
+            # Dropping first of other categorical columns to avoid
+            # linear dependency
             dummies = pd.get_dummies(
                 data_table[col], prefix=col, drop_first=True
             ).astype(int)
@@ -389,58 +411,55 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
             f.write(f"c{i}_neg: {name}\n")
 
     contrast_files_dict = {
-        "pos": contrast_matrix_file_pos,
-        "neg": contrast_matrix_file_neg,
+        "positive": contrast_matrix_file_pos,
+        "negative": contrast_matrix_file_neg,
     }
     glt_codes_dict = {
-        "pos": glt_codes_pos,
-        "neg": glt_codes_neg,
+        "positive": glt_codes_pos,
+        "negative": glt_codes_neg,
     }
 
     return design_matrix_file, eb_file, contrast_files_dict, glt_codes_dict
 
 
 def perform_palm(
-    task,
-    contrast,
-    n_permutations,
-    voxel_threshold,
     dst_dir,
     contrast_files,
     group_mask_filename,
     design_matrix_file,
     eb_file,
     contrast_matrix_files_dict,
-    afni_img_path,
-    palm_img_path,
+    fsl_img_path,
+    task,
+    contrast,
+    n_permutations,
 ):
     concatenated_filename = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-concatenated.nii.gz"
     )
 
-    # Concatenate images using AFNI (only once)
-    if not concatenated_filename.exists():
-        cmd = (
-            f"apptainer exec -B /projects:/projects {afni_img_path} 3dTcat "
-            f"-prefix {concatenated_filename} "
-            f"{' '.join([str(f) for f in contrast_files])}"
-        )
-        LGR.info(f"Concatenating images: {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
-    else:
-        LGR.info(f"Using existing concatenated file: {concatenated_filename}")
+    if concatenated_filename.exists():
+        concatenated_filename.unlink()
+
+    cmd = (
+        f"apptainer exec -B /projects:/projects {fsl_img_path} fslmerge "
+        f"-t {concatenated_filename} "
+        f"{' '.join([str(f) for f in contrast_files])}"
+    )
+    LGR.info(f"Concatenating images: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
 
     output_prefixes = {}
-
-    for direction in ["pos", "neg"]:
+    for direction in ["positive", "negative"]:
         output_prefix = (
             dst_dir / f"task-{task}_contrast-{contrast}_desc-nonparametric_{direction}"
         )
         contrast_matrix_file = contrast_matrix_files_dict[direction]
 
         cmd = (
-            f"apptainer run -B /projects:/projects {palm_img_path} "
+            f"apptainer run -B /projects:/projects {fsl_img_path} "
             "octave eval 'palm "
+            "-noniiclass "
             f"-i {concatenated_filename} "
             f"-m {group_mask_filename} "
             f"-d {design_matrix_file} "
@@ -449,8 +468,8 @@ def perform_palm(
             "-ise "
             "-within "
             f"-n {n_permutations} "
-            f"-C {voxel_threshold} "
-            "-Cstat extent "
+            "-T "
+            "-tfce_C 6 "
             "-logp "
             "-savedof "
             f"-o {output_prefix}'"
@@ -465,12 +484,12 @@ def perform_palm(
 
 
 def threshold_palm_output(
-    output_prefixes, glt_codes_dict, cluster_significance, dst_dir
+    output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir
 ):
-    logp_threshold = -np.log10(cluster_significance)
+    logp_threshold = -np.log10(cluster_correction_p)
     LGR.info(
         f"Using -log10(p) threshold: {logp_threshold:.4f} "
-        f"(cluster_significance={cluster_significance})"
+        f"(cluster_significance={cluster_correction_p})"
     )
 
     for direction, prefix_path in output_prefixes.items():
@@ -478,11 +497,14 @@ def threshold_palm_output(
         output_dir = prefix_path.parent
         prefix = prefix_path.name
 
+        # If only one contrast, palm excludes c{index}; however
+        # a minimum of two contrasts are needed since only one tail will
+        # be used
         for index, glt_code in enumerate(glt_codes, 1):
             LGR.info(f"Processing {direction} contrast {index}: {glt_code}")
 
-            tstat_file = output_dir / f"{prefix}_vox_tstat_c{index}.nii.gz"
-            pval_file = output_dir / f"{prefix}_clustere_tstat_fwep_c{index}.nii.gz"
+            tstat_file = output_dir / f"{prefix}_tfce_tstat_c{index}.nii.gz"
+            pval_file = output_dir / f"{prefix}_tfce_tstat_fwep_c{index}.nii.gz"
 
             if not pval_file.exists():
                 LGR.warning(f"Missing file: {pval_file}")
@@ -491,12 +513,11 @@ def threshold_palm_output(
             tstat_img = nib.load(tstat_file)
             pval_img = nib.load(pval_file)
 
-            tstat_data = tstat_img.get_fdata()
-            pval_data = pval_img.get_fdata()
-
-            sig_mask = (pval_data > logp_threshold).astype(float)
-            masked_tstat = tstat_data * sig_mask
-            thresholded_img = new_img_like(tstat_img, masked_tstat, copy_header=True)
+            sig_mask = (pval_img.get_fdata() > logp_threshold).astype(float)
+            masked_tstat = tstat_img.get_fdata() * sig_mask
+            thresholded_img = new_img_like(
+                tstat_img, masked_tstat, affine=tstat_img.affine, copy_header=True
+            )
 
             # Use glt_code in filename (e.g., 5_vs_0 or 0_vs_5)
             thresholded_file = (
@@ -547,6 +568,8 @@ def perform_3dlmer(
     LGR.info(f"Running 3dLMEr: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
+    return residual_filename
+
 
 def main(
     bids_dir,
@@ -557,11 +580,10 @@ def main(
     space,
     mask_threshold,
     afni_img_path,
-    palm_img_path,
+    fsl_img_path,
     method,
     n_permutations,
-    voxel_threshold,
-    cluster_significance,
+    cluster_correction_p,
     n_cores,
     exclude_niftis_file,
 ):
@@ -608,6 +630,10 @@ def main(
         )
 
         if method == "parametric":
+            if not afni_img_path:
+                LGR.critical("afni_img_path is required when method is parametric.")
+                sys.exit(1)
+
             data_table["dose"] = data_table["dose"].astype(str)
             LGR.info(f"Saving data table to: {data_table_filename}")
             data_table.to_csv(data_table_filename, sep=" ", index=False)
@@ -616,7 +642,7 @@ def main(
             model_str = get_model_str(data_table)
             center_str = get_centering_str(data_table)
 
-            perform_3dlmer(
+            residual_filename = perform_3dlmer(
                 task,
                 contrast,
                 dst_dir,
@@ -628,10 +654,26 @@ def main(
                 glt_str,
                 n_cores,
             )
+
+            acf_parameters_filename = estimate_noise_smoothness(
+                dst_dir,
+                afni_img_path,
+                group_mask_filename,
+                residual_filename,
+                contrast,
+            )
+
+            perform_cluster_simulation(
+                dst_dir,
+                afni_img_path,
+                group_mask_filename,
+                acf_parameters_filename,
+                contrast,
+            )
         else:
             # Nonparametric (PALM)
-            if not palm_img_path:
-                LGR.critical("palm_img_path is required when method is nonparametric.")
+            if not fsl_img_path:
+                LGR.critical("fsl_img_path is required when method is nonparametric.")
                 sys.exit(1)
 
             LGR.info(f"Saving data table to: {data_table_filename}")
@@ -642,24 +684,22 @@ def main(
             )
 
             output_prefixes = perform_palm(
-                task,
-                contrast,
-                n_permutations,
-                voxel_threshold,
                 dst_dir,
                 contrast_files,
                 group_mask_filename,
                 design_matrix_file,
                 eb_file,
                 contrast_matrix_files_dict,
-                afni_img_path,
-                palm_img_path,
+                fsl_img_path,
+                task,
+                contrast,
+                n_permutations,
             )
 
             threshold_palm_output(
                 output_prefixes,
                 glt_codes_dict,
-                cluster_significance=cluster_significance,
+                cluster_correction_p,
                 dst_dir=dst_dir,
             )
 

@@ -43,22 +43,22 @@ def _get_cmd_args():
         "--method",
         dest="method",
         required=False,
-        default="parametric",
+        default="nonparametric",
         help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
     )
     parser.add_argument(
-        "--stat_threshold",
-        dest="stat_threshold",
+        "--voxel_correction_p",
+        dest="voxel_correction_p",
         required=False,
         default=0.001,
-        help="P-value for voxel correction. Only used when method is parametric.",
+        help=("P-value for voxel correction. Only used for the parametric approach."),
     )
     parser.add_argument(
         "--cluster_correction_p",
         dest="cluster_correction_p",
         required=False,
-        default=0.01,
-        help="P-value for cluster correction. Only used when method is parametric.",
+        default=0.05,
+        help="P-value for cluster correction.",
     )
     parser.add_argument(
         "--template_img_path",
@@ -126,7 +126,9 @@ def get_cluster_correction_table(analysis_dir, task, contrast):
     return cluster_correction_table.astype(float)
 
 
-def get_cluster_size(cluster_correction_table, stat_threshold, cluster_correction_p):
+def get_cluster_size(
+    cluster_correction_table, voxel_correction_p, cluster_correction_p
+):
     cluster_p_values = list(map(float, cluster_correction_table.columns[1:]))
     cluster_p_values_arr = np.array(cluster_p_values)
     clust_p_indx = np.where(cluster_p_values_arr == cluster_correction_p)[0][0] + 1
@@ -135,7 +137,8 @@ def get_cluster_size(cluster_correction_table, stat_threshold, cluster_correctio
     return int(
         np.ceil(
             cluster_correction_table.loc[
-                cluster_correction_table["pthr"] == stat_threshold, cluster_p_str
+                cluster_correction_table["pthr"] == p_to_z(voxel_correction_p),
+                cluster_p_str,
             ].to_numpy(copy=True)[0]
         )
     )
@@ -160,7 +163,9 @@ def identify_clusters(
     clusters_table, labels_map_list = get_clusters_table(
         thresholded_img,
         stat_threshold=(
-            p_to_z(stat_threshold) if method == "parametric" else stat_threshold
+            p_to_z(stat_threshold)
+            if method == "parametric"
+            else -np.log10(stat_threshold)
         ),
         cluster_threshold=cluster_size,
         two_sided=True if method == "parametric" else False,
@@ -288,7 +293,7 @@ def main(
     afni_img_path,
     task,
     method,
-    stat_threshold,
+    voxel_correction_p,
     cluster_correction_p,
     template_img_path,
 ):
@@ -323,13 +328,13 @@ def main(
                 analysis_dir, task, contrast
             )
             cluster_size = get_cluster_size(
-                cluster_correction_table, stat_threshold, cluster_correction_p
+                cluster_correction_table, voxel_correction_p, cluster_correction_p
             )
 
             thresholded_img = threshold_img(
                 nib.load(zcore_map_filename),
                 mask_img=nib.load(group_mask_filename),
-                threshold=p_to_z(stat_threshold),
+                threshold=p_to_z(voxel_correction_p),
                 cluster_threshold=cluster_size,
             )
             thresholded_filename = str(zcore_map_filename).replace(
@@ -340,8 +345,6 @@ def main(
         else:
             # For non-parametric, files are already thresholded
             cluster_size = 0
-            stat_threshold = 0.001  # Small number to ensure no zeroes selected
-
             try:
                 thresholded_filename = next(
                     analysis_dir.rglob(
@@ -358,7 +361,7 @@ def main(
             analysis_dir,
             thresholded_img,
             method,
-            stat_threshold,
+            cluster_correction_p,
             cluster_size,
             task,
             contrast,

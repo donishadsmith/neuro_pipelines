@@ -15,8 +15,7 @@ BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
 CONTRAST_DIR="$HOME/contrasts"
-METHOD="parametric"
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+METHOD="nonparametric"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTI_FILE=""
 
@@ -40,7 +39,6 @@ CMD="$PYTHON second_level.py \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
 	--method $METHOD \
-	--afni_img_path $AFNI_IMG_PATH \
 	--task $TASK \
     --n_cores $SLURM_CPUS_PER_TASK"
 
@@ -49,8 +47,11 @@ if [[ -n $EXCLUDE_NIFTI_FILE ]]; then
 fi
 
 if [[ $METHOD == "nonparametric" ]]; then
-	PALM_IMG_PATH="/projects/bigos_lab/apptainer-images/palm.sif"
-	CMD+=" --palm_img_path $PALM_IMG_PATH"
+	FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
+	CMD+=" --fsl_img_path $FSL_IMG_PATH"
+else
+	AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+	CMD+=" --afni_img_path $AFNI_IMG_PATH"
 fi
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

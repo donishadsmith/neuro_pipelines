@@ -1,9 +1,9 @@
-import argparse, shutil, subprocess, sys
+import argparse
 from pathlib import Path
 
 from nifti2bids.logging import setup_logger
 
-from _utils import get_task_contrasts
+from .._utils import create_contrast_files
 
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
@@ -23,7 +23,7 @@ def _get_cmd_args():
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
-        help="Path to Singularity image of Afni with R.",
+        help="Path to Apptainer image of Afni with R.",
     )
     parser.add_argument(
         "--subject",
@@ -46,35 +46,6 @@ def _get_cmd_args():
     return parser
 
 
-def create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir):
-    contrasts = get_task_contrasts(task, caller="extract_betas")
-
-    for contrast in contrasts:
-        contrast_file = contrast_dir / stats_file.name.replace(
-            "stats", contrast.replace("#0_Coef", "_betas")
-        )
-        cmd = (
-            f"singularity exec -B /projects:/projects {afni_img_path} 3dbucket "
-            f"{stats_file}'[{contrast}]' "
-            f"-prefix {contrast_file} "
-            "-overwrite"
-        )
-        LGR.info(f"Extracting {contrast} contrast: {cmd}")
-
-        try:
-            subprocess.run(cmd, shell=True, check=True)
-        except Exception:
-            LGR.critical(f"The following command failed: {cmd}", exc_info=True)
-
-        if out_dir and contrast_file.exists():
-            path = Path(out_dir) / contrast_file.name
-            if path.exists():
-                LGR.info("Replacing old file with new file.")
-                path.unlink()
-
-            shutil.move(contrast_file, out_dir)
-
-
 def main(analysis_dir, subject, afni_img_path, task, out_dir):
     subject_base_dir = Path(analysis_dir) / (
         f"sub-{subject}" if not str(subject).startswith("sub-") else subject
@@ -85,11 +56,14 @@ def main(analysis_dir, subject, afni_img_path, task, out_dir):
 
     for session in sessions:
         subject_analysis_dir = subject_base_dir / session / "func"
-        stats_file = list(subject_analysis_dir.glob(f"*task-{task}*desc-stats.nii.gz"))
-        if stats_file:
-            stats_file = stats_file[0]
-        else:
-            sys.exit()
+
+        try:
+            stats_file = next(
+                subject_analysis_dir.glob(f"*task-{task}*desc-stats.nii.gz")
+            )
+        except Exception:
+            LGR.critical(f"No stats file for subject {subject}, session {session}")
+            continue
 
         contrast_dir = subject_analysis_dir / "contrasts"
         if not contrast_dir.exists():

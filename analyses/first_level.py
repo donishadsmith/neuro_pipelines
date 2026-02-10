@@ -7,6 +7,8 @@ from nifti2bids._helpers import iterable_to_str
 from nifti2bids.logging import setup_logger
 from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
 
+from ._utils import create_contrast_files
+
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
 
@@ -299,6 +301,17 @@ def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file,
 def get_task_contrast_cmd(task, timing_dir, regressors_file):
     # Using stim_times_AM1 and dmUBLOCK so that duration doesn't need to passed
     # and is instead paired with the onset time for block designs
+    # Likely overkill since duration variation is minimal, maybe change to
+    # block and a fixed value and remove the durations later
+
+    """
+    https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/statistics/deconvolve_block.html
+    The second column shows dmUBLOCK, with either a positive parameter (\geq 0) or no parameter.
+    For arguments \geq 1, this function behaves exactly like dmBLOCK above. When the argument is
+    0 or no parameter is given, then the response is similar to that of dmBLOCK in that
+    the response amplitude varies, but different to it in that the scaling is such that
+    convolved plateau height is scaled to unity, and short duration events are shorter than 1.
+    """
     if task == "nback":
         contrast_cmd = {
             "num_stimts": "-num_stimts 4 ",
@@ -471,6 +484,8 @@ def perform_first_level(
         f"Running 3dREMLfit for first level accounting for auto-correlation: {cmd}"
     )
     subprocess.run(cmd, shell=True, check=True)
+
+    return stats_file_relm
 
 
 def main(
@@ -668,13 +683,19 @@ def main(
         )
 
         # Perform first level
-        perform_first_level(
+        stats_file_relm = perform_first_level(
             subject_dir,
             afni_img_path,
             design_matrix_file,
             smoothed_nifti_file,
             mask_file,
         )
+
+        contrast_dir = stats_file_relm.parent / "contrasts"
+        if not contrast_dir.exists():
+            contrast_dir.mkdir()
+
+        create_contrast_files(stats_file_relm, contrast_dir, afni_img_path, task)
 
 
 if __name__ == "__main__":

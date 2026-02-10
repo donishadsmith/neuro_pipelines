@@ -9,7 +9,6 @@ ENV LANG="en_GB.UTF-8"
 RUN apt update -y && \
     apt upgrade -y && \
     apt install -y \
-    sudo \ 
     python3 \
     wget \
     unzip \
@@ -17,7 +16,9 @@ RUN apt update -y && \
     dc \
     libquadmath0 \
     libgomp1 \
-    octave && \
+    octave \
+    octave-image \
+    octave-statistics && \
     ln -sf /usr/bin/python3 /usr/bin/python && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,8 +31,12 @@ RUN wget https://github.com/andersonwinkler/PALM/archive/master.zip && \
     rm master.zip && \
     mv /opt/PALM-master /opt/palm
 
+# Temp directory issue for compressed nifti
+RUN echo "function p = fsgettmppath; p = tempdir; end" > /opt/palm/fsgettmppath.m
+
 RUN useradd -md /home/user user && \
     echo "source /usr/local/fsl/etc/fslconf/fsl.sh" >> /home/user/.bashrc && \
+    echo "pkg load image; pkg load statistics;" >> /home/user/.octaverc && \
     echo "addpath(genpath('/opt/palm'));" >> /home/user/.octaverc && \
     chown -R user:user /home/user
 

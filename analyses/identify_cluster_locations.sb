@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=identify_cluster_regions
+#SBATCH --job-name=identify_cluster_locations
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -7,8 +7,8 @@
 #SBATCH --mem=16G
 #SBATCH --exclude=cpu149
 # Outputs ----------------------------------------------------------------------------
-#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/identify_cluster_regions_%A_%a.out
-#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/identify_cluster_regions_%A_%a.err
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.err
 # -------------------------------------------------------------------------------------
 USERNAME=${HOME#/home/}
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
@@ -17,7 +17,7 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
-# sbatch --array=0 identify_cluster_regions.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array
+# sbatch --array=0 identify_cluster_locations.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array
 TASKS=( $@ )
 # slurm job value; essentially extracting sub-{id}
 if [ ${#TASKS[@]} -eq 0 ]; then
@@ -30,7 +30,7 @@ ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm/$TASK"
 SCRATCH_DIR="/scratch/${USERNAME}/mph/kids/mni_coordinate_files"
 mkdir -p ${SCRATCH_DIR}
 
-CMD="${PYTHON} identify_cluster_regions.py \
+CMD="${PYTHON} identify_cluster_locations.py \
     --analysis_dir $ANALYSIS_DIR \
     --scratch_dir $SCRATCH_DIR \
 	--afni_img_path $AFNI_IMG_PATH \
