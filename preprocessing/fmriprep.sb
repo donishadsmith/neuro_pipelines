@@ -89,9 +89,7 @@ CMD="${APPTAINER_CMD} \
 	--use-syn-sdc \
 	$SKULL_STRIP_TEMPLATE \
 	--subject-anatomical-reference first-lex \
-	--dummy-scans 0 \
 	--slice-time-ref 0 \
-	--fd-spike-threshold 0.9 \
 	$OUTPUT_SPACES \
 	--fs-license-file /freesurfer"
 

@@ -1,0 +1,45 @@
+# Dockerfile for creating image of FSL + PALM with Octave
+# Container is ~20 GB however a nifti reader is needed
+# Using octave --eval "palm_checkprogs" should show fsl as 1
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV LANG="en_GB.UTF-8"
+
+RUN apt update -y && \
+    apt upgrade -y && \
+    apt install -y \
+    sudo \ 
+    python3 \
+    wget \
+    unzip \
+    file \
+    dc \
+    libquadmath0 \
+    libgomp1 \
+    octave && \
+    ln -sf /usr/bin/python3 /usr/bin/python && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN wget https://fsl.fmrib.ox.ac.uk/fsldownloads/fslconda/releases/fslinstaller.py && \
+    python fslinstaller.py -d /usr/local/fsl/ && \
+    rm fslinstaller.py
+
+RUN wget https://github.com/andersonwinkler/PALM/archive/master.zip && \
+    unzip master.zip -d /opt/ && \
+    rm master.zip && \
+    mv /opt/PALM-master /opt/palm
+
+RUN useradd -md /home/user user && \
+    echo "source /usr/local/fsl/etc/fslconf/fsl.sh" >> /home/user/.bashrc && \
+    echo "addpath(genpath('/opt/palm'));" >> /home/user/.octaverc && \
+    chown -R user:user /home/user
+
+ENV FSLDIR="/usr/local/fsl"
+ENV PATH="$FSLDIR/bin:$PATH"
+ENV FSLOUTPUTTYPE="NIFTI_GZ"
+
+WORKDIR /home/user
+USER user
+
+CMD ["bash"]

@@ -71,7 +71,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--exclusion_criteria",
         dest="exclusion_criteria",
-        default=0.30,
+        default=0.40,
         type=float,
         required=False,
         help=(

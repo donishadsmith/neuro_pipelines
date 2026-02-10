@@ -74,7 +74,7 @@ def _get_cmd_args():
         required=False,
         default=None,
         help=(
-            "Path to apptainer image of FSL Palm. "
+            "Path to apptainer image of FSL Palm using Octave. "
             "Required if method is nonparametric."
         ),
     )
@@ -440,6 +440,7 @@ def perform_palm(
 
         cmd = (
             f"apptainer run -B /projects:/projects {palm_img_path} "
+            "octave eval 'palm "
             f"-i {concatenated_filename} "
             f"-m {group_mask_filename} "
             f"-d {design_matrix_file} "
@@ -452,7 +453,7 @@ def perform_palm(
             "-Cstat extent "
             "-logp "
             "-savedof "
-            f"-o {output_prefix}"
+            f"-o {output_prefix}'"
         )
 
         LGR.info(f"Running PALM ({direction} direction): {cmd}")
