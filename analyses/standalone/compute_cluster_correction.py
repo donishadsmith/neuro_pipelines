@@ -1,7 +1,9 @@
-import argparse
+import argparse, sys
 from pathlib import Path
 
 from nifti2bids.logging import setup_logger
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from _utils import (
     get_task_contrasts,

@@ -1,9 +1,11 @@
-import argparse
+import argparse, sys
 from pathlib import Path
 
 from nifti2bids.logging import setup_logger
 
-from .._utils import create_contrast_files
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from _utils import create_contrast_files
 
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")

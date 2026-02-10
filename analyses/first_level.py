@@ -7,7 +7,7 @@ from nifti2bids._helpers import iterable_to_str
 from nifti2bids.logging import setup_logger
 from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
 
-from ._utils import create_contrast_files
+from _utils import create_contrast_files
 
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
