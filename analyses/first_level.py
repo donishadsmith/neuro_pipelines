@@ -521,7 +521,7 @@ def create_design_matrix(
         f"-input {smoothed_nifti_file} "
         f"-mask {mask_file} "
         f"-censor {censor_file} "
-        "-polort 0 "
+        "-polort -1 "
         "-local_times "
         f"{contrast_cmd['num_stimts']} "
         f"{contrast_cmd['contrasts']} "
