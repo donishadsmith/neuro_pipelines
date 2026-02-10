@@ -71,7 +71,6 @@ else
 	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsy:res-2 MNI152NLin6Asym:res-2"
 fi
 
-# Dummy scans already discarded during scanning	
 CMD="${APPTAINER_CMD} \
 	/data \
 	/out \
