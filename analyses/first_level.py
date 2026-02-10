@@ -122,7 +122,9 @@ def _get_cmd_args():
 
 
 def get_cosine_regressors(confounds_df):
-    cosine_regressor_names = [col for col in confounds_df.columns if col.startswith("cosine_")]
+    cosine_regressor_names = [
+        col for col in confounds_df.columns if col.startswith("cosine_")
+    ]
 
     LGR.info(f"Name of cosine parameters: {cosine_regressor_names}")
 
@@ -186,7 +188,7 @@ def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999
     drop_columns = []
     for i in range(regressor_arr.shape[1]):
         for j in range(i + 1, regressor_arr.shape[1]):
-            r = np.corrcoef[regressor_arr[:, i], regressor_arr[:, j]]
+            r = np.corrcoef(regressor_arr[:, i], regressor_arr[:, j])
 
             if r > threshold:
                 col1 = get_col_name(i, regressor_positions)
@@ -216,19 +218,34 @@ def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
     return regressor_arr, regressor_positions
 
 
-def create_censor_file(subject_dir, censor_mask):
-    censor_file = subject_dir / "censor.1D"
+def create_censor_file(subject_dir, subject, session, task, space, censor_mask):
+    censor_file = (
+        subject_dir
+        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-censor.1D"
+    )
     np.savetxt(censor_file, censor_mask, fmt="%d")
 
     return censor_file
 
 
-def create_regressor_file(subject_dir, censor_mask, regressor_names, *regressor_arrays):
+def create_regressor_file(
+    subject_dir,
+    subject,
+    session,
+    task,
+    space,
+    censor_mask,
+    regressor_names,
+    *regressor_arrays,
+):
     regressor_positions = {
         pos: name for pos, name in enumerate(regressor_names, start=1)
     }
     LGR.info(f"Regressor names and positions assuming intercept: {regressor_positions}")
-    regressor_file = subject_dir / "regressors.1D"
+    regressor_file = (
+        subject_dir
+        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-regressors.1D"
+    )
     valid_arrays = [arr for arr in regressor_arrays if arr is not None]
     data = np.column_stack(valid_arrays)
 
@@ -361,17 +378,19 @@ def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file,
         "standardized", "smoothed"
     )
 
-    if not smoothed_nifti_file.exists():
-        cmd = (
-            f"apptainer exec -B /projects:/projects {afni_img_path} 3dBlurToFWHM "
-            f"-input {nifti_file} "
-            f"-mask {mask_file} "
-            f"-FWHM {fwhm} "
-            f"-prefix {smoothed_nifti_file} "
-            "-overwrite"
-        )
-        LGR.info(f"Performing spatial smoothing with fwhm={fwhm}: {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
+    if smoothed_nifti_file.exists():
+        smoothed_nifti_file.unlink()
+
+    cmd = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dBlurToFWHM "
+        f"-input {nifti_file} "
+        f"-mask {mask_file} "
+        f"-FWHM {fwhm} "
+        f"-prefix {smoothed_nifti_file} "
+        "-overwrite"
+    )
+    LGR.info(f"Performing spatial smoothing with fwhm={fwhm}: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
 
     return smoothed_nifti_file
 
@@ -713,7 +732,9 @@ def main(
             )
             continue
 
-        censor_file = create_censor_file(subject_dir, censor_mask)
+        censor_file = create_censor_file(
+            subject_dir, subject, session, task, space, censor_mask
+        )
 
         # Regressors
         with open(confounds_json_file, "r") as f:
@@ -728,9 +749,7 @@ def main(
         acompcor_regressor_names = get_acompcor_component_names(
             confounds_meta, n_acompcor
         )
-        (acompcor_regressors,) = confounds_df[acompcor_regressor_names].to_numpy(
-            copy=True
-        )
+        acompcor_regressors = confounds_df[acompcor_regressor_names].to_numpy(copy=True)
 
         global_regressors, global_regressor_names = (
             get_global_signal_regressors(confounds_df, n_motion_parameters)
@@ -750,6 +769,10 @@ def main(
 
         regressors_file = create_regressor_file(
             subject_dir,
+            subject,
+            session,
+            task,
+            space,
             censor_mask,
             regressor_names,
             cosine_regressors,

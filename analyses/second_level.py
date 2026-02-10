@@ -109,6 +109,26 @@ def _get_cmd_args():
         help="If method is nonparametric, the number of permutations to pass to Palm.",
     )
     parser.add_argument(
+        "--tfce_H",
+        dest="tfce_H",
+        default=2,
+        required=False,
+        help=(
+            "The height power. Higher values weigh signal intensity more. "
+            "See https://www.fmrib.ox.ac.uk/datasets/techrep/tr08ss1/tr08ss1.pdf"
+        ),
+    )
+    parser.add_argument(
+        "--tfce_E",
+        dest="tfce_E",
+        default=0.5,
+        required=False,
+        help=(
+            "The extent power. Higher values weigh cluster extent more. "
+            "See https://www.fmrib.ox.ac.uk/datasets/techrep/tr08ss1/tr08ss1.pdf"
+        ),
+    )
+    parser.add_argument(
         "--cluster_correction_p",
         dest="cluster_correction_p",
         default=0.05,
@@ -188,14 +208,11 @@ def create_data_table(bids_dir, subject_list, contrast_files):
                 subject_contrast_file, "ses", return_entity_prefix=True
             )
             df.loc[df["session_id"] == ses_id, "InputFile"] = subject_contrast_file
-            censor_file = ""
-            while not censor_file.name == "func":
-                if censor_file == censor_file.parents[-1]:
-                    break
-                else:
-                    censor_file = censor_file / "censor.1D"
-
-            if censor_file:
+            censor_file = (
+                subject_contrast_file.name.split("desc-")[0] + "desc-censor.1D"
+            )
+            censor_file = subject_contrast_file.parent / censor_file
+            if censor_file.exists():
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = (
                     get_number_of_censored_volumes(censor_file)
                 )
@@ -433,6 +450,8 @@ def perform_palm(
     task,
     contrast,
     n_permutations,
+    tfce_H,
+    tfce_E,
 ):
     concatenated_filename = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-concatenated.nii.gz"
@@ -469,6 +488,8 @@ def perform_palm(
             "-within "
             f"-n {n_permutations} "
             "-T "
+            f"-tfce_H {tfce_H} "
+            f"-tfce_E {tfce_E} "
             "-tfce_C 6 "
             "-logp "
             "-savedof "
@@ -583,6 +604,8 @@ def main(
     fsl_img_path,
     method,
     n_permutations,
+    tfce_H,
+    tfce_E,
     cluster_correction_p,
     n_cores,
     exclude_niftis_file,
@@ -694,6 +717,8 @@ def main(
                 task,
                 contrast,
                 n_permutations,
+                tfce_H,
+                tfce_E,
             )
 
             threshold_palm_output(

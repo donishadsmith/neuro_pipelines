@@ -34,11 +34,13 @@ RUN wget https://github.com/andersonwinkler/PALM/archive/master.zip && \
 # Temp directory issue for compressed nifti
 RUN echo "function p = fsgettmppath; p = tempdir; end" > /opt/palm/fsgettmppath.m
 
+RUN echo "pkg load image; pkg load statistics;" >> /usr/share/octave/site/m/startup/octaverc && \
+    echo "addpath(genpath('/opt/palm'));" >> /usr/share/octave/site/m/startup/octaverc && \
+    echo "source /usr/local/fsl/etc/fslconf/fsl.sh" > /etc/profile.d/fsl.sh
+
 RUN useradd -md /home/user user && \
-    echo "source /usr/local/fsl/etc/fslconf/fsl.sh" >> /home/user/.bashrc && \
-    echo "pkg load image; pkg load statistics;" >> /home/user/.octaverc && \
-    echo "addpath(genpath('/opt/palm'));" >> /home/user/.octaverc && \
-    chown -R user:user /home/user
+    chown -R user:user /home/user && \
+    chmod -R 777 /home/user
 
 ENV FSLDIR="/usr/local/fsl"
 ENV PATH="$FSLDIR/bin:$PATH"
