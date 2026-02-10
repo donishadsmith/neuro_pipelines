@@ -122,7 +122,7 @@ def _get_cmd_args():
 
 
 def get_cosine_regressors(confounds_df):
-    cosine_regressor_names = [col.startswith("cosine_") for col in confounds_df.columns]
+    cosine_regressor_names = [col for col in confounds_df.columns if col.startswith("cosine_")]
 
     LGR.info(f"Name of cosine parameters: {cosine_regressor_names}")
 
@@ -384,8 +384,8 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
 
     """
     https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/statistics/deconvolve_block.html
-    The second column shows dmUBLOCK, with either a positive parameter (\geq 0) or no parameter.
-    For arguments \geq 1, this function behaves exactly like dmBLOCK above. When the argument is
+    The second column shows dmUBLOCK, with either a positive parameter (eq 0) or no parameter.
+    For arguments eq 1, this function behaves exactly like dmBLOCK above. When the argument is
     0 or no parameter is given, then the response is similar to that of dmBLOCK in that
     the response amplitude varies, but different to it in that the scaling is such that
     convolved plateau height is scaled to unity, and short duration events are shorter than 1.
