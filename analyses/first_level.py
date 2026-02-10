@@ -188,7 +188,7 @@ def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999
     drop_columns = []
     for i in range(regressor_arr.shape[1]):
         for j in range(i + 1, regressor_arr.shape[1]):
-            r = np.corrcoef(regressor_arr[:, i], regressor_arr[:, j])
+            r = np.corrcoef(regressor_arr[:, i], regressor_arr[:, j])[0, 1]
 
             if r > threshold:
                 col1 = get_col_name(i, regressor_positions)
