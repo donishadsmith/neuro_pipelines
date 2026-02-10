@@ -766,7 +766,7 @@ def main(
             else (None, None)
         )
 
-        regressor_names = filter(
+        regressor_names_nested_list = filter(
             None,
             [
                 cosine_regressor_names,
@@ -775,7 +775,11 @@ def main(
                 global_regressor_names,
             ],
         )
-
+        regressor_names = [
+            regressor
+            for regressor_list in regressor_names_nested_list
+            for regressor in regressor_list
+        ]
         regressors_file = create_regressor_file(
             subject_dir,
             subject,
