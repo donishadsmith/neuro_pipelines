@@ -180,7 +180,7 @@ def get_global_signal_regressors(confounds_df, n_motion_parameters):
 
 
 def get_col_name(indx, regressor_positions):
-    return regressor_positions[list(regressor_positions)[indx + 1]]
+    return regressor_positions[list(regressor_positions)[indx]]
 
 
 def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999):
@@ -208,11 +208,10 @@ def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
 
     regressor_arr = np.delete(regressor_arr, axis=1)
     for indx in drop_columns:
-        del regressor_positions[indx + 1]
+        del regressor_positions[indx]
 
     regressor_positions = {
-        indx: regressor_positions[key]
-        for indx, key in enumerate(regressor_positions, start=1)
+        indx: regressor_positions[key] for indx, key in enumerate(regressor_positions)
     }
 
     return regressor_arr, regressor_positions
@@ -238,10 +237,8 @@ def create_regressor_file(
     regressor_names,
     *regressor_arrays,
 ):
-    regressor_positions = {
-        pos: name for pos, name in enumerate(regressor_names, start=1)
-    }
-    LGR.info(f"Regressor names and positions assuming intercept: {regressor_positions}")
+    regressor_positions = {pos: name for pos, name in enumerate(regressor_names)}
+    LGR.info(f"Regressor names and positions: {regressor_positions}")
     regressor_file = (
         subject_dir
         / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-regressors.1D"
@@ -254,9 +251,7 @@ def create_regressor_file(
         LGR.critical(f"Regressor matrix is rank deficient: {rank}")
 
         data, regressor_positions = remove_collinear_columns(data, regressor_positions)
-        LGR.critical(
-            f"New regressor names and positions assuming intercept: {regressor_positions}"
-        )
+        LGR.critical(f"New regressor names and positions: {regressor_positions}")
 
     # To stop errors and warnings
     drop_columns = np.where(np.var(data, axis=0) == 0)[0].tolist()
@@ -269,9 +264,7 @@ def create_regressor_file(
             drop_columns, data, regressor_positions
         )
 
-        LGR.critical(
-            f"New regressor names and positions assuming intercept: {regressor_positions}"
-        )
+        LGR.critical(f"New regressor names and positions: {regressor_positions}")
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)
