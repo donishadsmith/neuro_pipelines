@@ -206,7 +206,7 @@ def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
     if not drop_columns:
         return regressor_arr, regressor_positions
 
-    regressor_arr = np.delete(regressor_arr, axis=1)
+    regressor_arr = np.delete(regressor_arr, drop_columns, axis=1)
     for indx in drop_columns:
         del regressor_positions[indx]
 
