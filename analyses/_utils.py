@@ -42,7 +42,9 @@ def get_task_contrasts(task, caller):
     )
 
 
-def create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir=None, overwrite=True):
+def create_contrast_files(
+    stats_file, contrast_dir, afni_img_path, task, out_dir=None, overwrite=True
+):
     contrasts = get_task_contrasts(task, caller="extract_betas")
 
     for contrast in contrasts:
@@ -51,7 +53,7 @@ def create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir
         )
         if contrast_file.exists() and overwrite:
             contrast_file.unlink()
-            
+
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
             f"{stats_file}'[{contrast}]' "

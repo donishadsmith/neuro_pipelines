@@ -121,6 +121,32 @@ def _get_cmd_args():
     return parser
 
 
+def get_cosine_regressors(confounds_df):
+    cosine_regressor_names = [col.startswith("cosine_") for col in confounds_df.columns]
+
+    LGR.info(f"Name of cosine parameters: {cosine_regressor_names}")
+
+    return (
+        confounds_df[cosine_regressor_names].to_numpy(copy=True),
+        cosine_regressor_names,
+    )
+
+
+def get_motion_regressors(confounds_df, n_motion_parameters):
+    motion_params = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
+    if n_motion_parameters in [12, 24]:
+        derivatives = [f"{param}_derivative1" for param in motion_params]
+        motion_params += derivatives
+
+    if n_motion_parameters == 24:
+        power = [f"{param}_power2" for param in motion_params]
+        motion_params += power
+
+    LGR.info(f"Using motion parameters: {motion_params}")
+
+    return confounds_df[motion_params].to_numpy(copy=True), motion_params
+
+
 def get_acompcor_component_names(confounds_json_data, n_components):
     c_compcors = sorted([k for k in confounds_json_data.keys() if "c_comp_cor" in k])
     w_compcors = sorted([k for k in confounds_json_data.keys() if "w_comp_cor" in k])
@@ -138,21 +164,6 @@ def get_acompcor_component_names(confounds_json_data, n_components):
     return components_list
 
 
-def get_motion_regressors(confounds_df, n_motion_parameters):
-    motion_params = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
-    if n_motion_parameters in [12, 24]:
-        derivatives = [f"{param}_derivative1" for param in motion_params]
-        motion_params += derivatives
-
-    if n_motion_parameters == 24:
-        power = [f"{param}_power2" for param in motion_params]
-        motion_params += power
-
-    LGR.info(f"Using motion parameters: {motion_params}")
-
-    return confounds_df[motion_params].to_numpy(copy=True)
-
-
 def get_global_signal_regressors(confounds_df, n_motion_parameters):
     global_params = ["global_signal"]
     if n_motion_parameters in [12, 24]:
@@ -163,7 +174,46 @@ def get_global_signal_regressors(confounds_df, n_motion_parameters):
 
     LGR.info(f"Using global signal parameters: {global_params}")
 
-    return confounds_df[global_params].to_numpy(copy=True)
+    return confounds_df[global_params].to_numpy(copy=True), global_params
+
+
+def get_col_name(indx, regressor_positions):
+    return regressor_positions[list(regressor_positions)[indx + 1]]
+
+
+def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999):
+    # To remove errors and warnings
+    drop_columns = []
+    for i in range(regressor_arr.shape[1]):
+        for j in range(i + 1, regressor_arr.shape[1]):
+            r = np.corrcoef[regressor_arr[:, i], regressor_arr[:, j]]
+
+            if r > threshold:
+                col1 = get_col_name(i, regressor_positions)
+                col2 = get_col_name(j, regressor_positions)
+                drop_columns.append(j)
+
+                LGR.critical(
+                    f"Columns {col1} and {col2} are collinear ({r}), dropping {col2}."
+                )
+
+    return get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions)
+
+
+def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
+    if not drop_columns:
+        return regressor_arr, regressor_positions
+
+    regressor_arr = np.delete(regressor_arr, axis=1)
+    for indx in drop_columns:
+        del regressor_positions[indx + 1]
+
+    regressor_positions = {
+        indx: regressor_positions[key]
+        for indx, key in enumerate(regressor_positions, start=1)
+    }
+
+    return regressor_arr, regressor_positions
 
 
 def create_censor_file(subject_dir, censor_mask):
@@ -173,10 +223,38 @@ def create_censor_file(subject_dir, censor_mask):
     return censor_file
 
 
-def create_regressor_file(subject_dir, censor_mask, *regressor_arrays):
+def create_regressor_file(subject_dir, censor_mask, regressor_names, *regressor_arrays):
+    regressor_positions = {
+        pos: name for pos, name in enumerate(regressor_names, start=1)
+    }
+    LGR.info(f"Regressor names and positions assuming intercept: {regressor_positions}")
     regressor_file = subject_dir / "regressors.1D"
     valid_arrays = [arr for arr in regressor_arrays if arr is not None]
     data = np.column_stack(valid_arrays)
+
+    rank = np.linalg.matrix_rank(data)
+    if rank < data.shape[1]:
+        LGR.critical(f"Regressor matrix is rank deficient: {rank}")
+
+        data, regressor_positions = remove_collinear_columns(data, regressor_positions)
+        LGR.critical(
+            f"New regressor names and positions assuming intercept: {regressor_positions}"
+        )
+
+    # To stop errors and warnings
+    drop_columns = np.where(np.var(data, axis=0) == 0)[0].tolist()
+    if drop_columns:
+        col_names = [get_col_name(indx, regressor_positions) for indx in drop_columns]
+
+        LGR.critical(f"The following have constant variance: {col_names}")
+
+        data, regressor_positions = get_new_matrix_and_names(
+            drop_columns, data, regressor_positions
+        )
+
+        LGR.critical(
+            f"New regressor names and positions assuming intercept: {regressor_positions}"
+        )
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)
@@ -641,19 +719,40 @@ def main(
         with open(confounds_json_file, "r") as f:
             confounds_meta = json.load(f)
 
-        motion_regressors = get_motion_regressors(confounds_df, n_motion_parameters)
-        global_regressors = (
-            get_global_signal_regressors(confounds_df, n_motion_parameters)
-            if remove_global_signal
-            else None
+        cosine_regressors, cosine_regressor_names = get_cosine_regressors(confounds_df)
+
+        motion_regressors, motion_regressor_names = get_motion_regressors(
+            confounds_df, n_motion_parameters
         )
 
-        acompcor_names = get_acompcor_component_names(confounds_meta, n_acompcor)
-        acompcor_regressors = confounds_df[acompcor_names].to_numpy(copy=True)
+        acompcor_regressor_names = get_acompcor_component_names(
+            confounds_meta, n_acompcor
+        )
+        (acompcor_regressors,) = confounds_df[acompcor_regressor_names].to_numpy(
+            copy=True
+        )
+
+        global_regressors, global_regressor_names = (
+            get_global_signal_regressors(confounds_df, n_motion_parameters)
+            if remove_global_signal
+            else (None, None)
+        )
+
+        regressor_names = filter(
+            None,
+            [
+                cosine_regressor_names,
+                motion_regressor_names,
+                acompcor_regressor_names,
+                global_regressor_names,
+            ],
+        )
 
         regressors_file = create_regressor_file(
             subject_dir,
             censor_mask,
+            regressor_names,
+            cosine_regressors,
             motion_regressors,
             acompcor_regressors,
             global_regressors,
