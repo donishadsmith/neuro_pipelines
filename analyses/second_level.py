@@ -482,7 +482,7 @@ def perform_palm(
 
         cmd = (
             f"apptainer exec -B /projects:/projects {fsl_img_path} "
-            "octave eval 'palm "
+            "octave --eval 'palm "
             "-noniiclass "
             f"-i {concatenated_filename} "
             f"-m {group_mask_filename} "
