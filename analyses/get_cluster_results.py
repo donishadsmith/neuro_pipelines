@@ -90,7 +90,7 @@ def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_cod
         analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-stats.nii.gz")
     )
     zcore_map_filename = str(stats_filename).replace(
-        "_desc-stats", f"_gltcode-{glt_code}_desc-z_map"
+        "_desc-stats", f"_gltcode-{glt_code}_desc-parametric_z_map"
     )
 
     cmd = (
