@@ -166,7 +166,7 @@ def get_contrast_files(contrast_dir, task, contrast):
     return sorted(list(Path(contrast_dir).rglob(f"*{task}*{contrast}*betas*.nii.gz")))
 
 
-def filter_contrasts_files(contrast_files, exclude_niftis_file):
+def exclude_contrasts_files(contrast_files, exclude_niftis_file):
     if not exclude_niftis_file:
         return contrast_files
 
@@ -246,7 +246,9 @@ def create_data_table(bids_dir, subject_list, contrast_files):
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
-    nonconstant_columns = [col for col in data_table.columns if data_table[col].nunique() > 1]
+    nonconstant_columns = [
+        col for col in data_table.columns if data_table[col].nunique() > 1
+    ]
     data_table = data_table[nonconstant_columns]
 
     return data_table
@@ -628,7 +630,7 @@ def main(
     contrasts = get_task_contrasts(task, caller="second_level")
     for contrast in contrasts:
         LGR.info(f"CONTRAST: {contrast}")
-        contrast_files = filter_contrasts_files(
+        contrast_files = exclude_contrasts_files(
             get_contrast_files(contrast_dir, task, contrast), exclude_niftis_file
         )
 
@@ -641,26 +643,29 @@ def main(
             f"Found {len(contrast_files)} files from {len(set(subject_list))} subjects"
         )
 
-        LGR.info(f"Creating group mask with threshold: {mask_threshold}")
-        group_mask = create_group_mask(
-            get_layout(bids_dir, deriv_dir),
-            task,
-            space,
-            mask_threshold,
-            contrast_files,
-        )
-        group_mask_filename = (
-            dst_dir / f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"
-        )
-        LGR.info(f"Saving group mask to: {group_mask_filename}")
-        nib.save(group_mask, group_mask_filename)
-
         LGR.info("Creating data table.")
         data_table = create_data_table(bids_dir, subject_list, contrast_files)
 
         data_table_filename = (
             dst_dir / f"task-{task}_contrast-{contrast}_desc-data_table.txt"
         )
+
+        # Get the contrasts only in the table, these are the participants used
+        filtered_contrast_files = data_table["InputFile"].to_numpy(copy=True).tolist()
+
+        LGR.info(f"Creating group mask with threshold: {mask_threshold}")
+        group_mask = create_group_mask(
+            get_layout(bids_dir, deriv_dir),
+            task,
+            space,
+            mask_threshold,
+            filtered_contrast_files,
+        )
+        group_mask_filename = (
+            dst_dir / f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"
+        )
+        LGR.info(f"Saving group mask to: {group_mask_filename}")
+        nib.save(group_mask, group_mask_filename)
 
         if method == "parametric":
             if not afni_img_path:
@@ -718,7 +723,7 @@ def main(
 
             output_prefixes = perform_palm(
                 dst_dir,
-                contrast_files,
+                filtered_contrast_files,
                 group_mask_filename,
                 design_matrix_file,
                 eb_file,
