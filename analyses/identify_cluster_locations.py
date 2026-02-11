@@ -51,6 +51,16 @@ def _get_cmd_args():
         default="Haskins_Pediatric_Nonlinear_1.0",
         help="The atlas to use.",
     )
+    parser.add_argument(
+        "--save_excel_version",
+        dest="save_excel_version",
+        required=False,
+        default=True,
+        help=(
+            "Save Excel version of the cluster tables "
+            "to allow for certain Excel features such as highlighting"
+        ),
+    )
 
     return parser
 
@@ -102,7 +112,12 @@ def identify_mni_regions(afni_img_path, coord_filename, orient, atlas):
 
 
 def add_region_information_to_data(
-    cluster_table_filename, scratch_dir, afni_img_path, orient, atlas
+    cluster_table_filename,
+    scratch_dir,
+    afni_img_path,
+    orient,
+    atlas,
+    save_excel_version,
 ):
     coord_filename = scratch_dir / cluster_table_filename.name.replace(".csv", ".1D")
     coord_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -126,8 +141,15 @@ def add_region_information_to_data(
 
     cluster_table.to_csv(cluster_table_filename, sep=",", index=False)
 
+    if save_excel_version:
+        cluster_table.to_excel(
+            str(cluster_table_filename).replace(".csv", ".xlsx"), index=False
+        )
 
-def main(analysis_dir, scratch_dir, afni_img_path, task, orient, atlas):
+
+def main(
+    analysis_dir, scratch_dir, afni_img_path, task, orient, atlas, save_excel_version
+):
     analysis_dir = Path(analysis_dir)
     scratch_dir = Path(scratch_dir)
 
@@ -150,7 +172,12 @@ def main(analysis_dir, scratch_dir, afni_img_path, task, orient, atlas):
 
         cluster_table_filename = cluster_table_filename[0]
         add_region_information_to_data(
-            cluster_table_filename, scratch_dir, afni_img_path, orient, atlas
+            cluster_table_filename,
+            scratch_dir,
+            afni_img_path,
+            orient,
+            atlas,
+            save_excel_version,
         )
 
 
