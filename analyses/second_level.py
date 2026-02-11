@@ -246,6 +246,9 @@ def create_data_table(bids_dir, subject_list, contrast_files):
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
+    nonconstant_columns = [col for col in data_table.columns if data_table[col].nunique() > 1]
+    data_table = data_table[nonconstant_columns]
+
     return data_table
 
 
