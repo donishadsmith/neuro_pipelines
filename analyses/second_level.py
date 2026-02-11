@@ -423,7 +423,9 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
         f.write("# Positive direction contrasts:\n")
         for i, name in enumerate(glt_codes_pos, 1):
             f.write(f"c{i}_pos: {name}\n")
+
         f.write("\n# Negative direction contrasts:\n")
+        
         for i, name in enumerate(glt_codes_neg, 1):
             f.write(f"c{i}_neg: {name}\n")
 
