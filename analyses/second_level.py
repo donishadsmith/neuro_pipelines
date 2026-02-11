@@ -464,7 +464,7 @@ def perform_palm(
     tfce_E,
 ):
     concatenated_filename = (
-        dst_dir / f"task-{task}_contrast-{contrast}_desc-concatenated.nii.gz"
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-group_concatenated.nii.gz"
     )
 
     if concatenated_filename.exists():
@@ -478,10 +478,14 @@ def perform_palm(
     LGR.info(f"Concatenating images: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
+    base_dir = dst_dir / "palm_outputs"
+    if not base_dir.exists():
+        base_dir.mkdir(parents=True, exist_ok=True)
+
     output_prefixes = {}
     for direction in ["positive", "negative"]:
         output_prefix = (
-            dst_dir / f"task-{task}_contrast-{contrast}_desc-nonparametric_{direction}"
+            base_dir / f"task-{task}_contrast-{contrast}_desc-nonparametric_{direction}"
         )
         contrast_matrix_file = contrast_matrix_files_dict[direction]
 
@@ -537,10 +541,6 @@ def threshold_palm_output(
             tstat_file = output_dir / f"{prefix}_tfce_tstat_c{index}.nii.gz"
             pval_file = output_dir / f"{prefix}_tfce_tstat_fwep_c{index}.nii.gz"
 
-            if not pval_file.exists():
-                LGR.warning(f"Missing file: {pval_file}")
-                continue
-
             tstat_img = nib.load(tstat_file)
             pval_img = nib.load(pval_file)
 
@@ -573,12 +573,15 @@ def perform_3dlmer(
     glt_str,
     n_cores,
 ):
-    output_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-stats.nii.gz"
+    output_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-parametric_stats.nii.gz"
     if output_filename.exists():
         LGR.info("Replacing stats file")
         output_filename.unlink()
 
-    residual_filename = Path(str(output_filename).replace("-stats", "-residuals"))
+    if not output_filename.parent.exists():
+        output_filename.parent.mkdir(parents=True, exist_ok=True)
+
+    residual_filename = Path(str(output_filename).replace("_stats", "_residuals"))
     if residual_filename.exists():
         LGR.info("Replacing residual file")
         residual_filename.unlink()
