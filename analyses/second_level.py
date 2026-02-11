@@ -225,7 +225,11 @@ def create_data_table(bids_dir, subject_list, contrast_files):
             censor_file = (
                 Path(subject_contrast_file).name.split("desc-")[0] + "desc-censor.1D"
             )
-            censor_file = Path(subject_contrast_file).parent / censor_file
+            parent_path = Path(subject_contrast_file).parent
+            if parent_path.name == "contrasts":
+                parent_path = parent_path.parent
+
+            censor_file = parent_path / censor_file
             if censor_file.exists():
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = (
                     get_number_of_censored_volumes(censor_file)
