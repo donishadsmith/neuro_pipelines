@@ -1,4 +1,4 @@
-import argparse, subprocess, sys
+import argparse, math, subprocess, sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -103,10 +103,14 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_permutations",
         dest="n_permutations",
-        default=10000,
-        type=int,
+        default="auto",
         required=False,
-        help="If method is nonparametric, the number of permutations to pass to Palm.",
+        help=(
+            "If method is nonparametric, the number of permutations to pass to Palm. "
+            "For 'auto' the permutation is computed by doing 1dose!^n * 2dose!^n * .... "
+            "If the max permutation exceeds 10,000, then the permutation is set to 10,000. "
+            "Lowest p-value -log10(1/1e4)."
+        ),
     )
     parser.add_argument(
         "--tfce_H",
@@ -449,6 +453,27 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     return design_matrix_file, eb_file, contrast_files_dict, glt_codes_dict
 
 
+def compute_n_permutation(data_table):
+    # TODO: Possibly put in utils and add n! option
+    n_available_doses_counts = (
+        data_table["participant_id"].value_counts().value_counts()
+    )
+    counts_list = list(
+        zip(n_available_doses_counts.index, n_available_doses_counts.values)
+    )
+    products = [
+        math.factorial(int(factorial)) ** (int(n_subjects))
+        for factorial, n_subjects in counts_list
+    ]
+    product = math.prod(products)
+    LGR.info(f"Maximum permutations possible: {product}")
+
+    n_permutations = min(product, 10000)
+    LGR.info(f"Setting number of permutations to: {n_permutations}")
+
+    return n_permutations
+
+
 def perform_palm(
     dst_dir,
     contrast_files,
@@ -498,7 +523,7 @@ def perform_palm(
             f"-d {design_matrix_file} "
             f"-t {contrast_matrix_file} "
             f"-eb {eb_file} "
-            "-ise "
+            "-ee "
             "-within "
             f"-n {n_permutations} "
             "-T "
@@ -573,7 +598,9 @@ def perform_3dlmer(
     glt_str,
     n_cores,
 ):
-    output_filename = dst_dir / f"task-{task}_contrast-{contrast}_desc-parametric_stats.nii.gz"
+    output_filename = (
+        dst_dir / f"task-{task}_contrast-{contrast}_desc-parametric_stats.nii.gz"
+    )
     if output_filename.exists():
         LGR.info("Replacing stats file")
         output_filename.unlink()
@@ -723,6 +750,9 @@ def main(
             design_matrix_file, eb_file, contrast_matrix_files_dict, glt_codes_dict = (
                 convert_table_to_matrices(data_table, dst_dir, task, contrast)
             )
+
+            if n_permutations == "auto":
+                n_permutations = compute_n_permutation(data_table)
 
             output_prefixes = perform_palm(
                 dst_dir,
