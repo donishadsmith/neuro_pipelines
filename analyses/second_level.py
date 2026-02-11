@@ -133,6 +133,16 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
+        "--tfce_C",
+        dest="tfce_C",
+        default=6,
+        required=False,
+        help=(
+            "The connectivity to use for the nonparametric approach. "
+            "See https://www.fmrib.ox.ac.uk/datasets/techrep/tr08ss1/tr08ss1.pdf"
+        ),
+    )
+    parser.add_argument(
         "--cluster_correction_p",
         dest="cluster_correction_p",
         default=0.05,
@@ -487,6 +497,7 @@ def perform_palm(
     n_permutations,
     tfce_H,
     tfce_E,
+    tfce_C,
 ):
     concatenated_filename = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-group_concatenated.nii.gz"
@@ -529,7 +540,7 @@ def perform_palm(
             "-T "
             f"-tfce_H {tfce_H} "
             f"-tfce_E {tfce_E} "
-            "-tfce_C 6 "
+            f"-tfce_C {tfce_C} "
             "-logp "
             "-savedof "
             f"-o {output_prefix}'"
@@ -646,6 +657,7 @@ def main(
     n_permutations,
     tfce_H,
     tfce_E,
+    tfce_C,
     cluster_correction_p,
     n_cores,
     exclude_niftis_file,
@@ -767,6 +779,7 @@ def main(
                 n_permutations,
                 tfce_H,
                 tfce_E,
+                tfce_C,
             )
 
             threshold_palm_output(

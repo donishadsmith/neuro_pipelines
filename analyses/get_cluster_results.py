@@ -51,6 +51,13 @@ def _get_cmd_args():
         help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
     )
     parser.add_argument(
+        "--connectivity",
+        dest="connectivity",
+        required=False,
+        default="NN1",
+        help="Connectivity to use for parametric. Will always use 2-sided/bisided version.",
+    )
+    parser.add_argument(
         "--voxel_correction_p",
         dest="voxel_correction_p",
         required=False,
@@ -116,10 +123,10 @@ def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_cod
     return Path(zcore_map_filename), group_mask_filename
 
 
-def get_cluster_correction_table(analysis_dir, task, contrast):
+def get_cluster_correction_table(analysis_dir, task, contrast, connectivity):
     cluster_correction_filename = next(
         analysis_dir.rglob(
-            f"task-{task}_contrast-{contrast}_desc-cluster_correction.NN1_bisided.1D"
+            f"task-{task}_contrast-{contrast}_desc-cluster_correction.{connectivity}_bisided.1D"
         )
     )
     cluster_correction_table = pd.DataFrame(
@@ -295,6 +302,7 @@ def main(
     afni_img_path,
     task,
     method,
+    connectivity,
     voxel_correction_p,
     cluster_correction_p,
     template_img_path,
@@ -327,7 +335,7 @@ def main(
                 continue
 
             cluster_correction_table = get_cluster_correction_table(
-                analysis_dir, task, contrast
+                analysis_dir, task, contrast, connectivity
             )
             cluster_size = get_cluster_size(
                 cluster_correction_table, voxel_correction_p, cluster_correction_p
