@@ -425,12 +425,12 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     with open(glt_codes_file, "w") as f:
         f.write("# Positive direction contrasts:\n")
         for i, name in enumerate(glt_codes_pos, 1):
-            f.write(f"c{i}_pos: {name}\n")
+            f.write(f"c{i}_pos: {name.replace('_vs_', ' > ')}\n")
 
         f.write("\n# Negative direction contrasts:\n")
 
         for i, name in enumerate(glt_codes_neg, 1):
-            f.write(f"c{i}_neg: {name}\n")
+            f.write(f"c{i}_neg: {name.replace('_vs_', ' > ')}\n")
 
     contrast_files_dict = {
         "positive": contrast_matrix_file_pos,
@@ -481,7 +481,7 @@ def perform_palm(
         contrast_matrix_file = contrast_matrix_files_dict[direction]
 
         cmd = (
-            f"apptainer run -B /projects:/projects {fsl_img_path} "
+            f"apptainer exec -B /projects:/projects {fsl_img_path} "
             "octave eval 'palm "
             "-noniiclass "
             f"-i {concatenated_filename} "
