@@ -167,7 +167,7 @@ def identify_clusters(
             p_to_z(stat_threshold) if method == "parametric" else stat_threshold
         ),
         cluster_threshold=cluster_size,
-        two_sided=True if method == "parametric" else False,
+        two_sided=True,
         return_label_maps=True,
     )
 
