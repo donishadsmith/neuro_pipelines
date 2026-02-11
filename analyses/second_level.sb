@@ -25,9 +25,9 @@ DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 TASKS=( $@ )
 # slurm job value; essentially extracting sub-id
 if [ ${#TASKS[@]} -eq 0 ]; then
-    TASK=$DEFAULT_TASKS[$SLURM_ARRAY_TASK_ID]
+    TASK="${DEFAULT_TASKS[$SLURM_ARRAY_TASK_ID]}"
 else
-	TASK=$TASKS[$SLURM_ARRAY_TASK_ID]
+	TASK="${TASKS[$SLURM_ARRAY_TASK_ID]}"
 fi
 
 DST_DIR="$ANALYSIS_DIR/$TASK"
