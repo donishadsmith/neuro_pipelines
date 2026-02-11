@@ -567,38 +567,64 @@ def threshold_palm_output(
         f"(cluster_significance={cluster_correction_p})"
     )
 
-    for direction, prefix_path in output_prefixes.items():
-        glt_codes = glt_codes_dict[direction]
-        output_dir = prefix_path.parent
-        prefix = prefix_path.name
+    output_dir = output_prefixes["positive"].parent
+    prefix_positive = output_prefixes["positive"].name
+    prefix_negative = output_prefixes["negative"].name
 
-        # If only one contrast, palm excludes c{index}; however
-        # a minimum of two contrasts are needed since only one tail will
-        # be used
-        for index, glt_code in enumerate(glt_codes, 1):
-            LGR.info(f"Processing {direction} contrast {index}: {glt_code}")
+    # If only one contrast, palm excludes c{index}; however
+    # a minimum of two contrasts are needed since only one tail will
+    # be used
+    for index, glt_code in enumerate(glt_codes_dict["positive"], 1):
+        LGR.info(f"Processing contrasts for {index}: {glt_code}")
 
-            tstat_file = output_dir / f"{prefix}_tfce_tstat_c{index}.nii.gz"
-            pval_file = output_dir / f"{prefix}_tfce_tstat_fwep_c{index}.nii.gz"
+        # Forward direction (e.g., 5_vs_0)
+        positive_tstat_file = (
+            output_dir / f"{prefix_positive}_tfce_tstat_c{index}.nii.gz"
+        )
+        positive_pval_file = (
+            output_dir / f"{prefix_positive}_tfce_tstat_fwep_c{index}.nii.gz"
+        )
 
-            tstat_img = nib.load(tstat_file)
-            pval_img = nib.load(pval_file)
+        positive_tstat_img = nib.load(positive_tstat_file)
+        positive_sig_mask = (
+            nib.load(positive_pval_file).get_fdata() > logp_threshold
+        ).astype(float)
+        positive_masked_tstat = positive_tstat_img.get_fdata() * positive_sig_mask
 
-            sig_mask = (pval_img.get_fdata() > logp_threshold).astype(float)
-            masked_tstat = tstat_img.get_fdata() * sig_mask
-            thresholded_img = new_img_like(
-                tstat_img, masked_tstat, affine=tstat_img.affine, copy_header=True
-            )
+        # Reverse direction (e.g., 0_vs_5)
+        negative_tstat_file = (
+            output_dir / f"{prefix_negative}_tfce_tstat_c{index}.nii.gz"
+        )
+        negative_pval_file = (
+            output_dir / f"{prefix_negative}_tfce_tstat_fwep_c{index}.nii.gz"
+        )
 
-            # Use glt_code in filename (e.g., 5_vs_0 or 0_vs_5)
-            thresholded_file = (
-                dst_dir / f"task-{prefix.split('task-')[1].split('_contrast')[0]}_"
-                f"contrast-{prefix.split('contrast-')[1].split('_desc')[0]}_"
-                f"gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
-            )
-            nib.save(thresholded_img, thresholded_file)
+        negative_tstat_img = nib.load(negative_tstat_file)
+        negative_sig_mask = (
+            nib.load(negative_pval_file).get_fdata() > logp_threshold
+        ).astype(float)
+        negative_masked_tstat = (
+            negative_tstat_img.get_fdata() * negative_sig_mask
+        ) * -1
 
-            LGR.info(f"Saved thresholded t-map: {thresholded_file}")
+        # Combine, significant clusters should not overlap/ mutually exclusive
+        combined_masked_tstat = positive_masked_tstat + negative_masked_tstat
+        combined_thresholded_img = new_img_like(
+            positive_tstat_img,
+            combined_masked_tstat,
+            affine=positive_tstat_img.affine,
+            copy_header=True,
+        )
+
+        # Use glt_code in filename (e.g., 5_vs_0)
+        combined_thresholded_file = (
+            dst_dir / f"task-{prefix_positive.split('task-')[1].split('_contrast')[0]}_"
+            f"contrast-{prefix_positive.split('contrast-')[1].split('_desc')[0]}_"
+            f"gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
+        )
+        nib.save(combined_thresholded_img, combined_thresholded_file)
+
+        LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
 
 
 def perform_3dlmer(

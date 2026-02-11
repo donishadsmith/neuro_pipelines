@@ -85,16 +85,6 @@ def p_to_z(p_value, two_sided=True):
     return norm.ppf(1 - p_value / (2 if two_sided else 1))
 
 
-def get_glt_codes_for_method(method):
-    base_glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-
-    if method == "nonparametric":
-        reversed_glt_codes = ["0_vs_5", "0_vs_10", "5_vs_10"]
-        return base_glt_codes + reversed_glt_codes
-
-    return base_glt_codes
-
-
 def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_code):
     stats_filename = next(
         analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-stats.nii.gz")
@@ -311,9 +301,7 @@ def main(
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    glt_codes = get_glt_codes_for_method(method)
-    LGR.info(f"GLT codes to process: {glt_codes}")
-
+    glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
     contrasts = get_task_contrasts(task, caller="get_cluster_results")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
 
@@ -356,7 +344,7 @@ def main(
             try:
                 thresholded_filename = next(
                     analysis_dir.rglob(
-                        f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-nonparametric_cluster_corrected.nii.gz"
+                        f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
                     )
                 )
             except Exception:
