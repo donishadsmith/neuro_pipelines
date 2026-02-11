@@ -80,7 +80,7 @@ def get_number_of_censored_volumes(censored_filename):
     arr = np.loadtxt(censored_filename)
     arr = arr.astype(int)
 
-    return arr[arr == 0].sum()
+    return arr[arr == 0].size
 
 
 def estimate_noise_smoothness(
