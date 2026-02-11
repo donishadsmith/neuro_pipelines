@@ -14,6 +14,10 @@ from _utils import get_task_contrasts
 LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
 
+# For nonparametric approach which is already thresholded
+NONZERO_STAT_THRESHOLD = 1e-10
+ZERO_CLUSTER_SIZE = 0
+
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
@@ -58,7 +62,7 @@ def _get_cmd_args():
         dest="cluster_correction_p",
         required=False,
         default=0.05,
-        help="P-value for cluster correction.",
+        help="P-value for cluster correction. Only used for the parametric approach.",
     )
     parser.add_argument(
         "--template_img_path",
@@ -163,9 +167,7 @@ def identify_clusters(
     clusters_table, labels_map_list = get_clusters_table(
         thresholded_img,
         stat_threshold=(
-            p_to_z(stat_threshold)
-            if method == "parametric"
-            else -np.log10(stat_threshold)
+            p_to_z(stat_threshold) if method == "parametric" else stat_threshold
         ),
         cluster_threshold=cluster_size,
         two_sided=True if method == "parametric" else False,
@@ -343,8 +345,6 @@ def main(
             LGR.info(f"Saving thresholded image to: {thresholded_filename}")
             nib.save(thresholded_img, thresholded_filename)
         else:
-            # For non-parametric, files are already thresholded
-            cluster_size = 0
             try:
                 thresholded_filename = next(
                     analysis_dir.rglob(
@@ -361,8 +361,8 @@ def main(
             analysis_dir,
             thresholded_img,
             method,
-            cluster_correction_p,
-            cluster_size,
+            NONZERO_STAT_THRESHOLD,
+            ZERO_CLUSTER_SIZE,
             task,
             contrast,
             glt_code,
