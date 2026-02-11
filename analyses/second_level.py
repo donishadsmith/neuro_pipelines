@@ -224,8 +224,10 @@ def create_data_table(bids_dir, subject_list, contrast_files):
     all_sessions = pd.concat(sessions_dfs, ignore_index=True)
     data_table = all_sessions.merge(participants_df, on="participant_id")
 
-    if "acq_date" in data_table.columns:
-        data_table = data_table.drop("acq_date", axis=1)
+    for col in ["acq_time", "acq_date"]:
+        if col in data_table.columns:
+            data_table = data_table.drop(col, axis=1)
+
 
     column_names = (
         ["participant_id", "dose"]
@@ -236,11 +238,15 @@ def create_data_table(bids_dir, subject_list, contrast_files):
         ]
         + ["InputFile"]
     )
-
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
     data_table["dose"] = data_table["dose"].astype(int)
 
+    exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
+    continuous_vars = set(data_table.columns).difference(exclude)
+    for continuous_var in continuous_vars:
+        data_table[continuous_var] = data_table[continuous_var].astype(float)
+       
     return data_table
 
 
@@ -344,14 +350,14 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     LGR.info(f"Saving eb file to: {eb_file}")
     np.savetxt(eb_file, eb_data, delimiter=",", fmt="%d")
 
-    available_doses = sorted(data_table["dose"].unique())
+    available_doses = list(map(int, sorted(data_table["dose"].unique())))
     LGR.info(f"Available doses: {available_doses}")
 
     dose_dummies = pd.get_dummies(data_table["dose"], prefix="dose").astype(int)
     design_components = [dose_dummies]
 
     categorical_cols = list(
-        set(["race", "education", "sex"]).intersection(data_table.columns.tolist())
+        CATEGORICAL_VARS.intersection(data_table.columns.tolist())
     )
 
     continuous_cols = [
@@ -361,7 +367,7 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     ]
 
     if continuous_cols:
-        covariates = data_table[continuous_cols].copy()
+        covariates = data_table[continuous_cols].tolist()
         for col in continuous_cols:
             covariates[col] = covariates[col] - covariates[col].mean()
 
