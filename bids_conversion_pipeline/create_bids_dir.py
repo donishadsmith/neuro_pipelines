@@ -280,12 +280,11 @@ def _generate_bids_dir_pipeline(
 
         sessions_dict = {"session_id": [], "acq_time": [], "dose": []}
         for session_id, scan_date, dose in session_data_tuple:
-            # Max three sessions
+            sessions_dict["session_id"].append(session_id)
+            sessions_dict["acq_time"].append(scan_date)
+            sessions_dict["dose"].append(dose)
             session_nifti_files = _filter_nifti_files(subject_nifti_files, scan_date)
             for session_nifti_file in session_nifti_files:
-                sessions_dict["session_id"].append(session_id)
-                sessions_dict["acq_time"].append(scan_date)
-                sessions_dict["dose"].append(dose)
 
                 dst_path = (
                     bids_dir

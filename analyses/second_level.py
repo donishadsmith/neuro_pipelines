@@ -163,7 +163,7 @@ def _get_cmd_args():
 
 
 def get_contrast_files(contrast_dir, task, contrast):
-    return sorted(list(Path(contrast_dir).rglob(f"*{task}*{contrast}*.nii.gz")))
+    return sorted(list(Path(contrast_dir).rglob(f"*{task}*{contrast}*betas*.nii.gz")))
 
 
 def filter_contrasts_files(contrast_files, exclude_niftis_file):
@@ -184,7 +184,7 @@ def filter_contrasts_files(contrast_files, exclude_niftis_file):
 
 
 def get_subjects(contrast_files):
-    return sorted([get_entity_value(file, "sub") for file in contrast_files])
+    return sorted([get_entity_value(file.name, "sub") for file in contrast_files])
 
 
 def create_data_table(bids_dir, subject_list, contrast_files):
@@ -209,9 +209,9 @@ def create_data_table(bids_dir, subject_list, contrast_files):
             )
             df.loc[df["session_id"] == ses_id, "InputFile"] = subject_contrast_file
             censor_file = (
-                subject_contrast_file.name.split("desc-")[0] + "desc-censor.1D"
+                Path(subject_contrast_file).name.split("desc-")[0] + "desc-censor.1D"
             )
-            censor_file = subject_contrast_file.parent / censor_file
+            censor_file = Path(subject_contrast_file).parent / censor_file
             if censor_file.exists():
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = (
                     get_number_of_censored_volumes(censor_file)
@@ -425,7 +425,7 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
             f.write(f"c{i}_pos: {name}\n")
 
         f.write("\n# Negative direction contrasts:\n")
-        
+
         for i, name in enumerate(glt_codes_neg, 1):
             f.write(f"c{i}_neg: {name}\n")
 
