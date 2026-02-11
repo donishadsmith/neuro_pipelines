@@ -228,7 +228,6 @@ def create_data_table(bids_dir, subject_list, contrast_files):
         if col in data_table.columns:
             data_table = data_table.drop(col, axis=1)
 
-
     column_names = (
         ["participant_id", "dose"]
         + [
@@ -246,7 +245,7 @@ def create_data_table(bids_dir, subject_list, contrast_files):
     continuous_vars = set(data_table.columns).difference(exclude)
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
-       
+
     return data_table
 
 
@@ -356,9 +355,7 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     dose_dummies = pd.get_dummies(data_table["dose"], prefix="dose").astype(int)
     design_components = [dose_dummies]
 
-    categorical_cols = list(
-        CATEGORICAL_VARS.intersection(data_table.columns.tolist())
-    )
+    categorical_cols = list(CATEGORICAL_VARS.intersection(data_table.columns.tolist()))
 
     continuous_cols = [
         col
@@ -367,7 +364,7 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     ]
 
     if continuous_cols:
-        covariates = data_table[continuous_cols].tolist()
+        covariates = data_table[continuous_cols]
         for col in continuous_cols:
             covariates[col] = covariates[col] - covariates[col].mean()
 
@@ -637,7 +634,9 @@ def main(
             continue
 
         subject_list = get_subjects(contrast_files)
-        LGR.info(f"Found {len(contrast_files)} files from {len(subject_list)} subjects")
+        LGR.info(
+            f"Found {len(contrast_files)} files from {len(set(subject_list))} subjects"
+        )
 
         LGR.info(f"Creating group mask with threshold: {mask_threshold}")
         group_mask = create_group_mask(
