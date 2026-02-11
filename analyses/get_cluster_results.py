@@ -15,7 +15,7 @@ LGR = setup_logger(__name__)
 LGR.setLevel("INFO")
 
 # For nonparametric approach which is already thresholded
-NONZERO_STAT_THRESHOLD = 1e-10
+ZERO_STAT_THRESHOLD = 0
 ZERO_CLUSTER_SIZE = 0
 
 
@@ -357,7 +357,7 @@ def main(
             analysis_dir,
             thresholded_img,
             method,
-            NONZERO_STAT_THRESHOLD,
+            ZERO_STAT_THRESHOLD,
             ZERO_CLUSTER_SIZE,
             task,
             contrast,
