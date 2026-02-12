@@ -28,7 +28,7 @@ FSL_IMG_PATH=""
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 # Path to native Palm
-export PATH=$PATH:$HOME/PALM
+export PATH=$PATH:/projects/bigos_lab/software/PALM
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 

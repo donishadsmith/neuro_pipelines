@@ -369,6 +369,8 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
         dst_dir / f"task-{task}_contrast-{contrast}_desc-contrast_matrix_neg.csv"
     )
 
+    header_file = dst_dir / f"task-{task}_contrast-{contrast}_desc-header_names.txt"
+
     eb_data = data_table["participant_id"].factorize()[0] + 1
     LGR.info(f"Saving eb file to: {eb_file}")
     np.savetxt(eb_file, eb_data, delimiter=",", fmt="%d")
@@ -403,10 +405,24 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
             ).astype(int)
             design_components.append(dummies)
 
+    # Create intercept for each subject except the first one to account for
+    # within subject variance for repeat design
+    subject_regressors = pd.get_dummies(
+            data_table["participant_id"], 
+            prefix="", 
+            prefix_sep="", 
+            drop_first=True
+        ).astype(int)
+    design_components.append(subject_regressors)
+
     design_matrix = pd.concat(design_components, axis=1)
+
+    with open(header_file, "w") as f:
+        f.write(f"{','.join(design_matrix.columns.tolist())}")
 
     LGR.info(f"Design matrix columns: {design_matrix.columns.tolist()}")
     LGR.info(f"Saving design matrix file to: {design_matrix_file}")
+
     design_matrix.to_csv(design_matrix_file, sep=",", header=False, index=False)
 
     # Build contrasts for both directions
