@@ -9,15 +9,24 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/second_level_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/second_level_%A_%a.err
 # -----------------------------------------------------------------------------
+module load fsl
+module load matlab
+
 FMRIPREP_VERSION="25.2.3"
 
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
 CONTRAST_DIR="$ANALYSIS_DIR"
-METHOD="nonparametric"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTI_FILE=""
+
+METHOD="nonparametric"
+# /projects/bigos_lab/apptainer-images/fsl-palm.sif
+FSL_IMG_PATH=""
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+
+
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
@@ -46,11 +55,9 @@ if [[ -n $EXCLUDE_NIFTI_FILE ]]; then
 	CMD+=" --exclude_niftis_file $EXCLUDE_NIFTI_FILE"
 fi
 
-if [[ $METHOD == "nonparametric" ]]; then
-	FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
+if [[ $METHOD == "nonparametric" && -n $FSL_IMG_PATH ]]; then
 	CMD+=" --fsl_img_path $FSL_IMG_PATH"
 else
-	AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 	CMD+=" --afni_img_path $AFNI_IMG_PATH"
 fi
 

@@ -1,4 +1,4 @@
-import argparse, math, subprocess, sys
+import argparse, math, shutil, subprocess, sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -83,7 +83,8 @@ def _get_cmd_args():
         default=None,
         help=(
             "Path to apptainer image of FSL with Palm using Octave. "
-            "Required if method is nonparametric."
+            "Required if method is nonparametric, palm is not in path, "
+            "matlab not module and fsl not module"
         ),
     )
     parser.add_argument(
@@ -502,6 +503,8 @@ def perform_palm(
     tfce_H,
     tfce_E,
     tfce_C,
+    use_native_palm,
+    use_native_fsl,
 ):
     concatenated_filename = (
         dst_dir / f"task-{task}_contrast-{contrast}_desc-group_concatenated.nii.gz"
@@ -510,8 +513,13 @@ def perform_palm(
     if concatenated_filename.exists():
         concatenated_filename.unlink()
 
+    fsl_call = (
+        "fslmerge"
+        if use_native_fsl
+        else f"apptainer exec -B /projects:/projects {fsl_img_path} fslmerge"
+    )
     cmd = (
-        f"apptainer exec -B /projects:/projects {fsl_img_path} fslmerge "
+        f"{fsl_call} "
         f"-t {concatenated_filename} "
         f"{' '.join([str(f) for f in contrast_files])}"
     )
@@ -529,9 +537,7 @@ def perform_palm(
         )
         contrast_matrix_file = contrast_matrix_files_dict[direction]
 
-        cmd = (
-            f"apptainer exec -B /projects:/projects {fsl_img_path} "
-            "octave --eval 'palm "
+        palm_flags = (
             "-noniiclass "
             f"-i {concatenated_filename} "
             f"-m {group_mask_filename} "
@@ -547,8 +553,17 @@ def perform_palm(
             f"-tfce_C {tfce_C} "
             "-logp "
             "-savedof "
-            f"-o {output_prefix}'"
+            f"-o {output_prefix}"
         )
+
+        if use_native_palm:
+            palm_dir = Path(shutil.which("palm")).parent
+            cmd = f"matlab -nodisplay -nosplash -r \"addpath('{palm_dir}'); palm {palm_flags}; exit;\""
+        else:
+            cmd = (
+                f"apptainer exec -B /projects:/projects {fsl_img_path} "
+                f"octave --eval 'palm {palm_flags}'"
+            )
 
         LGR.info(f"Running PALM ({direction} direction): {cmd}")
         subprocess.run(cmd, shell=True, check=True)
@@ -782,8 +797,13 @@ def main(
             )
         else:
             # Nonparametric (PALM)
-            if not fsl_img_path:
-                LGR.critical("fsl_img_path is required when method is nonparametric.")
+            use_native_palm = shutil.which("palm") is not None
+            use_native_fsl = shutil.which("fslmerge") is not None
+
+            if not fsl_img_path and not (use_native_palm or use_native_fsl):
+                LGR.critical(
+                    "fsl_img_path is required when method is nonparametric and palm and fslmerge are not in path."
+                )
                 sys.exit(1)
 
             LGR.info(f"Saving data table to: {data_table_filename}")
@@ -810,6 +830,8 @@ def main(
                 tfce_H,
                 tfce_E,
                 tfce_C,
+                use_native_palm,
+                use_native_fsl,
             )
 
             threshold_palm_output(
