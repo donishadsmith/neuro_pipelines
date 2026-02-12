@@ -14,6 +14,7 @@ module load matlab
 
 FMRIPREP_VERSION="25.2.3"
 
+DATASET="mph"
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
@@ -25,7 +26,8 @@ EXCLUDE_NIFTI_FILE=""
 METHOD="nonparametric"
 # /projects/bigos_lab/apptainer-images/fsl-palm.sif
 FSL_IMG_PATH=""
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+# /projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg
+AFNI_IMG_PATH=""
 
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
@@ -49,6 +51,7 @@ CMD="$PYTHON second_level.py \
     --contrast_dir $CONTRAST_DIR \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
+	--dataset $DATASET \
 	--method $METHOD \
 	--task $TASK \
     --n_cores $SLURM_CPUS_PER_TASK"
@@ -59,7 +62,9 @@ fi
 
 if [[ $METHOD == "nonparametric" && -n $FSL_IMG_PATH ]]; then
 	CMD+=" --fsl_img_path $FSL_IMG_PATH"
-else
+fi
+
+if [[ -n $AFNI_IMG_PATH ]]; then
 	CMD+=" --afni_img_path $AFNI_IMG_PATH"
 fi
 

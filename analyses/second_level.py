@@ -21,6 +21,7 @@ LGR.setLevel("INFO")
 
 EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
 CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
+SUBJECT_CONSTANT_VARS = ["age"] + list(CATEGORICAL_VARS)
 
 
 def _get_cmd_args():
@@ -58,6 +59,13 @@ def _get_cmd_args():
         required=False,
         help="Template space.",
     )
+    parser.add_argument(
+        "--dataset",
+        dest="dataset",
+        default="mph",
+        required=False,
+        help="Name of dataset.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--mask_threshold",
@@ -72,9 +80,7 @@ def _get_cmd_args():
         dest="afni_img_path",
         required=False,
         default=None,
-        help=(
-            "Path to Apptainer image of Afni with R. " "Required if using parametric."
-        ),
+        help=("Path to Apptainer image of Afni with R. Required if using parametric."),
     )
     parser.add_argument(
         "--fsl_img_path",
@@ -343,7 +349,7 @@ def get_centering_str(data_table):
     return centering_str
 
 
-def convert_table_to_matrices(data_table, dst_dir, task, contrast):
+def convert_table_to_matrices(data_table, dst_dir, task, contrast, dataset):
     """
     Takes the data table and creates matrices for PALM.
 
@@ -381,7 +387,17 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     dose_dummies = pd.get_dummies(data_table["dose"], prefix="dose").astype(int)
     design_components = [dose_dummies]
 
-    categorical_cols = list(CATEGORICAL_VARS.intersection(data_table.columns.tolist()))
+    # Including subject regressors in fixed effects model so drop columns that are constant within subjects
+    if dataset.lower().startswith("mph"):
+        for col in SUBJECT_CONSTANT_VARS:
+            if col in data_table.columns:
+                data_table = data_table.drop(col, axis=1)
+
+        categorical_cols = []
+    else:
+        categorical_cols = list(
+            CATEGORICAL_VARS.intersection(data_table.columns.tolist())
+        )
 
     continuous_cols = [
         col
@@ -408,11 +424,8 @@ def convert_table_to_matrices(data_table, dst_dir, task, contrast):
     # Create intercept for each subject except the first one to account for
     # within subject variance for repeat design
     subject_regressors = pd.get_dummies(
-            data_table["participant_id"], 
-            prefix="", 
-            prefix_sep="", 
-            drop_first=True
-        ).astype(int)
+        data_table["participant_id"], prefix="", prefix_sep="", drop_first=True
+    ).astype(int)
     design_components.append(subject_regressors)
 
     design_matrix = pd.concat(design_components, axis=1)
@@ -711,6 +724,7 @@ def main(
     dst_dir,
     task,
     space,
+    dataset,
     mask_threshold,
     afni_img_path,
     fsl_img_path,
@@ -826,7 +840,7 @@ def main(
             data_table.to_csv(data_table_filename, sep=" ", index=False)
 
             design_matrix_file, eb_file, contrast_matrix_files_dict, glt_codes_dict = (
-                convert_table_to_matrices(data_table, dst_dir, task, contrast)
+                convert_table_to_matrices(data_table, dst_dir, task, contrast, dataset)
             )
 
             if n_permutations == "auto":
