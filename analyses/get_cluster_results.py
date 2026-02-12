@@ -179,6 +179,10 @@ def identify_clusters(
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
 
     if not clusters_table.empty:
+        n_rows = clusters_table.shape[0]
+        clusters_table["Statistic Name"] = (
+            ["Z-score"] * n_rows if method == "parametric" else ["T-score"] * n_rows
+        )
         first_label, second_label = get_interpretation_labels(glt_code)
 
         clusters_table["Cluster ID"] = clusters_table["Cluster ID"].astype(str)
@@ -274,6 +278,8 @@ def plot_thresholded_img(
         display = plot_stat_map(**kwargs, display_mode=mode)
 
         display.title(title, bgcolor="black", color="white", size=10)
+        statistic = "Z-score" if method == "parametric" else "T-score"
+        display._cbar.set_label(f"{statistic} Intensity", alignment="center")
 
         plot_filename = (
             analysis_dir
