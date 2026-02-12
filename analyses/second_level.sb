@@ -9,7 +9,7 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/second_level_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/second_level_%A_%a.err
 # -----------------------------------------------------------------------------
-module load fsl
+module load FSL
 module load matlab
 
 FMRIPREP_VERSION="25.2.3"
@@ -21,12 +21,14 @@ CONTRAST_DIR="$ANALYSIS_DIR"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTI_FILE=""
 
+
 METHOD="nonparametric"
 # /projects/bigos_lab/apptainer-images/fsl-palm.sif
 FSL_IMG_PATH=""
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
-
+# Path to native Palm
+export PATH=$PATH:$HOME/PALM
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
