@@ -77,7 +77,7 @@ def identify_mni_regions(afni_img_path, coord_filename, orient, atlas):
     header_sentence = "Original input data coordinates"
     target_line_headers = ["Focus point:", "* Within", "Within"]
 
-    data = {"Region": [], "Accuracy": []}
+    data = {"Region": [], "Label Spatial Precision": []}
 
     lines = [line.strip() for line in std_output if line]
     block_indices = [
@@ -106,7 +106,7 @@ def identify_mni_regions(afni_img_path, coord_filename, orient, atlas):
             header_name = float("NaN")
 
         data["Region"].append(region_name)
-        data["Accuracy"].append(header_name)
+        data["Label Spatial Precision"].append(header_name)
 
     return data
 
