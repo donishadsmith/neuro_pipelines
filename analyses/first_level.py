@@ -102,7 +102,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--remove_global_signal",
         dest="remove_global_signal",
-        default=True,
+        default=False,
         required=False,
         help=(
             "Global signal regression. If True, ``n_motion_regressors`` is used "
@@ -357,6 +357,7 @@ def percent_signal_change(subject_dir, nifti_file, mask_file, censor_file):
 
     return percent_change_nifti_file
 
+
 # TODO: for future connectivity model
 def standardize(subject_dir, nifti_file, mask_file, censor_file):
     mean_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "mean")
@@ -560,9 +561,8 @@ def create_design_matrix(
         "smoothed.nii.gz", "design_matrix.1D"
     )
 
-    polort = -1 if cosine_regressor_names else 4
-
-    LGR.info("Using polort {polort} for 3dDeconvolve.")
+    polort = 0 if cosine_regressor_names else 4
+    LGR.info(f"Using polort {polort} for 3dDeconvolve.")
 
     cmd = (
         "3dDeconvolve "
