@@ -54,7 +54,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_motion_parameters",
         dest="n_motion_parameters",
-        default=24,
+        default=12,
         type=int,
         required=False,
         help=(
