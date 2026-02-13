@@ -59,7 +59,8 @@ def _get_cmd_args():
         required=False,
         help=(
             "Number of motion parameters to use: 6 (base trans + rot), "
-            "12 (base + derivatives), 24 (base + derivatives + power)"
+            "12 (base + derivatives), 18 (base + derivatives + power ), "
+            "24 (base + derivatives + power + derivative power)."
         ),
     )
     parser.add_argument(
@@ -143,12 +144,16 @@ def get_cosine_regressors(confounds_df):
 
 def get_motion_regressors(confounds_df, n_motion_parameters):
     motion_params = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
-    if n_motion_parameters in [12, 24]:
+    if n_motion_parameters in [12, 18, 24]:
         derivatives = [f"{param}_derivative1" for param in motion_params]
         motion_params += derivatives
 
+    if n_motion_parameters in [18, 24]:
+        derivatives = [f"{param}_power2" for param in motion_params]
+        motion_params += derivatives
+
     if n_motion_parameters == 24:
-        power = [f"{param}_power2" for param in motion_params]
+        power = [f"{param}_derivative1_power2" for param in motion_params]
         motion_params += power
 
     LGR.info(f"Using motion parameters: {motion_params}")
