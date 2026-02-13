@@ -100,6 +100,13 @@ def _get_cmd_args():
         help="Number of aCompCor components.",
     )
     parser.add_argument(
+        "--acompcor_strategy",
+        dest="acompcor_strategy",
+        default="combined",
+        required=False,
+        help="Whether to use combined aCompCor components or 'separate' components.",
+    )
+    parser.add_argument(
         "--remove_global_signal",
         dest="remove_global_signal",
         default=False,
@@ -149,18 +156,33 @@ def get_motion_regressors(confounds_df, n_motion_parameters):
     return confounds_df[motion_params].to_numpy(copy=True), motion_params
 
 
-def get_acompcor_component_names(confounds_json_data, n_components):
-    c_compcors = sorted([k for k in confounds_json_data.keys() if "c_comp_cor" in k])
-    w_compcors = sorted([k for k in confounds_json_data.keys() if "w_comp_cor" in k])
+def get_acompcor_component_names(confounds_json_data, n_components, strategy):
+    if strategy == "separate":
+        c_compcors = sorted(
+            [k for k in confounds_json_data.keys() if "c_comp_cor" in k]
+        )
+        w_compcors = sorted(
+            [k for k in confounds_json_data.keys() if "w_comp_cor" in k]
+        )
 
-    CSF = [c for c in c_compcors if confounds_json_data[c].get("Mask") == "CSF"][
-        :n_components
-    ]
-    WM = [c for c in w_compcors if confounds_json_data[c].get("Mask") == "WM"][
-        :n_components
-    ]
+        CSF = [c for c in c_compcors if confounds_json_data[c].get("Mask") == "CSF"][
+            :n_components
+        ]
+        WM = [w for w in w_compcors if confounds_json_data[w].get("Mask") == "WM"][
+            :n_components
+        ]
 
-    components_list = CSF + WM
+        components_list = CSF + WM
+    else:
+        a_compcors = sorted(
+            [k for k in confounds_json_data.keys() if "a_comp_cor" in k]
+        )
+        combined = [
+            a for a in a_compcors if confounds_json_data[a].get("Mask") == "combined"
+        ][:n_components]
+
+        components_list = combined
+
     LGR.info(f"The following acompcor components will be used: {components_list}")
 
     return components_list
@@ -628,6 +650,7 @@ def main(
     exclusion_criteria,
     n_dummy_scans,
     n_acompcor,
+    acompcor_strategy,
     fwhm,
 ):
     tasknames = ["princess", "flanker", "nback", "mtle", "mtlr"]
@@ -776,7 +799,7 @@ def main(
         )
 
         acompcor_regressor_names = get_acompcor_component_names(
-            confounds_meta, n_acompcor
+            confounds_meta, n_acompcor, acompcor_strategy
         )
         acompcor_regressors = confounds_df[acompcor_regressor_names].to_numpy(copy=True)
 
