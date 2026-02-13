@@ -331,7 +331,34 @@ def create_timing_files(subject_dir, event_file, task):
     return timing_dir
 
 
-def create_standardized_nifti_file(subject_dir, nifti_file, mask_file, censor_file):
+def percent_signal_change(subject_dir, nifti_file, mask_file, censor_file):
+    mean_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "mean")
+    percent_change_nifti_file = subject_dir / Path(nifti_file).name.replace(
+        "preproc_bold", "percent_change"
+    )
+    if not percent_change_nifti_file.exists():
+        censor_data = np.loadtxt(censor_file)
+        kept_indices = np.where(censor_data == 1)[0]
+        selector = ",".join(map(str, kept_indices))
+        cmd_mean = (
+            f"3dTstat -prefix {mean_file} "
+            f"-mask {mask_file} "
+            "-mean "
+            f"-overwrite "
+            f"'{nifti_file}[{selector}]'"
+        )
+        subprocess.run(cmd_mean, shell=True, check=True)
+        # https://afni.nimh.nih.gov/pub/dist/edu/2011_03_one_day/afni_handouts/afni06_decon.pdf
+        cmd_calc = (
+            f"3dcalc -a {nifti_file} -b {mean_file} -c {mask_file} "
+            f"-expr 'c * min(200, a/b*100)' -prefix {percent_change_nifti_file} -overwrite "
+        )
+        subprocess.run(cmd_calc, shell=True, check=True)
+
+    return percent_change_nifti_file
+
+# TODO: for future connectivity model
+def standardize(subject_dir, nifti_file, mask_file, censor_file):
     mean_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "mean")
     stdev_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "std")
     standardized_nifti_file = subject_dir / Path(nifti_file).name.replace(
@@ -368,7 +395,7 @@ def create_standardized_nifti_file(subject_dir, nifti_file, mask_file, censor_fi
 
 def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file, fwhm):
     smoothed_nifti_file = subject_dir / str(nifti_file).replace(
-        "standardized", "smoothed"
+        "percent_change", "smoothed"
     )
 
     if smoothed_nifti_file.exists():
@@ -790,14 +817,14 @@ def main(
         # Create timing files
         timing_dir = create_timing_files(subject_dir, event_file, task)
 
-        # Z-score data
-        standardized_nifti_file = create_standardized_nifti_file(
+        # Percent signal change data
+        percent_change_nifti_file = percent_signal_change(
             subject_dir, nifti_file, mask_file, censor_file
         )
 
         # Smooth data
         smoothed_nifti_file = perform_spatial_smoothing(
-            subject_dir, afni_img_path, standardized_nifti_file, mask_file, fwhm
+            subject_dir, afni_img_path, percent_change_nifti_file, mask_file, fwhm
         )
 
         # Create design matrix
