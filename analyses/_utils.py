@@ -3,7 +3,8 @@
 from pathlib import Path
 import shutil, subprocess
 
-import numpy as np
+import nibabel as nib, numpy as np
+from nilearn.image import new_img_like
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
@@ -137,3 +138,89 @@ def perform_cluster_simulation(
 
     LGR.info(f"Running 3dClustSim: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
+
+
+def replace_extension(filename, new_ext):
+    filename = Path(filename)
+    old_ext = "".join(filename.suffixes)
+
+    return Path(str(filename).replace(old_ext, new_ext))
+
+
+def threshold_palm_output(
+    output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir
+):
+    logp_threshold = -np.log10(cluster_correction_p)
+    LGR.info(
+        f"Using -log10(p) threshold: {logp_threshold:.4f} "
+        f"(cluster_significance={cluster_correction_p})"
+    )
+
+    output_dir = output_prefixes["positive"].parent
+    prefix_positive = output_prefixes["positive"].name
+    prefix_negative = output_prefixes["negative"].name
+
+    # If only one contrast, palm excludes c{index}; however
+    # a minimum of two contrasts are needed since only one tail will
+    # be used
+    for index, glt_code in enumerate(glt_codes_dict["positive"], 1):
+        LGR.info(f"Processing contrasts for {index}: {glt_code}")
+
+        # Forward direction (e.g., 5_vs_0)
+        positive_tstat_file = (
+            output_dir / f"{prefix_positive}_tfce_tstat_c{index}.nii.gz"
+        )
+        if not positive_tstat_file.exists():
+            positive_tstat_file = replace_extension(positive_tstat_file, ".nii")
+
+        positive_pval_file = (
+            output_dir / f"{prefix_positive}_tfce_tstat_fwep_c{index}.nii.gz"
+        )
+        if not positive_pval_file.exists():
+            positive_pval_file = replace_extension(positive_pval_file, ".nii")
+
+        positive_tstat_img = nib.load(positive_tstat_file)
+        positive_sig_mask = (
+            nib.load(positive_pval_file).get_fdata() > logp_threshold
+        ).astype(float)
+        positive_masked_tstat = positive_tstat_img.get_fdata() * positive_sig_mask
+
+        # Reverse direction (e.g., 0_vs_5)
+        negative_tstat_file = (
+            output_dir / f"{prefix_negative}_tfce_tstat_c{index}.nii.gz"
+        )
+        if not negative_tstat_file.exists():
+            negative_tstat_file = replace_extension(negative_tstat_file, ".nii")
+
+        negative_pval_file = (
+            output_dir / f"{prefix_negative}_tfce_tstat_fwep_c{index}.nii.gz"
+        )
+        if not negative_pval_file.exists():
+            negative_pval_file = replace_extension(negative_pval_file, ".nii")
+
+        negative_tstat_img = nib.load(negative_tstat_file)
+        negative_sig_mask = (
+            nib.load(negative_pval_file).get_fdata() > logp_threshold
+        ).astype(float)
+        negative_masked_tstat = (
+            negative_tstat_img.get_fdata() * negative_sig_mask
+        ) * -1
+
+        # Combine, significant clusters should not overlap/ mutually exclusive
+        combined_masked_tstat = positive_masked_tstat + negative_masked_tstat
+        combined_thresholded_img = new_img_like(
+            positive_tstat_img,
+            combined_masked_tstat,
+            affine=positive_tstat_img.affine,
+            copy_header=True,
+        )
+
+        # Use glt_code in filename (e.g., 5_vs_0)
+        combined_thresholded_file = (
+            dst_dir / f"task-{prefix_positive.split('task-')[1].split('_contrast')[0]}_"
+            f"contrast-{prefix_positive.split('contrast-')[1].split('_desc')[0]}_"
+            f"gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
+        )
+        nib.save(combined_thresholded_img, combined_thresholded_file)
+
+        LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
