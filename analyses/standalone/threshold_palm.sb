@@ -11,8 +11,11 @@
 # -------------------------------------------------------------------------------
 DATASET="mph"
 COHORT="kids"
+ANALYSIS_TYPE="glm" # glm or gPPI
 CLUSTER_CORRECTION_P=0.05
-ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
+
+BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
@@ -33,6 +36,7 @@ CMD="$PYTHON threshold_palm.py \
     --analysis_dir $ANALYSIS_DIR \
 	--dst_dir $DST_DIR \
     --task $TASK \
+    --analysis_type $ANALYSIS_TYPE \
     --dataset $DATASET \
     --cohort $COHORT \
     --cluster_correction_p $CLUSTER_CORRECTION_P"

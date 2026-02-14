@@ -10,10 +10,9 @@ from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 
-def get_task_contrasts(task, caller):
+def get_task_contrasts(task, analysis_type, caller):
     if task == "nback":
         contrasts = (
             "1-back_vs_0-back",
@@ -36,6 +35,9 @@ def get_task_contrasts(task, caller):
             "incongruent_vs_nogo",
         )
 
+    if analysis_type == "gPPI":
+        contrasts = modify_contrast_names(task, contrasts)
+
     return (
         (f"{contrast}#0_Coef" for contrast in contrasts)
         if caller == "extract_betas"
@@ -43,10 +45,26 @@ def get_task_contrasts(task, caller):
     )
 
 
+def modify_contrast_names(task, contrasts):
+    if task in ["mtle", "mtlr"]:
+        return (f"PPI_{contrast}" for contrast in contrasts)
+    else:
+        return (
+            f"PPI_{contrast.split('_vs_')[0]}_vs_{contrast.split('_vs_')[1]}"
+            for contrast in contrasts
+        )
+
+
 def create_contrast_files(
-    stats_file, contrast_dir, afni_img_path, task, out_dir=None, overwrite=True
+    stats_file,
+    contrast_dir,
+    afni_img_path,
+    task,
+    analysis_type,
+    out_dir=None,
+    overwrite=True,
 ):
-    contrasts = get_task_contrasts(task, caller="extract_betas")
+    contrasts = get_task_contrasts(task, analysis_type, caller="extract_betas")
 
     for contrast in contrasts:
         contrast_file = contrast_dir / stats_file.name.replace(
@@ -168,7 +186,7 @@ def threshold_palm_output(
 
         # Forward direction (e.g., 5_vs_0)
         positive_tstat_file = (
-            output_dir / f"{prefix_positive}_tfce_tstat_c{index}.nii.gz"
+            output_dir / f"{prefix_positive}_vox_tstat_c{index}.nii.gz"
         )
         if not positive_tstat_file.exists():
             positive_tstat_file = replace_extension(positive_tstat_file, ".nii")
@@ -187,7 +205,7 @@ def threshold_palm_output(
 
         # Reverse direction (e.g., 0_vs_5)
         negative_tstat_file = (
-            output_dir / f"{prefix_negative}_tfce_tstat_c{index}.nii.gz"
+            output_dir / f"{prefix_negative}_vox_tstat_c{index}.nii.gz"
         )
         if not negative_tstat_file.exists():
             negative_tstat_file = replace_extension(negative_tstat_file, ".nii")

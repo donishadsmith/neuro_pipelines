@@ -1,0 +1,55 @@
+#!/bin/bash
+#SBATCH --job-name=first_level
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=16G
+# Outputs --------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_%A_%a.err
+# ----------------------------------------------------------------------------
+FMRIPREP_VERSION="25.2.3"
+
+BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
+DST_DIR="$BIDS_DIR/derivatives/glm"
+mkdir -p $DST_DIR
+
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+
+TASK="nback" # nback, mtle, mtlr, princess, flanker
+
+# sbatch --array=0 first_level.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
+# sbatch --array=1-13%3 first_level.sb
+# sbatch --array=0-13 first_level.sb
+
+# Extract one subject from the like corresponding to the current
+# slurm job value; essentially extracting sub-{id}
+# Check values passed to script to process specific subjects
+SUBJECTS=( $@ )
+
+# slurm job value; essentially extracting sub-{id}
+if [ ${#SUBJECTS[@]} -eq 0 ]; then
+	# https://catonmat.net/awk-one-liners-explained-part-two
+	SUBJECT=$(awk -v line=$((SLURM_ARRAY_TASK_ID + 2)) 'NR==line { sub(/\r$/,""); print $1 }' "$BIDS_DIR/participants.tsv")
+else
+    SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
+fi
+
+CMD="$PYTHON first_level_glm.py \
+	--bids_dir $BIDS_DIR \
+	--afni_img_path $AFNI_IMG_PATH \
+	--deriv_dir $DERIV_DIR \
+	--dst_dir $DST_DIR \
+	--subject ${SUBJECT#sub-} \
+	--task $TASK"
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?

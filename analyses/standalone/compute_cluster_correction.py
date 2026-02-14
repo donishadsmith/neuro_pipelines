@@ -12,7 +12,6 @@ from _utils import (
 )
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 
 def _get_cmd_args():
@@ -30,16 +29,24 @@ def _get_cmd_args():
         help="Path to Apptainer image of Afni with R.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
 
     return parser
 
 
-def main(analysis_dir, afni_img_path, task):
+def main(analysis_dir, afni_img_path, task, analysis_type):
     analysis_dir = Path(analysis_dir)
 
     LGR.info(f"TASK: {task}")
 
-    contrasts = get_task_contrasts(task, caller="compute_cluster_correction")
+    contrasts = get_task_contrasts(
+        task, analysis_type, caller="compute_cluster_correction"
+    )
     for contrast in contrasts:
         LGR.info(f"CONTRAST: {contrast}")
 

@@ -10,10 +10,10 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.err
 # -------------------------------------------------------------------------------------
-
+ANALYSIS_TYPE="glm" # glm or gPPI
+METHOD="nonparametric"
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
-METHOD="nonparametric"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
@@ -27,13 +27,14 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm/$TASK"
+ANALYSIS_DIR="${BIDS_DIR}/derivatives/$ANALYSIS_TYPE/$TASK"
 TEMPLATE_IMG_PATH='/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz'
 
 CMD="${PYTHON} get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
     --method $METHOD \
 	--task $TASK \
+    --analysis_type $ANALYSIS_TYPE \
     --template_img_path $TEMPLATE_IMG_PATH"
 
 if [[ $METHOD == "parametric" ]]; then

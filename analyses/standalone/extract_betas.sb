@@ -10,8 +10,10 @@
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_betas_%A_%a.err
 # ----------------------------------------------------------------------------------
 # Use --array to process multiple subjects at the same time
+ANALYSIS_TYPE="glm" # glm or gPPI
+
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
-ANALYSIS_DIR="$BIDS_DIR/derivatives/glm"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 TASK="nback" # nback, mtle, mtlr, princess, flanker
@@ -30,15 +32,16 @@ else
     SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-CMD="${PYTHON} extract_betas.py \
-	--analysis_dir ${ANALYSIS_DIR} \
-	--afni_img_path ${AFNI_IMG_PATH} \
-	--subject ${SUBJECT} \
-	--task ${TASK}"
+CMD="$PYTHON extract_betas.py \
+	--analysis_dir $ANALYSIS_DIR \
+	--afni_img_path $AFNI_IMG_PATH \
+	--subject $SUBJECT \
+	--task $TASK \
+	--analysis_type $ANALYSIS_TYPE"
 
 if [[ -n $OUT_DIR ]]; then
 	mkdir -p $OUT_DIR
-	CMD+=" --out_dir ${OUT_DIR}"
+	CMD+=" --out_dir $OUT_DIR"
 fi
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

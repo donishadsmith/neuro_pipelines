@@ -79,7 +79,7 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
             # Philips fat direction is "P", phase encoding is on the "A-P" axis
             # Assuming either RAS or LPS. Native format is LPS
             json_schema["PhaseEncodingDirection"] = (
-                "j" if orientation == "RAS" else "j-"
+                "j-" if orientation == "RAS" else "j"
             )
 
         json_filename = str(nifti_file).replace(".nii.gz", ".json")

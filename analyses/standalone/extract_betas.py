@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _utils import create_contrast_files
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 
 def _get_cmd_args():
@@ -35,6 +34,12 @@ def _get_cmd_args():
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
+    parser.add_argument(
         "--out_dir",
         dest="out_dir",
         required=False,
@@ -48,7 +53,7 @@ def _get_cmd_args():
     return parser
 
 
-def main(analysis_dir, subject, afni_img_path, task, out_dir):
+def main(analysis_dir, subject, afni_img_path, task, analysis_type, out_dir):
     subject_base_dir = Path(analysis_dir) / (
         f"sub-{subject}" if not str(subject).startswith("sub-") else subject
     )
@@ -71,7 +76,9 @@ def main(analysis_dir, subject, afni_img_path, task, out_dir):
         if not contrast_dir.exists():
             contrast_dir.mkdir()
 
-        create_contrast_files(stats_file, contrast_dir, afni_img_path, task, out_dir)
+        create_contrast_files(
+            stats_file, contrast_dir, afni_img_path, task, analysis_type, out_dir
+        )
 
 
 if __name__ == "__main__":

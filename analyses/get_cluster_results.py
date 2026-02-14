@@ -12,7 +12,6 @@ from nifti2bids.logging import setup_logger
 from _utils import get_task_contrasts
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 # For nonparametric approach which is already thresholded
 ZERO_STAT_THRESHOLD = 0
@@ -44,10 +43,17 @@ def _get_cmd_args():
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
+    parser.add_argument(
         "--method",
         dest="method",
         required=False,
         default="nonparametric",
+        choices=["parametric", "nonparametric"],
         help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
     )
     parser.add_argument(
@@ -78,6 +84,7 @@ def _get_cmd_args():
         default=None,
         help="Path to a template image to use for plotting.",
     )
+
     return parser
 
 
@@ -279,7 +286,7 @@ def plot_thresholded_img(
 
         display.title(title, bgcolor="black", color="white", size=10)
         statistic = "Z-score" if method == "parametric" else "T-score"
-        display._cbar.set_label(f"{statistic} Intensity", alignment="center")
+        display._cbar.set_label(f"{statistic} Intensity")
 
         plot_filename = (
             analysis_dir
@@ -297,6 +304,7 @@ def main(
     analysis_dir,
     afni_img_path,
     task,
+    analysis_type,
     method,
     connectivity,
     voxel_correction_p,
@@ -308,7 +316,7 @@ def main(
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
     glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-    contrasts = get_task_contrasts(task, caller="get_cluster_results")
+    contrasts = get_task_contrasts(task, analysis_type, caller="get_cluster_results")
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
 
     for contrast, glt_code in contrasts_glts_list:

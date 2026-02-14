@@ -10,7 +10,7 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/compute_cluster_correction_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/compute_cluster_correction_%A_%a.err
 # ---------------------------------------------------------------------------------------------
-
+ANALYSIS_TYPE="glm" # glm or gPPI
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
@@ -26,12 +26,13 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm/$TASK"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/glm/$TASK"
 
 CMD="${PYTHON} compute_cluster_correction.py \
     --analysis_dir $ANALYSIS_DIR \
-	--afni_img_path ${AFNI_IMG_PATH} \
-	--task ${TASK}"
+	--afni_img_path $AFNI_IMG_PATH \
+	--task $TASK \
+	--analysis_type $ANALYSIS_TYPE"
 
 # hostname
 # id 

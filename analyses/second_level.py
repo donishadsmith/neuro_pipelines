@@ -17,7 +17,6 @@ from _utils import (
 )
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
 CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
@@ -68,6 +67,13 @@ def _get_cmd_args():
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        choices=["glm", "gPPI"],
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
+    parser.add_argument(
         "--mask_threshold",
         dest="mask_threshold",
         default=0.5,
@@ -96,13 +102,13 @@ def _get_cmd_args():
     parser.add_argument(
         "--method",
         dest="method",
-        default="parametric",
+        default="non parametric",
         choices=["parametric", "nonparametric"],
         required=False,
         help=(
             "Whether to use 3dlmer (parametric) or Palm (nonparametric). "
-            "Typically better to use nonparametric, it doesn't assume the distribution of the "
-            "data and better controls false positives. If parametric is used then the "
+            "Typically better to use nonparametric, it doesn't assume the erdistribution of the "
+            "data and better controls false positives. If parametric is useror d then the "
             "acf method method should be used on the residuals to estimate smoothness and "
             "determine the appropriate cluster size via simulations."
         ),
@@ -654,6 +660,7 @@ def main(
     contrast_dir,
     dst_dir,
     task,
+    analysis_type,
     space,
     dataset,
     mask_threshold,
@@ -675,7 +682,7 @@ def main(
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    contrasts = get_task_contrasts(task, caller="second_level")
+    contrasts = get_task_contrasts(task, analysis_type, caller="second_level")
     for contrast in contrasts:
         LGR.info(f"CONTRAST: {contrast}")
         contrast_files = exclude_contrasts_files(
