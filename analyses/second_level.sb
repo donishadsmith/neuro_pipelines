@@ -31,6 +31,7 @@ AFNI_IMG_PATH=""
 
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
+export FSLOUTPUTTYPE="NIFTI_GZ"
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 

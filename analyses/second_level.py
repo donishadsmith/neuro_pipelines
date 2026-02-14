@@ -602,6 +602,13 @@ def perform_palm(
     return output_prefixes
 
 
+def replace_extension(filename, new_ext):
+    filename = Path(filename)
+    old_ext = "".join(filename.suffixes)
+
+    return Path(str(filename).replace(old_ext, new_ext))
+
+
 def threshold_palm_output(
     output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir
 ):
@@ -625,9 +632,14 @@ def threshold_palm_output(
         positive_tstat_file = (
             output_dir / f"{prefix_positive}_tfce_tstat_c{index}.nii.gz"
         )
+        if not positive_tstat_file.exists():
+            positive_tstat_file = replace_extension(positive_tstat_file, ".nii")
+
         positive_pval_file = (
             output_dir / f"{prefix_positive}_tfce_tstat_fwep_c{index}.nii.gz"
         )
+        if not positive_pval_file.exists():
+            positive_pval_file = replace_extension(positive_pval_file, ".nii")
 
         positive_tstat_img = nib.load(positive_tstat_file)
         positive_sig_mask = (
@@ -639,9 +651,14 @@ def threshold_palm_output(
         negative_tstat_file = (
             output_dir / f"{prefix_negative}_tfce_tstat_c{index}.nii.gz"
         )
+        if not negative_tstat_file.exists():
+            negative_tstat_file = replace_extension(negative_tstat_file, ".nii")
+
         negative_pval_file = (
             output_dir / f"{prefix_negative}_tfce_tstat_fwep_c{index}.nii.gz"
         )
+        if not negative_pval_file.exists():
+            negative_pval_file = replace_extension(negative_pval_file, ".nii")
 
         negative_tstat_img = nib.load(negative_tstat_file)
         negative_sig_mask = (
