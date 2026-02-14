@@ -17,7 +17,6 @@ from _utils import (
 )
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
 CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
@@ -67,6 +66,12 @@ def _get_cmd_args():
         help="Name of dataset.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
     parser.add_argument(
         "--mask_threshold",
         dest="mask_threshold",
@@ -654,6 +659,7 @@ def main(
     contrast_dir,
     dst_dir,
     task,
+    analysis_type,
     space,
     dataset,
     mask_threshold,
@@ -675,7 +681,7 @@ def main(
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    contrasts = get_task_contrasts(task, caller="second_level")
+    contrasts = get_task_contrasts(task, analysis_type, caller="second_level")
     for contrast in contrasts:
         LGR.info(f"CONTRAST: {contrast}")
         contrast_files = exclude_contrasts_files(

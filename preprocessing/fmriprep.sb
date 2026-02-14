@@ -14,12 +14,13 @@
 FMRIPREP_VERSION="25.2.3"
 
 USERNAME=${HOME#/home/}
+DATASET="mph"
 COHORT="kids" # kids, adults
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 FS_LICENSE="/projects/bigos_lab/freesurfer/license.txt"
-DSET_DIR="/projects/bigos_lab/mph-study/${COHORT}"
-BIDS_DIR="${DSET_DIR}/dset"
-IMG_DIR="/projects/bigos_lab/apptainer-images/fmriprep-${FMRIPREP_VERSION}.simg"
+DSET_DIR="/projects/bigos_lab/$DATASET-study/$COHORT"
+BIDS_DIR="$DSET_DIR/dset"
+IMG_DIR="/projects/bigos_lab/apptainer-images/fmriprep-$FMRIPREP_VERSION.simg"
 
 TEMPLATEFLOW_HOST_HOME="/projects/bigos_lab/templateflow"
 
@@ -41,26 +42,26 @@ else
 	SUBJECT=${SUBJECTS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-DERIVS_DIR="${BIDS_DIR}/derivatives/fmriprep-${FMRIPREP_VERSION}"
-mkdir -p ${DERIVS_DIR}
+DERIVS_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
+mkdir -p $DERIVS_DIR
 
-SCRATCH_DIR="/scratch/${USERNAME}/mph/${COHORT}/fmriprep-${FMRIPREP_VERSION}/${SUBJECT}"
-mkdir -p ${SCRATCH_DIR}
+SCRATCH_DIR="/scratch/$USERNAME/$DATASET/$COHORT/fmriprep-$FMRIPREP_VERSION/$SUBJECT"
+mkdir -p $SCRATCH_DIR
 
-TMP_DIR="${SCRATCH_DIR}/tmp"
-mkdir -p ${TMP_DIR}
+TMP_DIR="$SCRATCH_DIR/tmp"
+mkdir -p $TMP_DIR
 
 # Directory within the container templateflow will be in
 APPTAINERENV_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/templateflow"
 export APPTAINERENV_TEMPLATEFLOW_HOME
 
 APPTAINER_CMD="apptainer run --containall --writable-tmpfs --cleanenv \
-	-B ${BIDS_DIR}:/data \
-	-B ${DERIVS_DIR}:/out \
-	-B ${TEMPLATEFLOW_HOST_HOME}:${APPTAINERENV_TEMPLATEFLOW_HOME} \
-	-B ${SCRATCH_DIR}:/work \
-	-B ${TMP_DIR}:/tmp \
-	-B ${FS_LICENSE}:/freesurfer \
+	-B $BIDS_DIR:/data \
+	-B $DERIVS_DIR:/out \
+	-B $TEMPLATEFLOW_HOST_HOME:$APPTAINERENV_TEMPLATEFLOW_HOME \
+	-B $SCRATCH_DIR:/work \
+	-B $TMP_DIR:/tmp \
+	-B $FS_LICENSE:/freesurfer \
 	$IMG_DIR"
 
 if [[ "$COHORT" == "kids" ]]; then
@@ -71,7 +72,7 @@ else
 	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsy:res-2 MNI152NLin6Asym:res-2"
 fi
 
-CMD="${APPTAINER_CMD} \
+CMD="$APPTAINER_CMD \
 	/data \
 	/out \
 	participant \

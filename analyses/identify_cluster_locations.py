@@ -8,7 +8,6 @@ from nifti2bids.logging import setup_logger
 from _utils import get_task_contrasts
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 
 def _get_cmd_args():
@@ -37,6 +36,12 @@ def _get_cmd_args():
         help="Path to Apptainer image of Afni with R.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
     parser.add_argument(
         "--orient",
         dest="orient",
@@ -148,7 +153,14 @@ def add_region_information_to_data(
 
 
 def main(
-    analysis_dir, scratch_dir, afni_img_path, task, orient, atlas, save_excel_version
+    analysis_dir,
+    scratch_dir,
+    afni_img_path,
+    task,
+    analysis_type,
+    orient,
+    atlas,
+    save_excel_version,
 ):
     analysis_dir = Path(analysis_dir)
     scratch_dir = Path(scratch_dir)
@@ -156,7 +168,9 @@ def main(
     LGR.info(f"TASK: {task}")
 
     glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-    contrasts = get_task_contrasts(task, caller="identify_cluster_regions")
+    contrasts = get_task_contrasts(
+        task, analysis_type, caller="identify_cluster_regions"
+    )
     contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
     for contrast, glt_code in contrasts_glts_list:
         cluster_table_filename = list(

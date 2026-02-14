@@ -7,10 +7,23 @@ from nifti2bids._helpers import iterable_to_str
 from nifti2bids.logging import setup_logger
 from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
 
+from _denoising import (
+    get_acompcor_component_names,
+    get_cosine_regressors,
+    get_global_signal_regressors,
+    get_motion_regressors,
+    percent_signal_change,
+    perform_spatial_smoothing,
+)
+from _gen_afni_files import (
+    create_censor_file,
+    create_timing_files,
+    create_regressor_file,
+)
+from _models import create_design_matrix, perform_first_level
 from _utils import create_contrast_files
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
 
 
 def _get_cmd_args():
@@ -114,7 +127,7 @@ def _get_cmd_args():
         required=False,
         help=(
             "Global signal regression. If True, ``n_motion_regressors`` is used "
-            "to include derivative if 16, and power if 24"
+            "to include derivative if 12, 18, or 24, and power if 18 or 24"
         ),
     )
     parser.add_argument(
@@ -129,341 +142,14 @@ def _get_cmd_args():
     return parser
 
 
-def get_cosine_regressors(confounds_df):
-    cosine_regressor_names = [
-        col for col in confounds_df.columns if col.startswith("cosine")
-    ]
-
-    LGR.info(f"Name of cosine parameters: {cosine_regressor_names}")
-
-    return (
-        confounds_df[cosine_regressor_names].to_numpy(copy=True),
-        cosine_regressor_names,
-    )
-
-
-def get_motion_regressors(confounds_df, n_motion_parameters):
-    motion_params = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
-    if n_motion_parameters in [12, 18, 24]:
-        derivatives = [f"{param}_derivative1" for param in motion_params]
-        motion_params += derivatives
-
-    if n_motion_parameters in [18, 24]:
-        derivatives = [f"{param}_power2" for param in motion_params]
-        motion_params += derivatives
-
-    if n_motion_parameters == 24:
-        power = [f"{param}_derivative1_power2" for param in motion_params]
-        motion_params += power
-
-    LGR.info(f"Using motion parameters: {motion_params}")
-
-    return confounds_df[motion_params].to_numpy(copy=True), motion_params
-
-
-def get_acompcor_component_names(confounds_json_data, n_components, strategy):
-    if strategy == "separate":
-        c_compcors = sorted(
-            [k for k in confounds_json_data.keys() if "c_comp_cor" in k]
-        )
-        w_compcors = sorted(
-            [k for k in confounds_json_data.keys() if "w_comp_cor" in k]
-        )
-
-        CSF = [c for c in c_compcors if confounds_json_data[c].get("Mask") == "CSF"][
-            :n_components
-        ]
-        WM = [w for w in w_compcors if confounds_json_data[w].get("Mask") == "WM"][
-            :n_components
-        ]
-
-        components_list = CSF + WM
-    else:
-        a_compcors = sorted(
-            [k for k in confounds_json_data.keys() if "a_comp_cor" in k]
-        )
-        combined = [
-            a for a in a_compcors if confounds_json_data[a].get("Mask") == "combined"
-        ][:n_components]
-
-        components_list = combined
-
-    LGR.info(f"The following acompcor components will be used: {components_list}")
-
-    return components_list
-
-
-def get_global_signal_regressors(confounds_df, n_motion_parameters):
-    global_params = ["global_signal"]
-    if n_motion_parameters in [12, 24]:
-        global_params += ["global_signal_derivative1"]
-
-    if n_motion_parameters == 24:
-        global_params += ["global_signal_power2"]
-
-    LGR.info(f"Using global signal parameters: {global_params}")
-
-    return confounds_df[global_params].to_numpy(copy=True), global_params
-
-
-def get_col_name(indx, regressor_positions):
-    return regressor_positions[list(regressor_positions)[indx]]
-
-
-def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999):
-    # To remove errors and warnings
-    drop_columns = []
-    for i in range(regressor_arr.shape[1]):
-        for j in range(i + 1, regressor_arr.shape[1]):
-            r = np.corrcoef(regressor_arr[:, i], regressor_arr[:, j])[0, 1]
-
-            if r > threshold:
-                col1 = get_col_name(i, regressor_positions)
-                col2 = get_col_name(j, regressor_positions)
-                drop_columns.append(j)
-
-                LGR.critical(
-                    f"Columns {col1} and {col2} are collinear ({r}), dropping {col2}."
-                )
-
-    return get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions)
-
-
-def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
-    if not drop_columns:
-        return regressor_arr, regressor_positions
-
-    regressor_arr = np.delete(regressor_arr, drop_columns, axis=1)
-    for indx in drop_columns:
-        del regressor_positions[indx]
-
-    regressor_positions = {
-        indx: regressor_positions[key] for indx, key in enumerate(regressor_positions)
-    }
-
-    return regressor_arr, regressor_positions
-
-
-def create_censor_file(subject_dir, subject, session, task, space, censor_mask):
-    censor_file = (
-        subject_dir
-        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-censor.1D"
-    )
-    np.savetxt(censor_file, censor_mask, fmt="%d")
-
-    return censor_file
-
-
-def create_regressor_file(
-    subject_dir,
-    subject,
-    session,
-    task,
-    space,
-    censor_mask,
-    regressor_names,
-    *regressor_arrays,
-):
-    regressor_positions = {pos: name for pos, name in enumerate(regressor_names)}
-    LGR.info(f"Regressor names and positions: {regressor_positions}")
-    regressor_file = (
-        subject_dir
-        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-regressors.1D"
-    )
-    valid_arrays = [arr for arr in regressor_arrays if arr is not None]
-    data = np.column_stack(valid_arrays)
-
-    rank = np.linalg.matrix_rank(data)
-    if rank < data.shape[1]:
-        LGR.critical(f"Regressor matrix is rank deficient: {rank}")
-
-        data, regressor_positions = remove_collinear_columns(data, regressor_positions)
-        LGR.critical(f"New regressor names and positions: {regressor_positions}")
-
-    # To stop errors and warnings
-    drop_columns = np.where(np.var(data, axis=0) == 0)[0].tolist()
-    if drop_columns:
-        col_names = [get_col_name(indx, regressor_positions) for indx in drop_columns]
-
-        LGR.critical(f"The following have constant variance: {col_names}")
-
-        data, regressor_positions = get_new_matrix_and_names(
-            drop_columns, data, regressor_positions
-        )
-
-        LGR.critical(f"New regressor names and positions: {regressor_positions}")
-
-    mean = data[censor_mask.astype(bool)].mean(axis=0)
-    std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)
-    std[std < np.finfo(np.float64).eps] = 1.0
-    data[censor_mask.astype(bool)] = (data[censor_mask.astype(bool)] - mean) / std
-
-    np.savetxt(regressor_file, data, fmt="%.6f")
-
-    return regressor_file
-
-
-def save_event_file(timing_dir, trial_type, timing_data):
-    filename = timing_dir / f"{trial_type}.1D"
-    timing_str = " ".join(timing_data)
-    with open(filename, "w") as f:
-        f.write(timing_str)
-
-
-def create_timing_files(subject_dir, event_file, task):
-    timing_dir = subject_dir / "timing_files" / task
-    timing_dir.mkdir(parents=True, exist_ok=True)
-
-    event_df = pd.read_csv(event_file, sep="\t")
-    trial_types = event_df["trial_type"].unique()
-
-    for trial_type in trial_types:
-        trial_df = event_df[event_df["trial_type"] == trial_type]
-        row_mask = (
-            np.full(len(trial_df), True, dtype=bool)
-            if task != "flanker"
-            else trial_df["accuracy"] == "correct"
-        )
-
-        if task == "flanker":
-            timing_data = (
-                trial_df.loc[
-                    row_mask,
-                    "onset",
-                ]
-                .astype(str)
-                .to_numpy(copy=True)
-            )
-        else:
-            timing_data = (
-                trial_df.loc[
-                    row_mask,
-                    "onset",
-                ].astype(str)
-                + ":"
-                + trial_df.loc[row_mask, "duration"].astype(str).to_numpy(copy=True)
-            )
-
-        if isinstance(timing_data, pd.Series):
-            timing_data = timing_data.to_list()
-
-        save_event_file(timing_dir, trial_type, timing_data)
-
-    # Get errors
-    if task == "flanker":
-        timing_data = trial_df.loc[~row_mask, "onset"].astype(str)
-
-        save_event_file(timing_dir, trial_type="errors", timing_data=timing_data)
-
-    return timing_dir
-
-
-def percent_signal_change(subject_dir, nifti_file, mask_file, censor_file):
-    mean_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "mean")
-    percent_change_nifti_file = subject_dir / Path(nifti_file).name.replace(
-        "preproc_bold", "percent_change"
-    )
-    if not percent_change_nifti_file.exists():
-        censor_data = np.loadtxt(censor_file)
-        kept_indices = np.where(censor_data == 1)[0]
-        selector = ",".join(map(str, kept_indices))
-        cmd_mean = (
-            f"3dTstat -prefix {mean_file} "
-            f"-mask {mask_file} "
-            "-mean "
-            f"-overwrite "
-            f"'{nifti_file}[{selector}]'"
-        )
-        subprocess.run(cmd_mean, shell=True, check=True)
-        # https://afni.nimh.nih.gov/pub/dist/edu/2011_03_one_day/afni_handouts/afni06_decon.pdf
-        cmd_calc = (
-            f"3dcalc -a {nifti_file} -b {mean_file} -c {mask_file} "
-            f"-expr 'c * min(200, a/b*100)' -prefix {percent_change_nifti_file} -overwrite "
-        )
-        subprocess.run(cmd_calc, shell=True, check=True)
-
-    return percent_change_nifti_file
-
-
-# TODO: for future connectivity model
-def standardize(subject_dir, nifti_file, mask_file, censor_file):
-    mean_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "mean")
-    stdev_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "std")
-    standardized_nifti_file = subject_dir / Path(nifti_file).name.replace(
-        "preproc_bold", "standardized"
-    )
-    if not standardized_nifti_file.exists():
-        censor_data = np.loadtxt(censor_file)
-        kept_indices = np.where(censor_data == 1)[0]
-        selector = ",".join(map(str, kept_indices))
-        cmd_mean = (
-            f"3dTstat -prefix {mean_file} "
-            f"-mask {mask_file} "
-            "-mean "
-            f"-overwrite "
-            f"'{nifti_file}[{selector}]'"
-        )
-        subprocess.run(cmd_mean, shell=True, check=True)
-        cmd_std = (
-            f"3dTstat -prefix {stdev_file} "
-            f"-mask {mask_file} "
-            "-stdev "
-            f"-overwrite "
-            f"'{nifti_file}[{selector}]'"
-        )
-        subprocess.run(cmd_std, shell=True, check=True)
-        cmd_calc = (
-            f"3dcalc -a {nifti_file} -b {mean_file} -c {stdev_file} -d {mask_file} "
-            f"-expr 'd * (a - b) / c' -prefix {standardized_nifti_file} -overwrite "
-        )
-        subprocess.run(cmd_calc, shell=True, check=True)
-
-    return standardized_nifti_file
-
-
-def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file, fwhm):
-    smoothed_nifti_file = subject_dir / str(nifti_file).replace(
-        "percent_change", "smoothed"
-    )
-
-    if smoothed_nifti_file.exists():
-        smoothed_nifti_file.unlink()
-
-    cmd = (
-        f"apptainer exec -B /projects:/projects {afni_img_path} 3dBlurToFWHM "
-        f"-input {nifti_file} "
-        f"-mask {mask_file} "
-        f"-FWHM {fwhm} "
-        f"-prefix {smoothed_nifti_file} "
-        "-overwrite"
-    )
-    LGR.info(f"Performing spatial smoothing with fwhm={fwhm}: {cmd}")
-    subprocess.run(cmd, shell=True, check=True)
-
-    return smoothed_nifti_file
-
-
 def get_task_contrast_cmd(task, timing_dir, regressors_file):
-    # Using stim_times_AM1 and dmUBLOCK so that duration doesn't need to passed
-    # and is instead paired with the onset time for block designs
-    # Likely overkill since duration variation is minimal, maybe change to
-    # block and a fixed value and remove the durations later
-
-    """
-    https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/statistics/deconvolve_block.html
-    The second column shows dmUBLOCK, with either a positive parameter (eq 0) or no parameter.
-    For arguments eq 1, this function behaves exactly like dmBLOCK above. When the argument is
-    0 or no parameter is given, then the response is similar to that of dmBLOCK in that
-    the response amplitude varies, but different to it in that the scaling is such that
-    convolved plateau height is scaled to unity, and short duration events are shorter than 1.
-    """
     if task == "nback":
         contrast_cmd = {
             "num_stimts": "-num_stimts 4 ",
-            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'instruction.1D'} 'dmUBLOCK' -stim_label 1 instruction "
-            f"-stim_times_AM1 2 {timing_dir / '0-back.1D'} 'dmUBLOCK' -stim_label 2 0-back "
-            f"-stim_times_AM1 3 {timing_dir / '1-back.1D'} 'dmUBLOCK' -stim_label 3 1-back "
-            f"-stim_times_AM1 4 {timing_dir / '2-back.1D'} 'dmUBLOCK' -stim_label 4 2-back "
+            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 2 0-back "
+            f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 3 1-back "
+            f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 4 2-back "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*1-back -1*0-back' -glt_label 1 1-back_vs_0-back "
             "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back "
@@ -472,24 +158,24 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
     elif task == "mtle":
         contrast_cmd = {
             "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'instruction.1D'} 'dmUBLOCK' -stim_label 1 instruction "
-            f"-stim_times_AM1 2 {timing_dir / 'indoor.1D'} 'dmUBLOCK' -stim_label 2 indoor "
+            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 2 indoor "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*indoor' -glt_label 1 indoor ",
         }
     elif task == "mtlr":
         contrast_cmd = {
             "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'instruction.1D'} 'dmUBLOCK' -stim_label 1 instruction "
-            f"-stim_times_AM1 2 {timing_dir / 'seen.1D'} 'dmUBLOCK' -stim_label 2 seen "
+            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 2 seen "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*seen' -glt_label 1 seen ",
         }
     elif task == "princess":
         contrast_cmd = {
             "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times_AM1 1 {timing_dir / 'switch.1D'} 'dmUBLOCK' -stim_label 1 switch "
-            f"-stim_times_AM1 2 {timing_dir / 'nonswitch.1D'} 'dmUBLOCK' -stim_label 2 nonswitch "
+            "contrasts": f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 1 switch "
+            f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 2 nonswitch "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
@@ -574,71 +260,6 @@ def _create_flanker_contrast(timing_dir, regressors_file):
     )
 
     return contrast_cmd
-
-
-def create_design_matrix(
-    subject_dir,
-    smoothed_nifti_file,
-    mask_file,
-    censor_file,
-    contrast_cmd,
-    cosine_regressor_names,
-):
-    design_matrix_file = subject_dir / str(smoothed_nifti_file).replace(
-        "smoothed.nii.gz", "design_matrix.1D"
-    )
-
-    polort = 0 if cosine_regressor_names else 4
-    LGR.info(f"Using polort {polort} for 3dDeconvolve.")
-
-    cmd = (
-        "3dDeconvolve "
-        f"-input {smoothed_nifti_file} "
-        f"-mask {mask_file} "
-        f"-censor {censor_file} "
-        f"-polort {polort} "
-        "-local_times "
-        f"{contrast_cmd['num_stimts']} "
-        f"{contrast_cmd['contrasts']} "
-        f"-x1D {design_matrix_file} "
-        "-x1D_stop "
-        "-overwrite"
-    )
-
-    LGR.info(f"Running 3dDeconvolve to create design matrix: {cmd}")
-    subprocess.run(cmd, shell=True, check=True)
-
-    return design_matrix_file
-
-
-def perform_first_level(
-    subject_dir,
-    afni_img_path,
-    design_matrix_file,
-    smoothed_nifti_file,
-    mask_file,
-):
-    stats_file_relm = subject_dir / Path(smoothed_nifti_file).name.replace(
-        "smoothed", "stats"
-    )
-
-    cmd = (
-        f"apptainer exec -B /projects:/projects {afni_img_path} 3dREMLfit "
-        f"-matrix {design_matrix_file} "
-        f"-input {smoothed_nifti_file} "
-        f"-mask {mask_file} "
-        "-fout -tout "
-        "-verb "
-        f"-Rbuck {stats_file_relm} "
-        "-overwrite"
-    )
-
-    LGR.info(
-        f"Running 3dREMLfit for first level accounting for auto-correlation: {cmd}"
-    )
-    subprocess.run(cmd, shell=True, check=True)
-
-    return stats_file_relm
 
 
 def main(
@@ -847,7 +468,7 @@ def main(
 
         # Percent signal change data
         percent_change_nifti_file = percent_signal_change(
-            subject_dir, nifti_file, mask_file, censor_file
+            subject_dir, afni_img_path, nifti_file, mask_file, censor_file
         )
 
         # Smooth data
@@ -859,6 +480,7 @@ def main(
         contrast_cmd = get_task_contrast_cmd(task, timing_dir, regressors_file)
         design_matrix_file = create_design_matrix(
             subject_dir,
+            afni_img_path,
             smoothed_nifti_file,
             mask_file,
             censor_file,
@@ -879,7 +501,9 @@ def main(
         if not contrast_dir.exists():
             contrast_dir.mkdir()
 
-        create_contrast_files(stats_file_relm, contrast_dir, afni_img_path, task)
+        create_contrast_files(
+            stats_file_relm, contrast_dir, afni_img_path, task, analysis_type="glm"
+        )
 
 
 if __name__ == "__main__":

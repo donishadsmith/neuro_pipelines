@@ -3,13 +3,12 @@
 import argparse, sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from nifti2bids.logging import setup_logger
 from _utils import get_task_contrasts, threshold_palm_output
 
 LGR = setup_logger(__name__)
-LGR.setLevel("INFO")
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def _get_cmd_args():
@@ -53,6 +52,12 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--analysis_type",
+        dest="analysis_type",
+        required=True,
+        help="The type of analysis performed (glm or gPPI).",
+    )
 
     return parser
 
@@ -78,13 +83,15 @@ def get_output_prefixes(analysis_dir, task, contrast):
     return output_prefixes
 
 
-def main(analysis_dir, dst_dir, dataset, cohort, task, cluster_correction_p):
+def main(
+    analysis_dir, dst_dir, dataset, cohort, task, analysis_type, cluster_correction_p
+):
     contrast_dir = Path(contrast_dir)
     dst_dir = Path(dst_dir)
 
     LGR.info(f"TASK: {task}")
 
-    contrasts = get_task_contrasts(task, caller="threshold_palm_images")
+    contrasts = get_task_contrasts(task, analysis_type, caller="threshold_palm_images")
     for contrast in contrasts:
         output_prefixes = get_output_prefixes(analysis_dir, task, contrast)
         glt_codes_dict = create_glt_dict(dataset, cohort)[
