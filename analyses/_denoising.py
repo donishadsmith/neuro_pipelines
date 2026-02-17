@@ -95,26 +95,28 @@ def percent_signal_change(
     percent_change_nifti_file = subject_dir / Path(nifti_file).name.replace(
         "preproc_bold", "percent_change"
     )
-    if not percent_change_nifti_file.exists():
-        censor_data = np.loadtxt(censor_file)
-        kept_indices = np.where(censor_data == 1)[0]
-        selector = ",".join(map(str, kept_indices))
-        cmd_mean = (
-            f"apptainer exec -B /projects:/projects {afni_img_path} 3dTstat "
-            f"-prefix {mean_file} "
-            f"-mask {mask_file} "
-            "-mean "
-            f"-overwrite "
-            f"'{nifti_file}[{selector}]'"
-        )
-        subprocess.run(cmd_mean, shell=True, check=True)
-        # https://afni.nimh.nih.gov/pub/dist/edu/2011_03_one_day/afni_handouts/afni06_decon.pdf
-        cmd_calc = (
-            f"apptainer exec -B /projects:/projects {afni_img_path} 3dcalc "
-            f"-a {nifti_file} -b {mean_file} -c {mask_file} "
-            f"-expr 'c * min(200, a/b*100)' -prefix {percent_change_nifti_file} -overwrite "
-        )
-        subprocess.run(cmd_calc, shell=True, check=True)
+    censor_data = np.loadtxt(censor_file)
+    kept_indices = np.where(censor_data == 1)[0]
+    selector = ",".join(map(str, kept_indices))
+    cmd_mean = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dTstat "
+        f"-prefix {mean_file} "
+        f"-mask {mask_file} "
+        "-mean "
+        f"-overwrite "
+        f"'{nifti_file}[{selector}]'"
+    )
+    subprocess.run(cmd_mean, shell=True, check=True)
+    # https://afni.nimh.nih.gov/pub/dist/doc/program_help/afni_proc.py.html
+    # https://afni.nimh.nih.gov/pub/dist/HOWTO/howto/ht05_group/html/afni_howto5_subj.html
+    # https://afni.nimh.nih.gov/pub/dist/edu/2011_03_one_day/afni_handouts/afni06_decon.pdf
+    # c * min(200, a/b*100)
+    cmd_calc = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dcalc "
+        f"-a {nifti_file} -b {mean_file} -c {mask_file} "
+        f"-expr 'c * max(-200, min(200, a/b*100))' -prefix {percent_change_nifti_file} -overwrite "
+    )
+    subprocess.run(cmd_calc, shell=True, check=True)
 
     return percent_change_nifti_file
 

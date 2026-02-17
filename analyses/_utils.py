@@ -242,3 +242,10 @@ def threshold_palm_output(
         nib.save(combined_thresholded_img, combined_thresholded_file)
 
         LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
+
+
+def needs_resampling(source_img, target_img):
+    equal_shape = source_img.shape == target_img.shape
+    equal_affine = np.allclose(source_img.affine, target_img.affine, atol=1e-5)
+
+    return False if (equal_shape and equal_affine) else True

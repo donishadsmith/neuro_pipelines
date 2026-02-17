@@ -27,10 +27,10 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-ANALYSIS_DIR="${BIDS_DIR}/derivatives/$ANALYSIS_TYPE/$TASK"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
 TEMPLATE_IMG_PATH='/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz'
 
-CMD="${PYTHON} get_cluster_results.py \
+CMD="$PYTHON get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
     --method $METHOD \
 	--task $TASK \
@@ -38,7 +38,6 @@ CMD="${PYTHON} get_cluster_results.py \
     --template_img_path $TEMPLATE_IMG_PATH"
 
 if [[ $METHOD == "parametric" ]]; then
-    AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 	CMD+=" --afni_img_path $AFNI_IMG_PATH --cluster"
 fi
 

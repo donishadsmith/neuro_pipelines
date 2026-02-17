@@ -46,6 +46,7 @@ def _get_cmd_args():
         "--analysis_type",
         dest="analysis_type",
         required=True,
+        choices=["glm", "gPPI"],
         help="The type of analysis performed (glm or gPPI).",
     )
     parser.add_argument(

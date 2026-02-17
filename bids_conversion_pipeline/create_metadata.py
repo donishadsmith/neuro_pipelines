@@ -76,10 +76,11 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
 
             _, orientation = bids_meta.get_image_orientation(nifti_file)
             orientation = "".join(orientation)
+            # https://neurostars.org/t/determining-phase-encoding-direction-and-total-read-out-time-from-philips-scans/25402/4
             # Philips fat direction is "P", phase encoding is on the "A-P" axis
             # Assuming either RAS or LPS. Native format is LPS
             json_schema["PhaseEncodingDirection"] = (
-                "j-" if orientation == "RAS" else "j"
+                "j" if orientation == "RAS" else "j-"
             )
 
         json_filename = str(nifti_file).replace(".nii.gz", ".json")

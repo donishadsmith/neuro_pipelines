@@ -12,7 +12,7 @@ sbatch --array=0-10 extract_contrasts.sb # Runs first 11 subjects in the partici
 For specific subjects:
 
 ```bash
-sbatch --array=0-1 first_level.sb 101 102 # Runs these two subjects in parallel
+sbatch --array=0-1 first_level_glm.sb 101 102 # Runs these two subjects in parallel
 sbatch --array=0-1 extract_contrasts.sb 101 102 # Runs these two subjects in parallel
 ```
 
@@ -21,3 +21,4 @@ sbatch --array=0-1 extract_contrasts.sb 101 102 # Runs these two subjects in par
 2. second_level.sb
 3. get_cluster_results.sb
 4. identify_cluster_locations.sb (uses afni whereami to auto identify peak cluster coordinate location as well as how many millimeters of the closes label is to the coordinate)
+5. extract_individual_betas.sb (for brain-behavior analyses)

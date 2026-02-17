@@ -1,0 +1,51 @@
+#!/bin/bash
+#SBATCH --job-name=extract_individual_betas
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16G
+#SBATCH --exclude=cpu149
+# Outputs ---------------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_individual_betas_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_individual_betas_%A_%a.err
+# ------------------------------------------------------------------------------------------
+ANALYSIS_TYPE="glm" # glm or gPPI
+METHOD="nonparametric"
+BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+
+DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
+
+# sbatch --array=0 extract_individual_betas.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array
+TASKS=( $@ )
+# slurm job value; essentially extracting sub-{id}
+if [ ${#TASKS[@]} -eq 0 ]; then
+    TASK=${DEFAULT_TASKS[${SLURM_ARRAY_TASK_ID}]}
+else
+	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
+fi
+
+SECOND_LEVEL_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
+DST_DIR="$SECOND_LEVEL_DIR/individual_betas_files"
+mkdir -p $DST_DIR
+
+CMD="$PYTHON extract_individual_betas.py \
+    --second_level_dir $SECOND_LEVEL_DIR \
+    --method $METHOD \
+	--task $TASK \
+    --analysis_type $ANALYSIS_TYPE \
+    --dst_dir $DST_DIR"
+
+
+# hostname
+# id 
+# getent passwd "$(id -u)" || echo "getent failed"
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?

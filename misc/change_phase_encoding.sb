@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH --job-name=phase_encoding
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=4G
+# Outputs -------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/phase_encoding_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/phase_encoding_%A_%a.err
+# ---------------------------------------------------------------------------
+
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+
+BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+PHASE_ENCODING_DIRECTION="j-"
+
+CMD="${PYTHON} change_phase_encoding.py --bids_dir $BIDS_DIR --phase_encoding_direction $PHASE_ENCODING_DIRECTION"
+
+echo $CMD
+eval $CMD

@@ -72,7 +72,7 @@ from _gen_afni_files import (
     create_regressor_file,
 )
 from _models import create_design_matrix, perform_first_level
-from _utils import create_contrast_files
+from _utils import create_contrast_files, needs_resampling
 
 LGR = setup_logger(__name__)
 
@@ -82,7 +82,9 @@ TASK_DURATIONS = {"flanker": 0, "nback": 32, "princess": 52, "mtle": 18, "mtlr":
 
 
 def _get_cmd_args():
-    parser = argparse.ArgumentParser(description="Perform first level GLM for a task.")
+    parser = argparse.ArgumentParser(
+        description="Perform first level gPPI (task-based functional connectivty) for a task."
+    )
     parser.add_argument(
         "--bids_dir", dest="bids_dir", required=True, help="Path to BIDS directory."
     )
@@ -237,7 +239,7 @@ def extract_seed_timeseries(subject_dir, nifti_file, seed_mask_file, afni_img_pa
     nifti_img = nib.load(nifti_file)
     seed_img = nib.load(seed_mask_file)
 
-    if nifti_file.shape != seed_img.shape:
+    if needs_resampling(seed_img, nifti_file):
         seed_img = resample_to_img(
             seed_img, nifti_img, interpolation="nearest", copy_header=True
         )
@@ -255,42 +257,57 @@ def denoise_seed_timeseries(seed_timeseries_file, regressors_file, afni_img_path
 
 
 # TODO: Modify from GLM to gPPI
-def get_task_contrast_cmd(task, timing_dir, regressors_file, seed_timeseries_file):
+def get_task_contrast_cmd(
+    task, timing_dir, regressors_file, seed_timeseries_file, ppi_dir
+):
+    # Assume seed file is the name
+    seed_name = seed_timeseries_file.name.split(".nii")[0]
     if task == "nback":
         contrast_cmd = {
-            "num_stimts": "-num_stimts 4 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 2 0-back "
-            f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 3 1-back "
-            f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 4 2-back "
+            "num_stimts": "-num_stimts 8 ",
+            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
+            f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
+            f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 5 2-back "
+            f"-stim_file {ppi_dir / 'PPI_0-back.1D'} -stim_label 6 PPI_0-back"
+            f"-stim_file {ppi_dir / 'PPI_1-back.1D'} -stim_label 7 PPI_1-back"
+            f"-stim_file {ppi_dir / 'PPI_2-back.1D'} -stim_label 8 PPI_2-back"
             f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*1-back -1*0-back' -glt_label 1 1-back_vs_0-back "
-            "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back "
-            "-gltsym 'SYM: +1*2-back -1*1-back' -glt_label 3 2-back_vs_1-back ",
+            "-gltsym 'SYM: +1*PPI_1-back -1*PPI_0-back' -glt_label 1 PPI_1-back_vs_PPI_0-back "
+            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back "
+            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_1-back' -glt_label 3 PPI_2-back_vs_PPI_1-back ",
         }
     elif task == "mtle":
         contrast_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 2 indoor "
+            "num_stimts": "-num_stimts 4 ",
+            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor_regressor "
+            f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 4 PPI_indoor_regressor"
             f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*indoor' -glt_label 1 indoor ",
+            "-gltsym 'SYM: +1* PPI_indoor_regressor' -glt_label 1 PPI_indoor ",
         }
     elif task == "mtlr":
         contrast_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 2 seen "
+            "num_stimts": "-num_stimts 4 ",
+            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen_regressor "
+            f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 4 PPI_seen_regressor"
             f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*seen' -glt_label 1 seen ",
+            "-gltsym 'SYM: +1*PPI_seen_regressor' -glt_label 1 PPI_seen ",
         }
     elif task == "princess":
         contrast_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 1 switch "
-            f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 2 nonswitch "
+            "num_stimts": "-num_stimts 5 ",
+            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 2 switch "
+            f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 3 nonswitch "
+            f"-stim_file {ppi_dir / 'PPI_switch.1D'} -stim_label 4 PPI_switch"
+            f"-stim_file {ppi_dir / 'PPI_nonswitch.1D'} -stim_label 5 PPI_nonswitch"
             f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
+            "-gltsym 'SYM: +1*PPI_switch -1*PPI_nonswitch' -glt_label 1 PPI_switch_vs_PPI_nonswitch ",
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
@@ -300,9 +317,12 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file, seed_timeseries_fil
 
 
 # TODO: Modify from GLM to gPPI
-def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file):
+def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file, ppi_dir):
     # Dynamically create the flanker contrast to avoid including contrasts that
     # have no data
+    # Assume seed file is the name
+    seed_name = seed_timeseries_file.name.split(".nii")[0]
+
     contrast_cmd = {
         "num_stimts": "-num_stimts {num_labels} ",
         "contrasts": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
@@ -310,19 +330,23 @@ def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file):
 
     labels_dict = {
         "stims": (
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} congruent ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} incongruent ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} neutral ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} congruent ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} incongruent ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} nogo ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} neutral ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_congruent ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_incongruent ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_nogo ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_neutral ",
         ),
         "gltsyms": (
-            "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label {label} congruent_vs_neutral ",
-            "-gltsym 'SYM: +1*incongruent -1*neutral' -glt_label {label} incongruent_vs_neutral ",
-            "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label {label} nogo_vs_neutral ",
-            "-gltsym 'SYM: +1*congruent -1*incongruent' -glt_label {label} congruent_vs_incongruent ",
-            "-gltsym 'SYM: +1*congruent -1*nogo' -glt_label {label} congruent_vs_nogo ",
-            "-gltsym 'SYM: +1*incongruent -1*nogo' -glt_label {label} incongruent_vs_nogo ",
+            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_neutral' -glt_label {label} PPI_congruent_vs_PPI_neutral ",
+            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_neutral' -glt_label {label} PPI_incongruent_vs_PPI_neutral ",
+            "-gltsym 'SYM: +1*PPI_nogo -1*PPI_neutral' -glt_label {label} PPI_nogo_vs_PPI_neutral ",
+            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_incongruent' -glt_label {label} PPI_congruent_vs_PPI_incongruent ",
+            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_nogo' -glt_label {label} PPI_congruent_vs_PPI_nogo ",
+            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_nogo' -glt_label {label} PPI_incongruent_vs_PPI_nogo ",
         ),
     }
 
@@ -332,7 +356,11 @@ def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file):
     )
 
     nonempty_files = np.array(files)[~empty_mask]
-    keep_trial_types = [file.removesuffix(".1D") for file in nonempty_files]
+    keep_trial_regressors = [file.removesuffix(".1D") for file in nonempty_files]
+    keep_ppi_regressors = [
+        f"PPI_{trial_regressor}" for trial_regressor in keep_trial_regressors
+    ]
+    keep_trial_regressors += keep_ppi_regressors
 
     # Length of the stims
     contrast_cmd["num_stimts"] = contrast_cmd["num_stimts"].format(
@@ -340,20 +368,25 @@ def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file):
     )
 
     # Only keep stims without empty files
-    stims = ""
-    for label, trial_type in enumerate(keep_trial_types, start=1):
+    stims = f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+    for label, regressor in enumerate(keep_trial_regressors, start=2):
         bool_list = [
-            trial_type == stim_string.rstrip().split(" ")[-1]
+            regressor == stim_string.rstrip().split(" ")[-1]
             for stim_string in labels_dict["stims"]
         ]
 
         stim_string = labels_dict["stims"][bool_list.index(True)]
-        if label == len(keep_trial_types):
-            stim_string = stim_string.rstrip()
 
-        stims += stim_string.format(
-            label=label, timing_file=timing_dir / f"{trial_type}.1D"
-        )
+        if "PPI_" in stim_string:
+            stims += stim_string.format(
+                label=label, ppi_file=ppi_dir / f"{regressor}.1D"
+            )
+        else:
+            stims += stim_string.format(
+                time_label=label - 1,
+                label=label,
+                timing_file=timing_dir / f"{regressor}.1D",
+            )
 
     # Only keep gltsym with two
     kept_gltsyms = []
@@ -361,7 +394,7 @@ def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file):
         glt_label = gltsym.rstrip().split(" ")[-1]
         glt_label_parts = glt_label.split("_vs_")
         if all(
-            glt_label_part in keep_trial_types for glt_label_part in glt_label_parts
+            glt_label_part in keep_ppi_regressors for glt_label_part in glt_label_parts
         ):
             kept_gltsyms.append(gltsym)
 
@@ -388,7 +421,7 @@ def resample_seed_timeseries(
         pass
 
 
-def upsample_condition_regressor(timing_file, afni_img_path, upsample_dt):
+def upsample_condition_regressor(timing_file, afni_img_path, upsample_dt=0.1):
     """
     timing_tool.py -timing condition_timing_in_original_TR -tr sub_TR
     -stim_dur ... -run_len ... -min_frac ... -timing_to_1D ... -per_run -show_timing
