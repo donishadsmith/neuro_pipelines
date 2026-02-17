@@ -28,7 +28,7 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-ANALYSIS_DIR="${BIDS_DIR}/derivatives/glm/$TASK"
+ANALYSIS_DIR="${BIDS_DIR}/derivatives/$ANALYSIS_TYPE/$TASK"
 SCRATCH_DIR="/scratch/${USERNAME}/mph/kids/mni_coordinate_files"
 mkdir -p ${SCRATCH_DIR}
 
