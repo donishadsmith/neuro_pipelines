@@ -730,7 +730,9 @@ def main(
 
             data_table["dose"] = data_table["dose"].astype(str)
             LGR.info(f"Saving data table to: {data_table_filename}")
-            data_table.to_csv(data_table_filename, sep=" ", index=False)
+            data_table.to_csv(
+                data_table_filename, sep="\t", index=False, encoding="utf-8"
+            )
 
             glt_str = get_glt_codes_str(data_table)
             model_str = get_model_str(data_table)
