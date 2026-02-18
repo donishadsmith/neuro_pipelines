@@ -27,10 +27,8 @@ EXCLUDE_NIFTI_FILE=""
 
 
 METHOD="nonparametric"
-# /projects/bigos_lab/apptainer-images/fsl-palm.sif
-FSL_IMG_PATH=""
-# /projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg
-AFNI_IMG_PATH=""
+FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
@@ -69,7 +67,7 @@ if [[ $METHOD == "nonparametric" && -n $FSL_IMG_PATH ]]; then
 	CMD+=" --fsl_img_path $FSL_IMG_PATH"
 fi
 
-if [[ -n $AFNI_IMG_PATH ]]; then
+if [[ $METHOD == "parametric" && -n $AFNI_IMG_PATH ]]; then
 	CMD+=" --afni_img_path $AFNI_IMG_PATH"
 fi
 
