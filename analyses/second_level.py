@@ -352,6 +352,8 @@ def get_centering_str(data_table):
         f"-qVars {' '.join(quoted_vars)}  -qVarCenters {' '.join(quoted_zeroes)} "
     )
 
+    LGR.info(f"The following centering string will be used: {centering_str}")
+
     return centering_str
 
 
