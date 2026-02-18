@@ -33,7 +33,7 @@ pip install -r requirements.txt
 On HPC:
 
 ```bash
-conda create -n venv python=3.10 
+conda create -n venv python=3.10
 source activate venv
 pip install -r requirements.txt
 ```

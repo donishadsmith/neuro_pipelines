@@ -77,8 +77,18 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
             _, orientation = bids_meta.get_image_orientation(nifti_file)
             orientation = "".join(orientation)
             # https://neurostars.org/t/determining-phase-encoding-direction-and-total-read-out-time-from-philips-scans/25402/4
+            # https://neurostars.org/t/bids-fmap-phase-encoding-direction-and-image-orientation-beginner/33274/7
+            # https://pmc.ncbi.nlm.nih.gov/articles/PMC4845159/
+            # When the fat shift direction is A, susceptibility artifacts are shifted posteriorly
+            # When fat shift direction is P, susceptibility artifacts are shifted anteriorly
+            # Artifacts shift in opposite direction of the fat
             # Philips fat direction is "P", phase encoding is on the "A-P" axis
             # Assuming either RAS or LPS. Native format is LPS
+            # Note from 0 to N is P -> A for RAS and A -> P for LPS
+            # Hence fat shift direction of A (phase encoding from A to P) is j- for RAS and j for LPS
+            # and fat shift direction of P (phase encoding from P to A) is j for RAS and j- for LPS
+            # SENSE=3 collects 1/3 of the data in k-space in the encoding direction which reduces sdc
+            # Distortion in these images are minimal https://cds.ismrm.org/protected/07MProceedings/PDFfiles/01500.pdf
             json_schema["PhaseEncodingDirection"] = (
                 "j" if orientation == "RAS" else "j-"
             )

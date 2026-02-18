@@ -93,7 +93,7 @@ def percent_signal_change(
 ):
     mean_file = subject_dir / Path(nifti_file).name.replace("preproc_bold", "mean")
     percent_change_nifti_file = subject_dir / Path(nifti_file).name.replace(
-        "preproc_bold", "percent_change"
+        "preproc_bold", "psc"
     )
     censor_data = np.loadtxt(censor_file)
     kept_indices = np.where(censor_data == 1)[0]
@@ -114,7 +114,7 @@ def percent_signal_change(
     cmd_calc = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dcalc "
         f"-a {nifti_file} -b {mean_file} -c {mask_file} "
-        f"-expr 'c * max(-200, min(200, a/b*100))' -prefix {percent_change_nifti_file} -overwrite "
+        f"-expr 'c * max(-200, min(200, (a-b)/b*100))' -prefix {percent_change_nifti_file} -overwrite "
     )
     subprocess.run(cmd_calc, shell=True, check=True)
 
@@ -160,9 +160,7 @@ def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
 
 
 def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file, fwhm):
-    smoothed_nifti_file = subject_dir / str(nifti_file).replace(
-        "percent_change", "smoothed"
-    )
+    smoothed_nifti_file = subject_dir / str(nifti_file).replace("psc", "smoothed")
 
     if smoothed_nifti_file.exists():
         smoothed_nifti_file.unlink()

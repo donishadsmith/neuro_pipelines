@@ -7,7 +7,7 @@ pip install nifti2bids[all]
 ```
 
 ```bash
-python create_event_files.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --task nback 
+python create_event_files.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --task nback
 ```
 
 To run with specific subjects:

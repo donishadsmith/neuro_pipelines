@@ -5,7 +5,7 @@ from nifti2bids.logging import setup_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from _utils import create_contrast_files
+from _utils import create_beta_files
 
 LGR = setup_logger(__name__)
 
@@ -37,6 +37,7 @@ def _get_cmd_args():
         "--analysis_type",
         dest="analysis_type",
         required=True,
+        choices=["glm", "gPPI"],
         help="The type of analysis performed (glm or gPPI).",
     )
     parser.add_argument(
@@ -72,12 +73,12 @@ def main(analysis_dir, subject, afni_img_path, task, analysis_type, out_dir):
             LGR.critical(f"No stats file for subject {subject}, session {session}")
             continue
 
-        contrast_dir = subject_analysis_dir / "contrasts"
-        if not contrast_dir.exists():
-            contrast_dir.mkdir()
+        beta_dir = subject_analysis_dir / "betas"
+        if not beta_dir.exists():
+            beta_dir.mkdir()
 
-        create_contrast_files(
-            stats_file, contrast_dir, afni_img_path, task, analysis_type, out_dir
+        create_beta_files(
+            stats_file, beta_dir, afni_img_path, task, analysis_type, out_dir
         )
 
 

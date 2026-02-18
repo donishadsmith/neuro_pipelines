@@ -31,17 +31,17 @@ For each condition in task (6-9):
 9) Downsample the PPI term back down to the true TR grid
 
 After:
-8) For nifti image, smooth use 3ddeconvolve. Ensure to model everything
+10) For nifti image, smooth use 3ddeconvolve. Ensure to model everything
    from nuisance regressors, all main effect conditions (convolved), the
    denoised seed signal, and the PPI interaction terms (already convolved
    in previous step). Create contrasts of the interaction terms (+ means
    greater connectivity for A than B and - means reduced connectivity for
    A relative to B)
-9) Use 3dremlfit to account for temporal autocorrelation
-10) Extract PPI interaction contrasts betas for downstream analyses
+11) Use 3dremlfit to account for temporal autocorrelation
+12) Extract PPI interaction contrasts betas for downstream analyses
 """
 
-import argparse, math, subprocess
+import argparse, subprocess
 from pathlib import Path
 
 import nibabel as nib, numpy as np
@@ -53,9 +53,8 @@ from pathlib import Path
 import bids, numpy as np, pandas as pd
 
 from nifti2bids._helpers import iterable_to_str
-from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
-from nifti2bids.metadata import get_n_volumes
+from nifti2bids.metadata import get_tr
 from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
 
 from _denoising import (
@@ -72,7 +71,7 @@ from _gen_afni_files import (
     create_regressor_file,
 )
 from _models import create_design_matrix, perform_first_level
-from _utils import create_contrast_files, needs_resampling
+from _utils import create_beta_files, needs_resampling
 
 LGR = setup_logger(__name__)
 
@@ -257,15 +256,15 @@ def denoise_seed_timeseries(seed_timeseries_file, regressors_file, afni_img_path
 
 
 # TODO: Modify from GLM to gPPI
-def get_task_contrast_cmd(
+def get_task_deconvolve_cmd(
     task, timing_dir, regressors_file, seed_timeseries_file, ppi_dir
 ):
     # Assume seed file is the name
     seed_name = seed_timeseries_file.name.split(".nii")[0]
     if task == "nback":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 8 ",
-            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
             f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
@@ -279,29 +278,27 @@ def get_task_contrast_cmd(
             "-gltsym 'SYM: +1*PPI_2-back -1*PPI_1-back' -glt_label 3 PPI_2-back_vs_PPI_1-back ",
         }
     elif task == "mtle":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
-            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor_regressor "
-            f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 4 PPI_indoor_regressor"
-            f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1* PPI_indoor_regressor' -glt_label 1 PPI_indoor ",
+            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
+            f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 4 PPI_indoor"
+            f"-ortvec {regressors_file} Nuisance ",
         }
     elif task == "mtlr":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
-            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen_regressor "
-            f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 4 PPI_seen_regressor"
-            f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*PPI_seen_regressor' -glt_label 1 PPI_seen ",
+            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
+            f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 4 PPI_seen"
+            f"-ortvec {regressors_file} Nuisance ",
         }
     elif task == "princess":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 5 ",
-            "contrasts": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 2 switch "
             f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 3 nonswitch "
             f"-stim_file {ppi_dir / 'PPI_switch.1D'} -stim_label 4 PPI_switch"
@@ -311,21 +308,23 @@ def get_task_contrast_cmd(
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
-        contrast_cmd = create_flanker_contrast(timing_dir, regressors_file)
+        deconvolve_cmd = create_flanker_deconvolve_cmd(timing_dir, regressors_file)
 
-    return contrast_cmd
+    return deconvolve_cmd
 
 
 # TODO: Modify from GLM to gPPI
-def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file, ppi_dir):
+def create_flanker_deconvolve_cmd(
+    timing_dir, regressors_file, seed_timeseries_file, ppi_dir
+):
     # Dynamically create the flanker contrast to avoid including contrasts that
     # have no data
     # Assume seed file is the name
     seed_name = seed_timeseries_file.name.split(".nii")[0]
 
-    contrast_cmd = {
+    deconvolve_cmd = {
         "num_stimts": "-num_stimts {num_labels} ",
-        "contrasts": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
+        "args": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
     }
 
     labels_dict = {
@@ -363,7 +362,7 @@ def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file, p
     keep_trial_regressors += keep_ppi_regressors
 
     # Length of the stims
-    contrast_cmd["num_stimts"] = contrast_cmd["num_stimts"].format(
+    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
         num_labels=len(nonempty_files)
     )
 
@@ -402,11 +401,11 @@ def create_flanker_contrast(timing_dir, regressors_file, seed_timeseries_file, p
     for label, gltsym in enumerate(kept_gltsyms, start=1):
         gltsyms += gltsym.format(label=label)
 
-    contrast_cmd["contrasts"] = contrast_cmd["contrasts"].format(
+    deconvolve_cmd["args"] = deconvolve_cmd["args"].format(
         stims=stims, regressors_file=regressors_file, gltsyms=gltsyms
     )
 
-    return contrast_cmd
+    return deconvolve_cmd
 
 
 def resample_seed_timeseries(
@@ -567,6 +566,9 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
+        if tr == "auto":
+            tr = get_tr(nifti_file)
+
         # Create subject directory
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
         subject_dir.mkdir(parents=True, exist_ok=True)
@@ -673,14 +675,14 @@ def main(
         )
 
         # Create design matrix
-        contrast_cmd = get_task_contrast_cmd(task, timing_dir, regressors_file)
+        deconvolve_cmd = get_task_deconvolve_cmd(task, timing_dir, regressors_file)
         design_matrix_file = create_design_matrix(
             subject_dir,
             afni_img_path,
             smoothed_nifti_file,
             mask_file,
             censor_file,
-            contrast_cmd,
+            deconvolve_cmd,
             cosine_regressor_names,
         )
 
@@ -693,10 +695,10 @@ def main(
             mask_file,
         )
 
-        contrast_dir = stats_file_relm.parent / "contrasts"
-        if not contrast_dir.exists():
-            contrast_dir.mkdir()
+        betas_dir = stats_file_relm.parent / "betas"
+        if not betas_dir.exists():
+            betas_dir.mkdir()
 
-        create_contrast_files(
-            stats_file_relm, contrast_dir, afni_img_path, task, analysis_type="gPPI"
+        create_beta_files(
+            stats_file_relm, betas_dir, afni_img_path, task, analysis_type="gPPI"
         )

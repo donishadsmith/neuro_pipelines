@@ -9,13 +9,15 @@ from scipy.stats import norm
 
 from nifti2bids.logging import setup_logger
 
-from _utils import get_task_contrasts
+from _utils import get_contrast_entity_key, get_first_level_gltsym_codes
 
 LGR = setup_logger(__name__)
 
 # For nonparametric approach which is already thresholded
 ZERO_STAT_THRESHOLD = 0
 ZERO_CLUSTER_SIZE = 0
+
+GLT_CODES = ("5_vs_0", "10_vs_0", "10_vs_5")
 
 
 def _get_cmd_args():
@@ -93,12 +95,16 @@ def p_to_z(p_value, two_sided=True):
     return norm.ppf(1 - p_value / (2 if two_sided else 1))
 
 
-def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_code):
+def get_zscore_map_and_mask(
+    analysis_dir, afni_img_path, task, entity_key, first_level_gltlabel, glt_code
+):
     stats_filename = next(
-        analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-stats.nii.gz")
+        analysis_dir.rglob(
+            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_stats.nii.gz"
+        )
     )
     zcore_map_filename = str(stats_filename).replace(
-        "_desc-stats", f"_gltcode-{glt_code}_desc-parametric_z_map"
+        "_desc-parametric_stats", f"_gltcode-{glt_code}_desc-parametric_z_map"
     )
 
     cmd = (
@@ -115,16 +121,20 @@ def get_zscore_map_and_mask(analysis_dir, afni_img_path, task, contrast, glt_cod
         LGR.critical(f"The following command failed: {cmd}", exc_info=True)
 
     group_mask_filename = next(
-        analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz")
+        analysis_dir.rglob(
+            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_mask.nii.gz"
+        )
     )
 
     return Path(zcore_map_filename), group_mask_filename
 
 
-def get_cluster_correction_table(analysis_dir, task, contrast, connectivity):
+def get_cluster_correction_table(
+    analysis_dir, task, entity_key, first_level_gltlabel, connectivity
+):
     cluster_correction_filename = next(
         analysis_dir.rglob(
-            f"task-{task}_contrast-{contrast}_desc-cluster_correction.{connectivity}_bisided.1D"
+            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-cluster_correction.{connectivity}_bisided.1D"
         )
     )
     cluster_correction_table = pd.DataFrame(
@@ -140,13 +150,15 @@ def get_cluster_size(
 ):
     cluster_p_values = list(map(float, cluster_correction_table.columns[1:]))
     cluster_p_values_arr = np.array(cluster_p_values)
-    clust_p_indx = np.where(cluster_p_values_arr == cluster_correction_p)[0][0] + 1
-    cluster_p_str = cluster_correction_table.columns[clust_p_indx]
+    clust_p_index = (
+        np.where((cluster_p_values_arr == cluster_correction_p) == True)[0][0] + 1
+    )
+    cluster_p_str = cluster_correction_table.columns[clust_p_index]
 
     return int(
         np.ceil(
             cluster_correction_table.loc[
-                cluster_correction_table["pthr"] == p_to_z(voxel_correction_p),
+                cluster_correction_table["pthr"] == voxel_correction_p,
                 cluster_p_str,
             ].to_numpy(copy=True)[0]
         )
@@ -166,7 +178,8 @@ def identify_clusters(
     stat_threshold,
     cluster_size,
     task,
-    contrast,
+    entity_key,
+    first_level_gltlabel,
     glt_code,
 ):
     clusters_table, labels_map_list = get_clusters_table(
@@ -182,7 +195,7 @@ def identify_clusters(
     cluster_table_filename = (
         analysis_dir
         / "cluster_results"
-        / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
+        / f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -253,7 +266,7 @@ def identify_clusters(
                     label_mask_fdata, label_map.affine, label_map.header
                 )
                 label_mask_filename = label_base_dir / (
-                    f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_clusterid-{cluster_id}"
+                    f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_clusterid-{cluster_id}"
                     f"_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
                 )
 
@@ -263,24 +276,29 @@ def identify_clusters(
 
 
 def plot_thresholded_img(
-    analysis_dir, thresholded_img, template_img_path, task, contrast, glt_code, method
+    analysis_dir,
+    thresholded_img,
+    template_img_path,
+    task,
+    entity_key,
+    first_level_gltlabel,
+    glt_code,
+    method,
 ):
     kwargs = {"stat_map_img": thresholded_img}
     if template_img_path:
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
 
-    if contrast not in ["seen", "indoor"]:
-        contrast_name = contrast.replace("_vs_", " > ")
+    if first_level_gltlabel not in ["seen", "indoor"]:
+        first_level_code = first_level_gltlabel.replace("_vs_", " > ")
     else:
-        contrast_name = contrast
+        first_level_code = first_level_gltlabel
 
     first_label, second_label = get_interpretation_labels(glt_code)
     first_group = f"{first_label} mg MPH"
     second_group = f"{second_label} mg MPH"
-    title = (
-        f"Task: {task} Contrast: {contrast_name} Group: {first_group} > {second_group}"
-    )
+    title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} GROUP CONTRAST: {first_group} > {second_group}"
 
     for mode in ["ortho", "x", "y", "z"]:
         display = plot_stat_map(**kwargs, display_mode=mode)
@@ -292,7 +310,7 @@ def plot_thresholded_img(
         plot_filename = (
             analysis_dir
             / "stat_plots"
-            / f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
+            / f"task-{task}_{entity_key}-{first_level_code}_gltcode-{glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -316,12 +334,16 @@ def main(
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-    contrasts = get_task_contrasts(task, analysis_type, caller="get_cluster_results")
-    contrasts_glts_list = list(itertools.product(contrasts, glt_codes))
+    first_level_gltlabels = get_first_level_gltsym_codes(
+        task, analysis_type, caller="get_cluster_results"
+    )
+    first_level_gltlabel_list = list(
+        itertools.product(first_level_gltlabels, GLT_CODES)
+    )
 
-    for contrast, glt_code in contrasts_glts_list:
-        LGR.info(f"CONTRAST: {contrast}, GLTCODE: {glt_code}")
+    for first_level_gltlabel, glt_code in first_level_gltlabel_list:
+        entity_key = get_contrast_entity_key(first_level_gltlabel)
+        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, GLTCODE: {glt_code}")
 
         if method == "parametric":
             if not afni_img_path:
@@ -329,7 +351,12 @@ def main(
                 sys.exit(1)
 
             zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
-                analysis_dir, afni_img_path, task, contrast, glt_code
+                analysis_dir,
+                afni_img_path,
+                task,
+                entity_key,
+                first_level_gltlabel,
+                glt_code,
             )
             if not zcore_map_filename.exists():
                 LGR.warning(
@@ -338,7 +365,7 @@ def main(
                 continue
 
             cluster_correction_table = get_cluster_correction_table(
-                analysis_dir, task, contrast, connectivity
+                analysis_dir, task, entity_key, first_level_gltlabel, connectivity
             )
             cluster_size = get_cluster_size(
                 cluster_correction_table, voxel_correction_p, cluster_correction_p
@@ -359,7 +386,7 @@ def main(
             try:
                 thresholded_filename = next(
                     analysis_dir.rglob(
-                        f"task-{task}_contrast-{contrast}_gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
+                        f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
                     )
                 )
             except Exception:
@@ -375,11 +402,12 @@ def main(
             ZERO_STAT_THRESHOLD,
             ZERO_CLUSTER_SIZE,
             task,
-            contrast,
+            entity_key,
+            first_level_gltlabel,
             glt_code,
         )
 
-        base_str = f"TASK: {task}, CONTRAST: {contrast} GLTCODE: {glt_code}"
+        base_str = f"TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel} GLTCODE: {glt_code}"
         if not cluster_table_filename.exists():
             LGR.info(f"No significant clusters for {base_str}")
             continue
@@ -391,7 +419,8 @@ def main(
             thresholded_img,
             template_img_path,
             task,
-            contrast,
+            entity_key,
+            first_level_gltlabel,
             glt_code,
             method,
         )

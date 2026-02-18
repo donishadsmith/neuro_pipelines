@@ -41,7 +41,7 @@ CMD="$PYTHON identify_cluster_locations.py \
     --analysis_type $ANALYSIS_TYPE"
 
 # hostname
-# id 
+# id
 # getent passwd "$(id -u)" || echo "getent failed"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

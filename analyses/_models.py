@@ -12,7 +12,7 @@ def create_design_matrix(
     smoothed_nifti_file,
     mask_file,
     censor_file,
-    contrast_cmd,
+    deconvolve_cmd,
     cosine_regressor_names,
 ):
     design_matrix_file = subject_dir / str(smoothed_nifti_file).replace(
@@ -29,8 +29,8 @@ def create_design_matrix(
         f"-censor {censor_file} "
         f"-polort {polort} "
         "-local_times "
-        f"{contrast_cmd['num_stimts']} "
-        f"{contrast_cmd['contrasts']} "
+        f"{deconvolve_cmd['num_stimts']} "
+        f"{deconvolve_cmd['args']} "
         f"-x1D {design_matrix_file} "
         "-x1D_stop "
         "-overwrite"

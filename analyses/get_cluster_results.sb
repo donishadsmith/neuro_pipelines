@@ -38,11 +38,11 @@ CMD="$PYTHON get_cluster_results.py \
     --template_img_path $TEMPLATE_IMG_PATH"
 
 if [[ $METHOD == "parametric" ]]; then
-	CMD+=" --afni_img_path $AFNI_IMG_PATH --cluster"
+	CMD+=" --afni_img_path $AFNI_IMG_PATH"
 fi
 
 # hostname
-# id 
+# id
 # getent passwd "$(id -u)" || echo "getent failed"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

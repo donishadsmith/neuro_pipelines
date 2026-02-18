@@ -26,12 +26,12 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-SECOND_LEVEL_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
-DST_DIR="$SECOND_LEVEL_DIR/individual_betas_files"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
+DST_DIR="$ANALYSIS_DIR/individual_betas_files"
 mkdir -p $DST_DIR
 
 CMD="$PYTHON extract_individual_betas.py \
-    --second_level_dir $SECOND_LEVEL_DIR \
+    --analysis_dir $ANALYSIS_DIR \
     --method $METHOD \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE \
@@ -39,7 +39,7 @@ CMD="$PYTHON extract_individual_betas.py \
 
 
 # hostname
-# id 
+# id
 # getent passwd "$(id -u)" || echo "getent failed"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

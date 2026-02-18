@@ -12,7 +12,7 @@ from nifti2bids.logging import setup_logger
 LGR = setup_logger(__name__)
 
 
-def get_task_contrasts(task, analysis_type, caller):
+def get_first_level_gltsym_codes(task, analysis_type, caller):
     if task == "nback":
         contrasts = (
             "1-back_vs_0-back",
@@ -45,54 +45,86 @@ def get_task_contrasts(task, analysis_type, caller):
     )
 
 
-def modify_contrast_names(task, contrasts):
-    if task in ["mtle", "mtlr"]:
-        return (f"PPI_{contrast}" for contrast in contrasts)
-    else:
-        return (
-            f"PPI_{contrast.split('_vs_')[0]}_vs_{contrast.split('_vs_')[1]}"
-            for contrast in contrasts
-        )
+def modify_contrast_names(contrasts):
+    modified_contrasts = []
+    for contrast in contrasts:
+        if "_vs_" in contrast:
+            modified_contrasts.append(
+                f"PPI_{contrast.split('_vs_')[0]}_vs_{contrast.split('_vs_')[1]}"
+            )
+
+        else:
+            modified_contrasts.append(f"PPI_{contrast}")
+
+    return modified_contrasts
 
 
-def create_contrast_files(
+def get_beta_names(gltsyms, add_coef_str=False):
+    beta_names = []
+
+    if isinstance(gltsyms, str):
+        gltsyms = [gltsyms]
+
+    for gltsym in gltsyms:
+        names = [] if "_vs_" not in gltsym else gltsym.split("_vs_")
+        names += [gltsym]
+
+        beta_names.extend(names)
+
+    if add_coef_str:
+        beta_names = [
+            f"{name}#0_Coef" if not name.endswith("#0_Coef") else name
+            for name in beta_names
+        ]
+
+    return list(set(beta_names))
+
+
+def get_contrast_entity_key(input_str):
+    input_str = Path(input_str).name
+
+    return "contrast" if "_vs_" in input_str else "condition"
+
+
+def create_beta_files(
     stats_file,
-    contrast_dir,
+    beta_dir,
     afni_img_path,
     task,
     analysis_type,
     out_dir=None,
     overwrite=True,
 ):
-    contrasts = get_task_contrasts(task, analysis_type, caller="extract_betas")
-
-    for contrast in contrasts:
-        contrast_file = contrast_dir / stats_file.name.replace(
-            "stats", contrast.replace("#0_Coef", "_betas")
+    first_level_gltsyms = get_first_level_gltsym_codes(
+        task, analysis_type, caller="extract_betas"
+    )
+    beta_names = get_beta_names(first_level_gltsyms, add_coef_str=True)
+    for beta_name in beta_names:
+        beta_file = beta_dir / stats_file.name.replace(
+            "stats", beta_name.replace("#0_Coef", "_betas")
         )
-        if contrast_file.exists() and overwrite:
-            contrast_file.unlink()
-
+        if beta_file.exists() and overwrite:
+            beta_file.unlink()
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
-            f"{stats_file}'[{contrast}]' "
-            f"-prefix {contrast_file} "
+            f"{stats_file}'[{beta_name}]' "
+            f"-prefix {beta_file} "
             "-overwrite"
         )
-        LGR.info(f"Extracting {contrast} contrast: {cmd}")
+        LGR.info(f"Extracting {beta_name} betas: {cmd}")
 
         try:
             subprocess.run(cmd, shell=True, check=True)
         except Exception:
             LGR.critical(f"The following command failed: {cmd}", exc_info=True)
 
-        if out_dir and contrast_file.exists():
-            path = Path(out_dir) / contrast_file.name
+        if out_dir and beta_file.exists():
+            path = Path(out_dir) / beta_file.name
             if path.exists():
                 LGR.info("Replacing old file with new file.")
                 path.unlink()
 
-            shutil.move(contrast_file, out_dir)
+            shutil.move(beta_file, out_dir)
 
 
 def get_number_of_censored_volumes(censored_filename):
@@ -103,13 +135,18 @@ def get_number_of_censored_volumes(censored_filename):
 
 
 def estimate_noise_smoothness(
-    analysis_dir, afni_img_path, group_mask_filename, residual_filename, contrast
+    analysis_dir,
+    afni_img_path,
+    group_mask_filename,
+    residual_filename,
+    first_level_gltlabel,
 ):
     task = get_entity_value(group_mask_filename.name, "task")
+    entity_key = get_contrast_entity_key(group_mask_filename)
     acf_parameters_filename = (
         analysis_dir
         / "acf_parameters"
-        / f"task-{task}_contrast-{contrast}_desc-acf_parameters.txt"
+        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-acf_parameters.txt"
     )
     acf_parameters_filename.parent.mkdir(parents=True, exist_ok=True)
     if acf_parameters_filename.exists():
@@ -130,14 +167,19 @@ def estimate_noise_smoothness(
 
 
 def perform_cluster_simulation(
-    analysis_dir, afni_img_path, group_mask_filename, acf_parameters_filename, contrast
+    analysis_dir,
+    afni_img_path,
+    group_mask_filename,
+    acf_parameters_filename,
+    first_level_glt,
 ):
     task = get_entity_value(group_mask_filename.name, "task")
+    entity_key = get_contrast_entity_key(group_mask_filename)
     # Partial filename
     output_filename_prefix = (
         analysis_dir
         / "cluster_correction"
-        / f"task-{task}_contrast-{contrast}_desc-cluster_correction"
+        / f"task-{task}_{entity_key}-{first_level_glt}_desc-cluster_correction"
     )
     output_filename_prefix.parent.mkdir(parents=True, exist_ok=True)
 
@@ -234,10 +276,10 @@ def threshold_palm_output(
         )
 
         # Use glt_code in filename (e.g., 5_vs_0)
+        prefix = prefix_positive.split("_desc")[0]
         combined_thresholded_file = (
-            dst_dir / f"task-{prefix_positive.split('task-')[1].split('_contrast')[0]}_"
-            f"contrast-{prefix_positive.split('contrast-')[1].split('_desc')[0]}_"
-            f"gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
+            dst_dir / f"{prefix}_gltcode-{glt_code}_"
+            "desc-nonparametric_thresholded_bisided.nii.gz"
         )
         nib.save(combined_thresholded_img, combined_thresholded_file)
 

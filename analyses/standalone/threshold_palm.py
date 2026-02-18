@@ -6,9 +6,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from nifti2bids.logging import setup_logger
-from _utils import get_task_contrasts, threshold_palm_output
+from _utils import (
+    get_contrast_entity_key,
+    get_first_level_gltsym_codes,
+    threshold_palm_output,
+)
 
 LGR = setup_logger(__name__)
+
+GLT_CODES = ("5_vs_0", "10_vs_0", "10_vs_5")
 
 
 def _get_cmd_args():
@@ -56,6 +62,7 @@ def _get_cmd_args():
         "--analysis_type",
         dest="analysis_type",
         required=True,
+        choices=["glm", "gPPI"],
         help="The type of analysis performed (glm or gPPI).",
     )
 
@@ -66,15 +73,18 @@ def create_glt_dict(dataset, cohort):
     # Positive codes are the anchors and the only ones that need to be created
     glt_codes_dict = {"positive": None}
     if dataset == "mph" and cohort == "kids":
-        glt_codes_dict["positive"] = ["5_vs_0", "10_vs_0", "10_vs_5"]
+        glt_codes_dict["positive"] = list(GLT_CODES)
 
     return glt_codes_dict
 
 
-def get_output_prefixes(analysis_dir, task, contrast):
+def get_output_prefixes(analysis_dir, task, first_level_gltlabel):
     # Positive files are the anchors and the only ones that need to be retrieved
     output_prefixes = {"positive": None}
-    prefix = f"task-{task}_contrast-{contrast}_desc-nonparametric_positive"
+    entity_key = get_contrast_entity_key(first_level_gltlabel)
+    prefix = (
+        f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-nonparametric_positive"
+    )
     files = list(analysis_dir.rglob(f"*{prefix}*"))
     output_prefixes["positive"] = files[0].parent / prefix
     output_prefixes["negative"] = files[0].parent / str(prefix).replace(
@@ -94,11 +104,15 @@ def main(
 
     LGR.info(f"TASK: {task}")
 
-    contrasts = get_task_contrasts(task, analysis_type, caller="threshold_palm_images")
-    for contrast in contrasts:
-        output_prefixes, n_contrasts = get_output_prefixes(analysis_dir, task, contrast)
+    first_level_gltlabels = get_first_level_gltsym_codes(
+        task, analysis_type, caller="threshold_palm_images"
+    )
+    for first_level_gltlabel in first_level_gltlabels:
+        output_prefixes, n_codes = get_output_prefixes(
+            analysis_dir, task, first_level_gltlabel
+        )
         glt_codes_dict = create_glt_dict(dataset, cohort)
-        glt_codes_dict["positive"] = list(glt_codes_dict["positive"])[:n_contrasts]
+        glt_codes_dict["positive"] = list(glt_codes_dict["positive"])[:n_codes]
 
         threshold_palm_output(
             output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir

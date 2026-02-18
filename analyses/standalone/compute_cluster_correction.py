@@ -6,7 +6,8 @@ from nifti2bids.logging import setup_logger
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from _utils import (
-    get_task_contrasts,
+    get_contrast_entity_key,
+    get_first_level_gltsym_codes,
     estimate_noise_smoothness,
     perform_cluster_simulation,
 )
@@ -33,6 +34,7 @@ def _get_cmd_args():
         "--analysis_type",
         dest="analysis_type",
         required=True,
+        choices=["glm", "gPPI"],
         help="The type of analysis performed (glm or gPPI).",
     )
 
@@ -44,19 +46,22 @@ def main(analysis_dir, afni_img_path, task, analysis_type):
 
     LGR.info(f"TASK: {task}")
 
-    contrasts = get_task_contrasts(
+    first_level_gltlabels = get_first_level_gltsym_codes(
         task, analysis_type, caller="compute_cluster_correction"
     )
-    for contrast in contrasts:
-        LGR.info(f"CONTRAST: {contrast}")
+    for first_level_gltlabel in first_level_gltlabels:
+        entity_key = get_contrast_entity_key(first_level_gltlabel)
+        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}")
 
         group_mask_filename = next(
             analysis_dir.rglob(
-                f"task-{task}_contrast-{contrast}_desc-group_mask.nii.gz"
+                f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_mask.nii.gz"
             )
         )
         residual_filename = next(
-            analysis_dir.rglob(f"task-{task}_contrast-{contrast}_desc-residuals.nii.gz")
+            analysis_dir.rglob(
+                f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_residuals.nii.gz"
+            )
         )
 
         acf_parameters_filename = estimate_noise_smoothness(
@@ -64,7 +69,7 @@ def main(analysis_dir, afni_img_path, task, analysis_type):
             afni_img_path,
             group_mask_filename,
             residual_filename,
-            contrast,
+            first_level_gltlabel,
         )
 
         perform_cluster_simulation(
@@ -72,7 +77,7 @@ def main(analysis_dir, afni_img_path, task, analysis_type):
             afni_img_path,
             group_mask_filename,
             acf_parameters_filename,
-            contrast,
+            first_level_gltlabel,
         )
 
 

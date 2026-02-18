@@ -21,7 +21,7 @@ from _gen_afni_files import (
     create_regressor_file,
 )
 from _models import create_design_matrix, perform_first_level
-from _utils import create_contrast_files
+from _utils import create_beta_files
 
 LGR = setup_logger(__name__)
 
@@ -147,11 +147,11 @@ def _get_cmd_args():
     return parser
 
 
-def get_task_contrast_cmd(task, timing_dir, regressors_file):
+def get_task_deconvolve_cmd(task, timing_dir, regressors_file):
     if task == "nback":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
             f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 2 0-back "
             f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 3 1-back "
             f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 4 2-back "
@@ -161,42 +161,40 @@ def get_task_contrast_cmd(task, timing_dir, regressors_file):
             "-gltsym 'SYM: +1*2-back -1*1-back' -glt_label 3 2-back_vs_1-back ",
         }
     elif task == "mtle":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
             f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 2 indoor "
-            f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*indoor' -glt_label 1 indoor ",
+            f"-ortvec {regressors_file} Nuisance ",
         }
     elif task == "mtlr":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
             f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 2 seen "
-            f"-ortvec {regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*seen' -glt_label 1 seen ",
+            f"-ortvec {regressors_file} Nuisance ",
         }
     elif task == "princess":
-        contrast_cmd = {
+        deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
-            "contrasts": f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 1 switch "
+            "args": f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 1 switch "
             f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 2 nonswitch "
             f"-ortvec {regressors_file} Nuisance "
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
-        contrast_cmd = create_flanker_contrast(timing_dir, regressors_file)
+        deconvolve_cmd = create_flanker_deconvolve_cmd(timing_dir, regressors_file)
 
-    return contrast_cmd
+    return deconvolve_cmd
 
 
-def create_flanker_contrast(timing_dir, regressors_file):
+def create_flanker_deconvolve_cmd(timing_dir, regressors_file):
     # Dynamically create the flanker contrast to avoid including contrasts that
     # have no data
-    contrast_cmd = {
+    deconvolve_cmd = {
         "num_stimts": "-num_stimts {num_labels} ",
-        "contrasts": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
+        "args": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
     }
 
     labels_dict = {
@@ -226,7 +224,7 @@ def create_flanker_contrast(timing_dir, regressors_file):
     keep_trial_types = [file.removesuffix(".1D") for file in nonempty_files]
 
     # Length of the stims
-    contrast_cmd["num_stimts"] = contrast_cmd["num_stimts"].format(
+    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
         num_labels=len(nonempty_files)
     )
 
@@ -260,11 +258,11 @@ def create_flanker_contrast(timing_dir, regressors_file):
     for label, gltsym in enumerate(kept_gltsyms, start=1):
         gltsyms += gltsym.format(label=label)
 
-    contrast_cmd["contrasts"] = contrast_cmd["contrasts"].format(
+    deconvolve_cmd["args"] = deconvolve_cmd["args"].format(
         stims=stims, regressors_file=regressors_file, gltsyms=gltsyms
     )
 
-    return contrast_cmd
+    return deconvolve_cmd
 
 
 def main(
@@ -482,14 +480,14 @@ def main(
         )
 
         # Create design matrix
-        contrast_cmd = get_task_contrast_cmd(task, timing_dir, regressors_file)
+        deconvolve_cmd = get_task_deconvolve_cmd(task, timing_dir, regressors_file)
         design_matrix_file = create_design_matrix(
             subject_dir,
             afni_img_path,
             smoothed_nifti_file,
             mask_file,
             censor_file,
-            contrast_cmd,
+            deconvolve_cmd,
             cosine_regressor_names,
         )
 
@@ -502,12 +500,12 @@ def main(
             mask_file,
         )
 
-        contrast_dir = stats_file_relm.parent / "contrasts"
-        if not contrast_dir.exists():
-            contrast_dir.mkdir()
+        betas_dir = stats_file_relm.parent / "betas"
+        if not betas_dir.exists():
+            betas_dir.mkdir()
 
-        create_contrast_files(
-            stats_file_relm, contrast_dir, afni_img_path, task, analysis_type="glm"
+        create_beta_files(
+            stats_file_relm, betas_dir, afni_img_path, task, analysis_type="glm"
         )
 
 

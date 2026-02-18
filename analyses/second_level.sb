@@ -21,7 +21,6 @@ DATASET="mph"
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE"
-CONTRAST_DIR="$ANALYSIS_DIR"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTI_FILE=""
 
@@ -29,6 +28,7 @@ EXCLUDE_NIFTI_FILE=""
 METHOD="nonparametric"
 FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+FIRST_LEVEL_GLTLABEL=""
 
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
@@ -50,7 +50,7 @@ mkdir -p $DST_DIR
 
 CMD="$PYTHON second_level.py \
 	--bids_dir $BIDS_DIR \
-    --contrast_dir $CONTRAST_DIR \
+    --analysis_dir $ANALYSIS_DIR \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
 	--dataset $DATASET \
@@ -58,6 +58,10 @@ CMD="$PYTHON second_level.py \
 	--task $TASK \
 	--analysis_type $ANALYSIS_TYPE \
     --n_cores $SLURM_CPUS_PER_TASK"
+
+if [[ -n $FIRST_LEVEL_GLTLABEL ]]; then
+	CMD+=" --first_level_gltlabel $FIRST_LEVEL_GLTLABEL"
+fi
 
 if [[ -n $EXCLUDE_NIFTI_FILE ]]; then
 	CMD+=" --exclude_niftis_file $EXCLUDE_NIFTI_FILE"
