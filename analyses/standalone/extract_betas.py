@@ -74,8 +74,7 @@ def main(analysis_dir, subject, afni_img_path, task, analysis_type, out_dir):
             continue
 
         beta_dir = subject_analysis_dir / "betas"
-        if not beta_dir.exists():
-            beta_dir.mkdir()
+        beta_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
             stats_file, beta_dir, afni_img_path, task, analysis_type, out_dir

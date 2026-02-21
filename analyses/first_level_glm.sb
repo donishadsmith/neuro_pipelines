@@ -11,10 +11,14 @@
 # ----------------------------------------------------------------------------
 FMRIPREP_VERSION="25.2.3"
 
+USERNAME=${HOME#/home/}
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 DST_DIR="$BIDS_DIR/derivatives/glm"
 mkdir -p $DST_DIR
+
+SCRATCH_DIR="/scratch/$USERNAME/mph/kids/resampled_seed_niftis"
+mkdir -p ${SCRATCH_DIR}
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
@@ -40,6 +44,7 @@ fi
 
 CMD="$PYTHON first_level_glm.py \
 	--bids_dir $BIDS_DIR \
+	--scratch_dir $SCRATCH_DIR \
 	--afni_img_path $AFNI_IMG_PATH \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \

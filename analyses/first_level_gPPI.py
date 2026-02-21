@@ -17,7 +17,7 @@ AFNI:
 2) PSC scaling of NIfTI image, compute mean for censored files
 3) Resample mask to NIfTI (if needed) then extract timeseries
 4) Tranpose the seed timeseries to a column vector
-5) Denoise seed timeseries
+5) Denoise seed timeseries not too aggressively
 
 For each condition in task (6-9):
 6) Upsample seed timeseries and task regressor to 0.1
@@ -54,8 +54,11 @@ import bids, numpy as np, pandas as pd
 
 from nifti2bids._helpers import iterable_to_str
 from nifti2bids.logging import setup_logger
-from nifti2bids.metadata import get_tr
-from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
+from nifti2bids.metadata import get_tr, get_n_volumes, needs_resampling
+from nifti2bids.qc import (
+    compute_n_dummy_scans,
+    create_censor_mask,
+)
 
 from _denoising import (
     get_acompcor_component_names,
@@ -68,16 +71,26 @@ from _denoising import (
 from _gen_afni_files import (
     create_censor_file,
     create_timing_files,
-    create_regressor_file,
+    create_nuisance_regressor_file,
 )
 from _models import create_design_matrix, perform_first_level
-from _utils import create_beta_files, needs_resampling
+from _utils import (
+    create_beta_files,
+    get_beta_names,
+    get_first_level_gltsym_codes,
+)
 
 LGR = setup_logger(__name__)
 
 # Using constant durations instead of BIDS one, which have small
 # stimulus presentation delays
-TASK_DURATIONS = {"flanker": 0, "nback": 32, "princess": 52, "mtle": 18, "mtlr": 18}
+CONDITION_DURATIONS = {
+    "flanker": 0.5,
+    "nback": 32,
+    "princess": 52,
+    "mtle": 18,
+    "mtlr": 18,
+}
 
 
 def _get_cmd_args():
@@ -98,6 +111,12 @@ def _get_cmd_args():
         dest="dst_dir",
         required=True,
         help="The destination (output) directory.",
+    )
+    parser.add_argument(
+        "--scratch_dir",
+        dest="scratch_dir",
+        required=True,
+        help="Path to the scratch directory.",
     )
     parser.add_argument(
         "--deriv_dir",
@@ -136,7 +155,8 @@ def _get_cmd_args():
         help=(
             "Number of motion parameters to use: 6 (base trans + rot), "
             "12 (base + derivatives), 18 (base + derivatives + power), "
-            "24 (base + derivatives + power + derivative power)."
+            "24 (base + derivatives + power + derivative power). "
+            "Seed denoising will always exclusively use 6 motion parameters (base trans + rot)"
         ),
     )
     parser.add_argument(
@@ -169,13 +189,6 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--tr",
-        dest="tr",
-        default="auto",
-        required=False,
-        help=("The repetition time. TR is detected automatically when using 'auto'."),
-    )
-    parser.add_argument(
         "--n_acompcor",
         dest="n_acompcor",
         default=5,
@@ -201,7 +214,7 @@ def _get_cmd_args():
             "Global signal regression. If 0, no global signal parameters used. "
             "If 1, 'global_signal' is used, if 2 'global_signal' and 'global_signal_derivative1' used "
             "If 3, 'global_signal', global_signal_derivative1', and global_signal_power2' used. "
-            "If 4, 'global_signal', global_signal_derivative1', global_signal_power2', an global_signal_derivative1_power2' used."
+            "If 4, 'global_signal', global_signal_derivative1', global_signal_power2', an global_signal_derivative1_power2' used. "
         ),
     )
     parser.add_argument(
@@ -233,8 +246,13 @@ def _get_cmd_args():
     return parser
 
 
-def extract_seed_timeseries(subject_dir, nifti_file, seed_mask_file, afni_img_path):
-    seed_timeseries_file = Path()
+def extract_seed_timeseries(
+    subject_analysis_dir, subject_scratch_dir, nifti_file, seed_mask_file, afni_img_path
+):
+    suffix = "".join(seed_mask_file.suffixes)
+    seed_timeseries_file = subject_analysis_dir / seed_mask_file.name.replace(
+        suffix, ".1D"
+    )
     nifti_img = nib.load(nifti_file)
     seed_img = nib.load(seed_mask_file)
 
@@ -243,7 +261,16 @@ def extract_seed_timeseries(subject_dir, nifti_file, seed_mask_file, afni_img_pa
             seed_img, nifti_img, interpolation="nearest", copy_header=True
         )
 
-    cmd = ()
+    resampled_seed_file = subject_scratch_dir / f"resampled_{seed_mask_file.name}"
+    nib.save(seed_img, resampled_seed_file)
+
+    cmd = (
+        f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "3dmaskave '
+        f"-mask {seed_mask_file} -q "
+        f"{resampled_seed_file} "
+        f" > {seed_timeseries_file} && "
+        f'1dtranspose {seed_timeseries_file} {seed_timeseries_file}"'
+    )
 
     LGR.info(f"Extracting seed: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
@@ -251,11 +278,59 @@ def extract_seed_timeseries(subject_dir, nifti_file, seed_mask_file, afni_img_pa
     return seed_timeseries_file
 
 
-def denoise_seed_timeseries(seed_timeseries_file, regressors_file, afni_img_path):
-    pass
+def denoise_seed_timeseries(
+    subject_scratch_dir,
+    subject,
+    session,
+    task,
+    space,
+    nifti_file,
+    seed_timeseries_file,
+    censor_file,
+    afni_img_path,
+    confounds_df,
+):
+
+    denoised_seed_timeseries_file = (
+        seed_timeseries_file.parent / f"denoised_{seed_timeseries_file.name}"
+    )
+    regressor_names = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
+    motion_regressors = confounds_df[regressor_names].to_numpy()
+
+    LGR.info(
+        "Only the six base motion parameters will be used to denoise the "
+        f"seed timeseries: {regressor_names}"
+    )
+
+    censor_mask = np.loadtxt(censor_file)
+    seed_nuisance_regressor_file = create_nuisance_regressor_file(
+        subject_scratch_dir,
+        subject,
+        session,
+        task,
+        space,
+        censor_mask,
+        regressor_names,
+        motion_regressors,
+        regressor_file_prefix="seed",
+    )
+
+    cmd = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "
+        f"-input {seed_timeseries_file} "
+        f"-ort {seed_nuisance_regressor_file} "
+        f"-polort A "
+        f"-censor {censor_file} "
+        "cenmode ZERO "
+        f"prefix {denoised_seed_timeseries_file}"
+    )
+
+    LGR.info(f"Denoising seed: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+    return denoised_seed_timeseries_file
 
 
-# TODO: Modify from GLM to gPPI
 def get_task_deconvolve_cmd(
     task, timing_dir, regressors_file, seed_timeseries_file, ppi_dir
 ):
@@ -313,7 +388,39 @@ def get_task_deconvolve_cmd(
     return deconvolve_cmd
 
 
-# TODO: Modify from GLM to gPPI
+def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
+    resampled_filename = None
+    if method == "upsample":
+        resampled_filename = target_file.parent / target_file.name.replace(
+            "denoised_", "upsampled_"
+        )
+        # Note: Some Afni functions only accept rows and require \', using \\' to
+        # make the backslash literal
+        cmd = (
+            f"apptainer exec -B /projects:/projects {afni_img_path} 1dUpsample {int(tr / upsample_dt)} "
+            f"{str(target_file)}\\' "
+            f"> {resampled_filename}"
+        )
+
+        LGR.info(f"Upsampling seed timeseries from {tr} to {upsample_dt}: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+    else:
+        # original TR divided by sub_TR, starts at the first tr (0) and takes every
+        # (original_tr / sub_tr) point
+        cmd = (
+            f"apptainer exec -B /projects:/projects {afni_img_path} 1dcat "
+            f"{target_file}'{{0..$({int(tr / upsample_dt)})}}' "
+            f"> {target_file}"
+        )
+
+        LGR.info(
+            f"Downsampling the PPI regressor back to the original {tr} s grid: {cmd}"
+        )
+        subprocess.run(cmd, shell=True, check=True)
+
+    return resampled_filename
+
+
 def create_flanker_deconvolve_cmd(
     timing_dir, regressors_file, seed_timeseries_file, ppi_dir
 ):
@@ -408,51 +515,95 @@ def create_flanker_deconvolve_cmd(
     return deconvolve_cmd
 
 
-def resample_seed_timeseries(
-    target_file, timing_file, afni_img_path, method, tr, upsample_dt=0.1
-):
-    if method == "upsample":
-        # 1dUpsample xx, xx is tr / upsample_dt
-        # Upsample seed timeseries
-        pass
-    else:
-        # Downsample PPI regressor
-        pass
-
-
-def upsample_condition_regressor(timing_file, afni_img_path, upsample_dt=0.1):
-    """
-    timing_tool.py -timing condition_timing_in_original_TR -tr sub_TR
-    -stim_dur ... -run_len ... -min_frac ... -timing_to_1D ... -per_run -show_timing
-    """
-    pass
-
-
 def deconvolve_seed_timeseries(
-    upsampled_seed_timeseries_file, tr, faltung_penalty_syntax, afni_img_path
+    upsampled_seed_timeseries_file, upsample_dt, faltung_penalty_syntax, afni_img_path
 ):
-    """
-    First generate the impulse response function:
+    gamma_file_name = upsampled_seed_timeseries_file.parent / "GammaHR.1D"
+    deconvolved_seed_timeseries_file = (
+        upsampled_seed_timeseries_file.parent
+        / f"{upsampled_seed_timeseries_file.name.replace('upsampled_', 'deconvolved_')}"
+    )
 
-    waver -dt TR -GAM -inline 1@1 > GammaHR.1D
+    # Created impulse response function and performs deconvolution to estimate the neural response given the observec
+    # upsampled seed timeseries and an impulse response function, while also adding a penalty for better/smoother
+    # estimation
+    cmd = (
+        f'apptainer exec -B /projects:/projects {afni_img_path} "waver '
+        f"-dt {upsample_dt} "
+        f"-GAM -inline 1@1 > {gamma_file_name} && "
+        f"3dTfitter -RHS {upsampled_seed_timeseries_file} "
+        f'-FALTUNG {gamma_file_name} {deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
+    )
 
-    Then run:
+    LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
 
-    3dTfitter -RHS Seed_ts.1D -FALTUNG GammaHR.1D Seed_Neur 012 0
-    """
-    pass
+    return deconvolved_seed_timeseries_file
+
+
+def upsample_condition_regressor(
+    timing_file, task, n_volumes, upsample_dt, afni_img_path
+):
+    upsampled_condition_regressor_file = (
+        timing_file.parent / "upsampled" / f"upsampled_{timing_file.name}"
+    )
+    upsampled_condition_regressor_file.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} timing_tool.py "
+        f"-timing {timing_file} "
+        f"-tr {upsample_dt} "
+        f"-run_len {n_volumes} "
+        f"-stim_dir {CONDITION_DURATIONS[task]}"
+    )
+
+    LGR.info(f"Upsampling condition {timing_file.name}: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+    return upsampled_condition_regressor_file
 
 
 def create_convolved_ppi_term(
-    deconvolved_seed_file, condition_regressor_file, afni_img_path
+    ppi_dir,
+    deconvolved_seed_timeseries_file,
+    upsampled_condition_regressor_file,
+    afni_img_path,
+    upsample_dt,
 ):
     # waver -GAM -peak 1 -TR ?  -input Inter_neuA.1D -numout #TRs > Inter_A.1D
     # PPI = ([neural signal * binary_condition_vector] * hrf)(t)
-    pass
+    neural_interaction_file = (
+        deconvolved_seed_timeseries_file.parent
+        / upsampled_condition_regressor_file.name.replace(
+            "upsampled_", "neural_interaction_"
+        )
+    )
+    ppi_regressor_file = ppi_dir / upsampled_condition_regressor_file.name.replace(
+        "upsampled_", "PPI_"
+    )
+
+    numout = np.loadtxt(deconvolved_seed_timeseries_file).size
+
+    # Create the interaction, which simply zeroes the parts when the condition is not active
+    # Then reconvolve the interaction term to get the estimated HRF, ensure no extended tail due to convolution
+    # So regressor can be properly downsampled
+    cmd = (
+        f'apptainer exec -B /projects:/projects bash -c {afni_img_path} "1deval '
+        f"-a {deconvolved_seed_timeseries_file}\\' -b {upsampled_condition_regressor_file} "
+        f"expr 'a*b' > {neural_interaction_file} && "
+        f"waver -GAM -peak 1 -TR {upsample_dt} "
+        f'-input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"'
+    )
+
+    LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+    return ppi_regressor_file
 
 
 def main(
     bids_dir,
+    scratch_dir,
     afni_img_path,
     dst_dir,
     deriv_dir,
@@ -465,7 +616,6 @@ def main(
     fd,
     exclusion_criteria,
     n_dummy_scans,
-    tr,
     n_acompcor,
     acompcor_strategy,
     fwhm,
@@ -480,6 +630,7 @@ def main(
         sys.exit()
 
     layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or True)
+    seed_mask_file = Path(seed_mask_file)
 
     sessions = layout.get(
         subject=subject, task=task, target="session", return_type="id"
@@ -566,12 +717,16 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
-        if tr == "auto":
-            tr = get_tr(nifti_file)
-
         # Create subject directory
-        subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
-        subject_dir.mkdir(parents=True, exist_ok=True)
+        subject_analysis_dir = (
+            Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
+        )
+        subject_analysis_dir.mkdir(parents=True, exist_ok=True)
+
+        subject_scratch_dir = (
+            Path(scratch_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
+        )
+        subject_scratch_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
@@ -607,7 +762,7 @@ def main(
             continue
 
         censor_file = create_censor_file(
-            subject_dir, subject, session, task, space, censor_mask
+            subject_analysis_dir, subject, session, task, space, censor_mask
         )
 
         # Regressors
@@ -645,8 +800,8 @@ def main(
             for regressor_list in regressor_names_nested_list
             for regressor in regressor_list
         ]
-        regressors_file = create_regressor_file(
-            subject_dir,
+        regressors_file = create_nuisance_regressor_file(
+            subject_analysis_dir,
             subject,
             session,
             task,
@@ -660,24 +815,91 @@ def main(
         )
 
         # Create timing files
-        timing_dir = create_timing_files(subject_dir, event_file, task)
+        timing_dir = create_timing_files(subject_analysis_dir, event_file, task)
 
         # Percent signal change data
         percent_change_nifti_file = percent_signal_change(
-            subject_dir, afni_img_path, nifti_file, mask_file, censor_file
+            subject_analysis_dir, afni_img_path, nifti_file, mask_file, censor_file
         )
 
-        # TODO: Add gPPI code
+        # gPPI preparation
+        tr = get_tr(nifti_file)
+        n_volumes = get_n_volumes(nifti_file)
+
+        ppi_dir = timing_dir / "ppi"
+        ppi_dir.mkdir(parents=True, exist_ok=True)
+
+        seed_timeseries_file = extract_seed_timeseries(
+            subject_analysis_dir,
+            subject_scratch_dir,
+            nifti_file,
+            seed_mask_file,
+            afni_img_path,
+        )
+        denoised_seed_timeseries_file = denoise_seed_timeseries(
+            subject_scratch_dir,
+            subject,
+            session,
+            task,
+            space,
+            nifti_file,
+            seed_timeseries_file,
+            censor_file,
+            afni_img_path,
+            confounds_df,
+        )
+        upsampled_seed_timeseries_file = resample_data(
+            denoised_seed_timeseries_file,
+            tr,
+            afni_img_path,
+            upsample_dt,
+            method="upsample",
+        )
+        deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
+            upsampled_seed_timeseries_file,
+            upsample_dt,
+            faltung_penalty_syntax,
+            afni_img_path,
+        )
+
+        first_level_gltsym_codes = get_first_level_gltsym_codes(
+            task, analysis_type="glm", caller="gPPI"
+        )
+        condition_filenames = [
+            timing_dir / f"{condition}.1D"
+            for condition in get_beta_names(first_level_gltsym_codes)
+            if "_vs_" not in condition
+        ]
+        for condition_filename in condition_filenames:
+            upsampled_condition_regressor_file = upsample_condition_regressor(
+                condition_filename, task, n_volumes, upsample_dt, afni_img_path
+            )
+            ppi_regressor_file = create_convolved_ppi_term(
+                ppi_dir,
+                deconvolved_seed_timeseries_file,
+                upsampled_condition_regressor_file,
+                afni_img_path,
+                upsample_dt,
+            )
+            resample_data(
+                ppi_regressor_file, tr, afni_img_path, upsample_dt, method="downsample"
+            )
 
         # Smooth data
         smoothed_nifti_file = perform_spatial_smoothing(
-            subject_dir, afni_img_path, percent_change_nifti_file, mask_file, fwhm
+            subject_analysis_dir,
+            afni_img_path,
+            percent_change_nifti_file,
+            mask_file,
+            fwhm,
         )
 
         # Create design matrix
-        deconvolve_cmd = get_task_deconvolve_cmd(task, timing_dir, regressors_file)
+        deconvolve_cmd = get_task_deconvolve_cmd(
+            task, timing_dir, regressors_file, seed_timeseries_file, ppi_dir
+        )
         design_matrix_file = create_design_matrix(
-            subject_dir,
+            subject_analysis_dir,
             afni_img_path,
             smoothed_nifti_file,
             mask_file,
@@ -688,7 +910,7 @@ def main(
 
         # Perform first level
         stats_file_relm = perform_first_level(
-            subject_dir,
+            subject_analysis_dir,
             afni_img_path,
             design_matrix_file,
             smoothed_nifti_file,
@@ -696,8 +918,7 @@ def main(
         )
 
         betas_dir = stats_file_relm.parent / "betas"
-        if not betas_dir.exists():
-            betas_dir.mkdir()
+        betas_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
             stats_file_relm, betas_dir, afni_img_path, task, analysis_type="gPPI"

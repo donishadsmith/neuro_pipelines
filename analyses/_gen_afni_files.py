@@ -17,7 +17,7 @@ def create_censor_file(subject_dir, subject, session, task, space, censor_mask):
     return censor_file
 
 
-def create_regressor_file(
+def create_nuisance_regressor_file(
     subject_dir,
     subject,
     session,
@@ -26,12 +26,13 @@ def create_regressor_file(
     censor_mask,
     regressor_names,
     *regressor_arrays,
+    regressor_file_prefix="3ddeconvolve",
 ):
     regressor_positions = {pos: name for pos, name in enumerate(regressor_names)}
     LGR.info(f"Regressor names and positions: {regressor_positions}")
     regressor_file = (
         subject_dir
-        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-regressors.1D"
+        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-{regressor_file_prefix}_nuisance_regressors.1D"
     )
     valid_arrays = [arr for arr in regressor_arrays if arr is not None]
     data = np.column_stack(valid_arrays)

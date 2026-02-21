@@ -7,13 +7,13 @@ from nilearn.masking import intersect_masks
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
+from nifti2bids.qc import get_n_censored_volumes
 
 from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
     estimate_noise_smoothness,
     perform_cluster_simulation,
-    get_number_of_censored_volumes,
     threshold_palm_output,
 )
 
@@ -272,7 +272,7 @@ def create_data_table(bids_dir, subject_list, beta_files):
             censor_file = parent_path / censor_file
             if censor_file.exists():
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = (
-                    get_number_of_censored_volumes(censor_file)
+                    get_n_censored_volumes(censor_file)
                 )
             else:
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = np.nan
@@ -599,8 +599,7 @@ def perform_palm(
     subprocess.run(cmd, shell=True, check=True)
 
     base_dir = dst_dir / "palm_outputs"
-    if not base_dir.exists():
-        base_dir.mkdir(parents=True, exist_ok=True)
+    base_dir.mkdir(parents=True, exist_ok=True)
 
     output_prefixes = {}
     for direction in ["positive", "negative"]:
@@ -666,12 +665,10 @@ def perform_3dlmer(
         dst_dir
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_stats.nii.gz"
     )
+    output_filename.parent.mkdir(parents=True, exist_ok=True)
     if output_filename.exists():
         LGR.info("Replacing stats file")
         output_filename.unlink()
-
-    if not output_filename.parent.exists():
-        output_filename.parent.mkdir(parents=True, exist_ok=True)
 
     residual_filename = Path(str(output_filename).replace("_stats", "_residuals"))
     if residual_filename.exists():

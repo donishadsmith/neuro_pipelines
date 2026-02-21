@@ -3,6 +3,7 @@ from pathlib import Path
 
 from nifti2bids.logging import setup_logger
 
+
 LGR = setup_logger(__name__)
 
 
@@ -19,7 +20,7 @@ def create_design_matrix(
         "smoothed.nii.gz", "design_matrix.1D"
     )
 
-    polort = 0 if cosine_regressor_names else 4
+    polort = 0 if cosine_regressor_names else "A"
     LGR.info(f"Using polort {polort} for 3dDeconvolve.")
 
     cmd = (

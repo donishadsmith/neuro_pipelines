@@ -8,6 +8,7 @@ from nilearn.image import new_img_like
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
+from nifti2bids.io import replace_ext
 
 LGR = setup_logger(__name__)
 
@@ -127,13 +128,6 @@ def create_beta_files(
             shutil.move(beta_file, out_dir)
 
 
-def get_number_of_censored_volumes(censored_filename):
-    arr = np.loadtxt(censored_filename)
-    arr = arr.astype(int)
-
-    return arr[arr == 0].size
-
-
 def estimate_noise_smoothness(
     analysis_dir,
     afni_img_path,
@@ -200,13 +194,6 @@ def perform_cluster_simulation(
     subprocess.run(cmd, shell=True, check=True)
 
 
-def replace_extension(filename, new_ext):
-    filename = Path(filename)
-    old_ext = "".join(filename.suffixes)
-
-    return Path(str(filename).replace(old_ext, new_ext))
-
-
 def threshold_palm_output(
     output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir
 ):
@@ -231,13 +218,13 @@ def threshold_palm_output(
             output_dir / f"{prefix_positive}_vox_tstat_c{index}.nii.gz"
         )
         if not positive_tstat_file.exists():
-            positive_tstat_file = replace_extension(positive_tstat_file, ".nii")
+            positive_tstat_file = replace_ext(positive_tstat_file, ".nii")
 
         positive_pval_file = (
             output_dir / f"{prefix_positive}_tfce_tstat_fwep_c{index}.nii.gz"
         )
         if not positive_pval_file.exists():
-            positive_pval_file = replace_extension(positive_pval_file, ".nii")
+            positive_pval_file = replace_ext(positive_pval_file, ".nii")
 
         positive_tstat_img = nib.load(positive_tstat_file)
         positive_sig_mask = (
@@ -250,13 +237,13 @@ def threshold_palm_output(
             output_dir / f"{prefix_negative}_vox_tstat_c{index}.nii.gz"
         )
         if not negative_tstat_file.exists():
-            negative_tstat_file = replace_extension(negative_tstat_file, ".nii")
+            negative_tstat_file = replace_ext(negative_tstat_file, ".nii")
 
         negative_pval_file = (
             output_dir / f"{prefix_negative}_tfce_tstat_fwep_c{index}.nii.gz"
         )
         if not negative_pval_file.exists():
-            negative_pval_file = replace_extension(negative_pval_file, ".nii")
+            negative_pval_file = replace_ext(negative_pval_file, ".nii")
 
         negative_tstat_img = nib.load(negative_tstat_file)
         negative_sig_mask = (
@@ -284,10 +271,3 @@ def threshold_palm_output(
         nib.save(combined_thresholded_img, combined_thresholded_file)
 
         LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
-
-
-def needs_resampling(source_img, target_img):
-    equal_shape = source_img.shape == target_img.shape
-    equal_affine = np.allclose(source_img.affine, target_img.affine, atol=1e-5)
-
-    return False if (equal_shape and equal_affine) else True

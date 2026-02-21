@@ -1,4 +1,4 @@
-import argparse, json, subprocess, sys
+import argparse, json, sys
 from pathlib import Path
 
 import bids, numpy as np, pandas as pd
@@ -18,7 +18,7 @@ from _denoising import (
 from _gen_afni_files import (
     create_censor_file,
     create_timing_files,
-    create_regressor_file,
+    create_nuisance_regressor_file,
 )
 from _models import create_design_matrix, perform_first_level
 from _utils import create_beta_files
@@ -452,7 +452,7 @@ def main(
             for regressor_list in regressor_names_nested_list
             for regressor in regressor_list
         ]
-        regressors_file = create_regressor_file(
+        regressors_file = create_nuisance_regressor_file(
             subject_dir,
             subject,
             session,
@@ -501,8 +501,7 @@ def main(
         )
 
         betas_dir = stats_file_relm.parent / "betas"
-        if not betas_dir.exists():
-            betas_dir.mkdir()
+        betas_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
             stats_file_relm, betas_dir, afni_img_path, task, analysis_type="glm"
