@@ -2,6 +2,8 @@ import argparse, json
 
 from bids import BIDSLayout
 
+from nifti2bids.metadata import get_image_orientation, direction_to_voxel_axis
+
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(description="Change phase encoding direction.")
@@ -12,17 +14,25 @@ def _get_cmd_args():
         help="The root of the BIDS directory.",
     )
     parser.add_argument(
-        "--phase_encoding_direction",
-        dest="phase_encoding_direction",
-        default="j-",
+        "--phase_encoding_axis",
+        dest="phase_encoding_axis",
+        default=("A", "P"),
         required=False,
-        help="The phase encoding direction.",
+        nargs=2,
+        help="The axis. Note that two letters need to be passed.",
+    )
+    parser.add_argument(
+        "--fat_shift_direction",
+        dest="fat_shift_direction",
+        default="P",
+        required=False,
+        help="The direction of the fat shift.",
     )
 
     return parser
 
 
-def main(bids_dir, phase_encoding_direction):
+def main(bids_dir, phase_encoding_axis, fat_shift_direction):
     layout = BIDSLayout(bids_dir)
     nifti_files = layout.get(
         return_type="file",
@@ -33,12 +43,21 @@ def main(bids_dir, phase_encoding_direction):
     )
 
     for nifti_file in nifti_files:
+        _, orient = get_image_orientation(nifti_file)
+        phase_axis, phase_index = direction_to_voxel_axis(
+            nifti_file, phase_encoding_axis
+        )
+
         json_file = str(nifti_file).replace(".nii.gz", ".json")
         with open(json_file, "r") as f:
             json_data = json.load(f)
 
         with open(json_file, "w") as f:
-            json_data["PhaseEncodingDirection"] = phase_encoding_direction
+            json_data["PhaseEncodingDirection"] = (
+                phase_axis
+                if orient[phase_index] != fat_shift_direction
+                else f"{phase_axis}-"
+            )
             json.dump(json_data, f, indent=2)
 
 
