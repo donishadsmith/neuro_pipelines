@@ -115,6 +115,7 @@ def add_dosages_to_sessions_tsv(
                 subject_id=get_entity_value(sessions_tsv_file.name, "sub"),
                 subjects_visits_df=subjects_visits_df,
                 column_name="dose",
+                subjects_visits_date_fmt=subjects_visits_date_fmt,
                 scan_date=converted_date,
             )
             if dose:

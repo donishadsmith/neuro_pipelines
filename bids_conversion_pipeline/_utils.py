@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
@@ -64,12 +65,26 @@ def _extract_subjects_visits_data(
     subject_id: str,
     subjects_visits_df: pd.DataFrame,
     column_name: int,
+    subjects_visits_date_fmt: Optional[str] = None,
     scan_date: Optional[str] = None,
 ):
-    mask = subjects_visits_df["subject_id"].astype(str) == subject_id
+    subjects_visits_df.columns = [col.strip() for col in subjects_visits_df.columns]
+    subjects_visits_df[["subject_id", "date"]] = subjects_visits_df[
+        ["subject_id", "date"]
+    ].astype(str)
+
+    if (
+        subjects_visits_date_fmt
+        and bool(re.search(r"\s", subjects_visits_date_fmt)) is False
+    ):
+        subjects_visits_df["date"] = subjects_visits_df["date"].str.replace(
+            r"\s+", "", regex=True
+        )
+
+    mask = subjects_visits_df["subject_id"] == str(subject_id)
 
     if scan_date:
-        mask &= subjects_visits_df["date"].astype(str) == str(scan_date)
+        mask &= subjects_visits_df["date"] == str(scan_date)
 
     return (
         subjects_visits_df[mask]
@@ -92,8 +107,10 @@ def _check_subjects_visits_file(
     required_colnames = ["subject_id", "date"]
 
     subjects_visits_df = pd.read_csv(subjects_visits_file, sep=None, engine="python")
+    subjects_visits_df.columns = [col.strip() for col in subjects_visits_df.columns]
+
     if not all(
-        required_colname in subjects_visits_df.columns
+        required_colname in subjects_visits_df.columns.tolist()
         for required_colname in required_colnames
     ):
         raise SubjectsVisitsFileError(

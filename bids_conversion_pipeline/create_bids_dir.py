@@ -105,7 +105,10 @@ def _get_subject_visits(
 ) -> dict[str, str]:
     # Don't sort to keep the order of the NaNs
     visit_dates = _extract_subjects_visits_data(
-        subject_id, subjects_visits_df, column_name="date"
+        subject_id,
+        subjects_visits_df,
+        column_name="date",
+        subjects_visits_date_fmt=subjects_visits_date_fmt,
     )
 
     if not visit_dates or all(not pd.notna(date) for date in visit_dates):
