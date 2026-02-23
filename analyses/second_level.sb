@@ -28,6 +28,22 @@ EXCLUDE_NIFTI_FILE=""
 METHOD="nonparametric"
 FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+
+# NBACK (glm or gPPI)
+# "1-back_vs_0-back" or "PPI_1-back_vs_PPI_0-back"
+# "2-back_vs_0-back" or "PPI_2-back_vs_PPI_0-back"
+# "2-back_vs_1-back" or "PPI_2-back_vs_PPI_1-back"
+
+# FLANKER (glm or gPPI)
+# "congruent_vs_neutral" or "PPI_congruent_vs_PPI_neutral"
+# "incongruent_vs_neutral" or "PPI_incongruent_vs_PPI_neutral"
+# "nogo_vs_neutral" or "PPI_nogo_vs_PPI_neutral"
+# "congruent_vs_incongruent" or "PPI_congruent_vs_PPI_incongruent"
+# "congruent_vs_nogo" or "PPI_congruent_vs_PPI_nogo"
+# "incongruent_vs_nogo" or "PPI_incongruent_vs_PPI_nogo"
+
+# If using, then pass the specific task to the shell script
+# e.g. sbatch second_level.sb nback
 FIRST_LEVEL_GLTLABEL=""
 
 # Path to native Palm
