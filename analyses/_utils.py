@@ -51,7 +51,7 @@ def modify_contrast_names(contrasts):
     for contrast in contrasts:
         if "_vs_" in contrast:
             modified_contrasts.append(
-                f"PPI_{contrast.split('_vs_')[0]}_vs_{contrast.split('_vs_')[1]}"
+                f"PPI_{contrast.split('_vs_')[0]}_vs_PPI_{contrast.split('_vs_')[1]}"
             )
 
         else:
