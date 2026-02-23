@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=first_level
+#SBATCH --job-name=first_level_glm
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=16G
-# Outputs --------------------------------------------------------------------
-#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_%A_%a.out
-#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_%A_%a.err
-# ----------------------------------------------------------------------------
+# Outputs -------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_glm_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_glm_%A_%a.err
+# ----------------------------------------------------------------------------------
 FMRIPREP_VERSION="25.2.3"
 
 USERNAME=${HOME#/home/}
@@ -22,9 +22,9 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 TASK="nback" # nback, mtle, mtlr, princess, flanker
 
-# sbatch --array=0 first_level.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
-# sbatch --array=1-13%3 first_level.sb
-# sbatch --array=0-13 first_level.sb
+# sbatch --array=0 first_level_glm.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
+# sbatch --array=1-13%3 first_level_glm.sb
+# sbatch --array=0-13 first_level_glm.sb
 
 # Extract one subject from the like corresponding to the current
 # slurm job value; essentially extracting sub-{id}
