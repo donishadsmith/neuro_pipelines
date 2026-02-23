@@ -147,7 +147,7 @@ def _get_cmd_args():
     return parser
 
 
-def get_task_deconvolve_cmd(task, timing_dir, regressors_file):
+def get_task_deconvolve_cmd(task, timing_dir, nuisance_regressors_file):
     if task == "nback":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
@@ -155,7 +155,7 @@ def get_task_deconvolve_cmd(task, timing_dir, regressors_file):
             f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 2 0-back "
             f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 3 1-back "
             f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 4 2-back "
-            f"-ortvec {regressors_file} Nuisance "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*1-back -1*0-back' -glt_label 1 1-back_vs_0-back "
             "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back "
             "-gltsym 'SYM: +1*2-back -1*1-back' -glt_label 3 2-back_vs_1-back ",
@@ -165,36 +165,38 @@ def get_task_deconvolve_cmd(task, timing_dir, regressors_file):
             "num_stimts": "-num_stimts 2 ",
             "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
             f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 2 indoor "
-            f"-ortvec {regressors_file} Nuisance ",
+            f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
             "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
             f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 2 seen "
-            f"-ortvec {regressors_file} Nuisance ",
+            f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "princess":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
             "args": f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 1 switch "
             f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 2 nonswitch "
-            f"-ortvec {regressors_file} Nuisance "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
-        deconvolve_cmd = create_flanker_deconvolve_cmd(timing_dir, regressors_file)
+        deconvolve_cmd = create_flanker_deconvolve_cmd(
+            timing_dir, nuisance_regressors_file
+        )
 
     return deconvolve_cmd
 
 
-def create_flanker_deconvolve_cmd(timing_dir, regressors_file):
+def create_flanker_deconvolve_cmd(timing_dir, nuisance_regressors_file):
     # Dynamically create the flanker contrast to avoid including contrasts that
     # have no data
     deconvolve_cmd = {
         "num_stimts": "-num_stimts {num_labels} ",
-        "args": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
+        "args": "{stims} -ortvec {nuisance_regressors_file} Nuisance {gltsyms}",
     }
 
     labels_dict = {
@@ -237,12 +239,12 @@ def create_flanker_deconvolve_cmd(timing_dir, regressors_file):
         ]
 
         stim_string = labels_dict["stims"][bool_list.index(True)]
-        if label == len(keep_trial_types):
-            stim_string = stim_string.rstrip()
 
         stims += stim_string.format(
             label=label, timing_file=timing_dir / f"{trial_type}.1D"
         )
+
+    stims = stims.rstrip()
 
     # Only keep gltsym with two
     kept_gltsyms = []
@@ -258,8 +260,10 @@ def create_flanker_deconvolve_cmd(timing_dir, regressors_file):
     for label, gltsym in enumerate(kept_gltsyms, start=1):
         gltsyms += gltsym.format(label=label)
 
+    gltsyms = gltsyms.rstrip()
+
     deconvolve_cmd["args"] = deconvolve_cmd["args"].format(
-        stims=stims, regressors_file=regressors_file, gltsyms=gltsyms
+        stims=stims, nuisance_regressors_file=nuisance_regressors_file, gltsyms=gltsyms
     )
 
     return deconvolve_cmd
@@ -452,7 +456,7 @@ def main(
             for regressor_list in regressor_names_nested_list
             for regressor in regressor_list
         ]
-        regressors_file = create_nuisance_regressor_file(
+        nuisance_regressors_file = create_nuisance_regressor_file(
             subject_dir,
             subject,
             session,
@@ -480,7 +484,9 @@ def main(
         )
 
         # Create design matrix
-        deconvolve_cmd = get_task_deconvolve_cmd(task, timing_dir, regressors_file)
+        deconvolve_cmd = get_task_deconvolve_cmd(
+            task, timing_dir, nuisance_regressors_file
+        )
         design_matrix_file = create_design_matrix(
             subject_dir,
             afni_img_path,

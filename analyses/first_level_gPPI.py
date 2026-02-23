@@ -332,7 +332,7 @@ def denoise_seed_timeseries(
 
 
 def get_task_deconvolve_cmd(
-    task, timing_dir, regressors_file, seed_timeseries_file, ppi_dir
+    task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
 ):
     # Assume seed file is the name
     seed_name = seed_timeseries_file.name.split(".nii")[0]
@@ -347,7 +347,7 @@ def get_task_deconvolve_cmd(
             f"-stim_file {ppi_dir / 'PPI_0-back.1D'} -stim_label 6 PPI_0-back"
             f"-stim_file {ppi_dir / 'PPI_1-back.1D'} -stim_label 7 PPI_1-back"
             f"-stim_file {ppi_dir / 'PPI_2-back.1D'} -stim_label 8 PPI_2-back"
-            f"-ortvec {regressors_file} Nuisance "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_1-back -1*PPI_0-back' -glt_label 1 PPI_1-back_vs_PPI_0-back "
             "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back "
             "-gltsym 'SYM: +1*PPI_2-back -1*PPI_1-back' -glt_label 3 PPI_2-back_vs_PPI_1-back ",
@@ -359,7 +359,7 @@ def get_task_deconvolve_cmd(
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
             f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 4 PPI_indoor"
-            f"-ortvec {regressors_file} Nuisance ",
+            f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
         deconvolve_cmd = {
@@ -368,7 +368,7 @@ def get_task_deconvolve_cmd(
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
             f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 4 PPI_seen"
-            f"-ortvec {regressors_file} Nuisance ",
+            f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "princess":
         deconvolve_cmd = {
@@ -378,12 +378,113 @@ def get_task_deconvolve_cmd(
             f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 3 nonswitch "
             f"-stim_file {ppi_dir / 'PPI_switch.1D'} -stim_label 4 PPI_switch"
             f"-stim_file {ppi_dir / 'PPI_nonswitch.1D'} -stim_label 5 PPI_nonswitch"
-            f"-ortvec {regressors_file} Nuisance "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_switch -1*PPI_nonswitch' -glt_label 1 PPI_switch_vs_PPI_nonswitch ",
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contast
-        deconvolve_cmd = create_flanker_deconvolve_cmd(timing_dir, regressors_file)
+        deconvolve_cmd = create_flanker_deconvolve_cmd(
+            timing_dir, nuisance_regressors_file
+        )
+
+    return deconvolve_cmd
+
+
+def create_flanker_deconvolve_cmd(
+    timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+):
+    # Dynamically create the flanker contrast to avoid including contrasts that
+    # have no data
+    # Assume seed file is the name
+    seed_name = seed_timeseries_file.name.split(".nii")[0]
+
+    deconvolve_cmd = {
+        "num_stimts": "-num_stimts {num_labels} ",
+        "args": "{stims} -ortvec {nuisance_regressors_file} Nuisance {gltsyms}",
+    }
+
+    labels_dict = {
+        "stims": (
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} congruent ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} incongruent ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} nogo ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} neutral ",
+            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_congruent ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_incongruent ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_nogo ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_neutral ",
+            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_errors ",
+        ),
+        "gltsyms": (
+            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_neutral' -glt_label {label} PPI_congruent_vs_PPI_neutral ",
+            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_neutral' -glt_label {label} PPI_incongruent_vs_PPI_neutral ",
+            "-gltsym 'SYM: +1*PPI_nogo -1*PPI_neutral' -glt_label {label} PPI_nogo_vs_PPI_neutral ",
+            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_incongruent' -glt_label {label} PPI_congruent_vs_PPI_incongruent ",
+            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_nogo' -glt_label {label} PPI_congruent_vs_PPI_nogo ",
+            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_nogo' -glt_label {label} PPI_incongruent_vs_PPI_nogo ",
+        ),
+    }
+
+    files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
+    empty_mask = np.array(
+        [np.loadtxt(timing_dir / file, delimiter=" ").size == 0 for file in files]
+    )
+
+    nonempty_files = np.array(files)[~empty_mask]
+    keep_trial_regressors = [file.removesuffix(".1D") for file in nonempty_files]
+    keep_ppi_regressors = [
+        f"PPI_{trial_regressor}" for trial_regressor in keep_trial_regressors
+    ]
+    keep_trial_regressors += keep_ppi_regressors
+
+    # Only keep stims without empty files
+    stims = f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+    for label, regressor in enumerate(keep_trial_regressors, start=2):
+        bool_list = [
+            regressor == stim_string.rstrip().split(" ")[-1]
+            for stim_string in labels_dict["stims"]
+        ]
+
+        stim_string = labels_dict["stims"][bool_list.index(True)]
+
+        if "PPI_" in stim_string:
+            stims += stim_string.format(
+                label=label, ppi_file=ppi_dir / f"{regressor}.1D"
+            )
+        else:
+            stims += stim_string.format(
+                time_label=label - 1,
+                label=label,
+                timing_file=timing_dir / f"{regressor}.1D",
+            )
+
+    stims = stims.rstrip()
+
+    # Length of the stims
+    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
+        num_labels=label - 1
+    )
+
+    # Only keep gltsym with two
+    kept_gltsyms = []
+    for gltsym in labels_dict["gltsyms"]:
+        glt_label = gltsym.rstrip().split(" ")[-1]
+        glt_label_parts = glt_label.split("_vs_")
+        if all(
+            glt_label_part in keep_ppi_regressors for glt_label_part in glt_label_parts
+        ):
+            kept_gltsyms.append(gltsym)
+
+    gltsyms = ""
+    for label, gltsym in enumerate(kept_gltsyms, start=1):
+        gltsyms += gltsym.format(label=label)
+
+    gltsyms = gltsyms.rstrip()
+
+    deconvolve_cmd["args"] = deconvolve_cmd["args"].format(
+        stims=stims, nuisance_regressors_file=nuisance_regressors_file, gltsyms=gltsyms
+    )
 
     return deconvolve_cmd
 
@@ -419,100 +520,6 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
         subprocess.run(cmd, shell=True, check=True)
 
     return resampled_filename
-
-
-def create_flanker_deconvolve_cmd(
-    timing_dir, regressors_file, seed_timeseries_file, ppi_dir
-):
-    # Dynamically create the flanker contrast to avoid including contrasts that
-    # have no data
-    # Assume seed file is the name
-    seed_name = seed_timeseries_file.name.split(".nii")[0]
-
-    deconvolve_cmd = {
-        "num_stimts": "-num_stimts {num_labels} ",
-        "args": "{stims} -ortvec {regressors_file} Nuisance {gltsyms}",
-    }
-
-    labels_dict = {
-        "stims": (
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} congruent ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} incongruent ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} nogo ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} neutral ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_congruent ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_incongruent ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_nogo ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_neutral ",
-        ),
-        "gltsyms": (
-            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_neutral' -glt_label {label} PPI_congruent_vs_PPI_neutral ",
-            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_neutral' -glt_label {label} PPI_incongruent_vs_PPI_neutral ",
-            "-gltsym 'SYM: +1*PPI_nogo -1*PPI_neutral' -glt_label {label} PPI_nogo_vs_PPI_neutral ",
-            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_incongruent' -glt_label {label} PPI_congruent_vs_PPI_incongruent ",
-            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_nogo' -glt_label {label} PPI_congruent_vs_PPI_nogo ",
-            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_nogo' -glt_label {label} PPI_incongruent_vs_PPI_nogo ",
-        ),
-    }
-
-    files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
-    empty_mask = np.array(
-        [np.loadtxt(timing_dir / file, delimiter=" ").size == 0 for file in files]
-    )
-
-    nonempty_files = np.array(files)[~empty_mask]
-    keep_trial_regressors = [file.removesuffix(".1D") for file in nonempty_files]
-    keep_ppi_regressors = [
-        f"PPI_{trial_regressor}" for trial_regressor in keep_trial_regressors
-    ]
-    keep_trial_regressors += keep_ppi_regressors
-
-    # Length of the stims
-    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
-        num_labels=len(nonempty_files)
-    )
-
-    # Only keep stims without empty files
-    stims = f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-    for label, regressor in enumerate(keep_trial_regressors, start=2):
-        bool_list = [
-            regressor == stim_string.rstrip().split(" ")[-1]
-            for stim_string in labels_dict["stims"]
-        ]
-
-        stim_string = labels_dict["stims"][bool_list.index(True)]
-
-        if "PPI_" in stim_string:
-            stims += stim_string.format(
-                label=label, ppi_file=ppi_dir / f"{regressor}.1D"
-            )
-        else:
-            stims += stim_string.format(
-                time_label=label - 1,
-                label=label,
-                timing_file=timing_dir / f"{regressor}.1D",
-            )
-
-    # Only keep gltsym with two
-    kept_gltsyms = []
-    for gltsym in labels_dict["gltsyms"]:
-        glt_label = gltsym.rstrip().split(" ")[-1]
-        glt_label_parts = glt_label.split("_vs_")
-        if all(
-            glt_label_part in keep_ppi_regressors for glt_label_part in glt_label_parts
-        ):
-            kept_gltsyms.append(gltsym)
-
-    gltsyms = ""
-    for label, gltsym in enumerate(kept_gltsyms, start=1):
-        gltsyms += gltsym.format(label=label)
-
-    deconvolve_cmd["args"] = deconvolve_cmd["args"].format(
-        stims=stims, regressors_file=regressors_file, gltsyms=gltsyms
-    )
-
-    return deconvolve_cmd
 
 
 def deconvolve_seed_timeseries(
@@ -800,7 +807,7 @@ def main(
             for regressor_list in regressor_names_nested_list
             for regressor in regressor_list
         ]
-        regressors_file = create_nuisance_regressor_file(
+        nuisance_regressors_file = create_nuisance_regressor_file(
             subject_analysis_dir,
             subject,
             session,
@@ -832,7 +839,7 @@ def main(
         seed_timeseries_file = extract_seed_timeseries(
             subject_analysis_dir,
             subject_scratch_dir,
-            nifti_file,
+            percent_change_nifti_file,
             seed_mask_file,
             afni_img_path,
         )
@@ -842,7 +849,7 @@ def main(
             session,
             task,
             space,
-            nifti_file,
+            percent_change_nifti_file,
             seed_timeseries_file,
             censor_file,
             afni_img_path,
@@ -896,7 +903,7 @@ def main(
 
         # Create design matrix
         deconvolve_cmd = get_task_deconvolve_cmd(
-            task, timing_dir, regressors_file, seed_timeseries_file, ppi_dir
+            task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
         design_matrix_file = create_design_matrix(
             subject_analysis_dir,
