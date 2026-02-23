@@ -67,6 +67,9 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
 
             # There is a mix of orientation in the data, mostly LAS and LPS for
             # functional images
+            # Angulation AP - rotation around an axis parallel to central AP axis
+            # Can be set by a mouse during planning and any values between -180 and 18-
+            # allowed; values greater than 45 degrees can affect slice orientation
             phase_axis, phase_index = bids_meta.direction_to_voxel_axis(
                 nifti_file, anatomical_directions=["A", "P"]
             )
