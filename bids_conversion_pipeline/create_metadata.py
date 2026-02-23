@@ -70,6 +70,10 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
             # Angulation AP - rotation around an axis parallel to central AP axis
             # Can be set by a mouse during planning and any values between -180 and 18-
             # allowed; values greater than 45 degrees can affect slice orientation
+            # Future note, the philips manual does not specify that angulation changes
+            # phase encoding direction only slice orientation but some vendors such
+            # as Siemens do change the phase encoding direction
+            # https://neurostars.org/t/dcm2niix-identifying-epi-orientation-incorrectly/25677
             phase_axis, phase_index = bids_meta.direction_to_voxel_axis(
                 nifti_file, anatomical_directions=["A", "P"]
             )
