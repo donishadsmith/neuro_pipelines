@@ -44,13 +44,13 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--sphere_mask_path",
-        dest="sphere_mask_path",
+        "--seed_mask_path",
+        dest="seed_mask_path",
         required=False,
         default=None,
         help=(
-            "Path to the sphere mask used as the seed for the gPPI. Used only when ``analysis_type`` is gPPI. "
-            "Used to compute the average beta coefficient from the glm for the sphere. This will only be used "
+            "Path to the seed mask used as the seed for the gPPI. Used only when ``analysis_type`` is gPPI. "
+            "Used to compute the average beta coefficient from the glm for the seed. This will only be used "
             "if `glm_dir` is not set to None."
         ),
     )
@@ -279,7 +279,7 @@ def main(
     analysis_dir,
     dst_dir,
     glm_dir,
-    sphere_mask_path,
+    seed_mask_path,
     task,
     analysis_type,
     method,
@@ -288,7 +288,7 @@ def main(
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
     glm_dir = Path(glm_dir) or None
-    sphere_mask_path = Path(sphere_mask_path) or None
+    seed_mask_path = Path(seed_mask_path) or None
 
     first_level_gltlabels = get_first_level_gltsym_codes(
         task, analysis_type, caller="extract_individual_betas"
@@ -399,19 +399,30 @@ def main(
                             analysis_type="glm",
                         )
 
-                        if sphere_mask_path:
-                            beta_coefficient_df[f"seed_mni_coordinate"] = (
-                                sphere_mask_path.name.split("[")[1].split("]")[0]
-                            )
+                        if seed_mask_path:
+                            if all(x in seed_mask_path.name for x in ["[", "]", ","]):
+                                possible_coordinate = seed_mask_path.name.split("[")[
+                                    1
+                                ].split("]")[0]
+                                suffix = "".join(seed_mask_path.suffixes)
+                                possible_coordinate = possible_coordinate.removesuffix(
+                                    suffix
+                                )
+                                if all(
+                                    x.isdigit() for x in possible_coordinate.split(",")
+                                ):
+                                    beta_coefficient_df[f"seed_mni_coordinate"] = (
+                                        seed_mask_path.name.split("[")[1].split("]")[0]
+                                    )
 
                             LGR.info(
-                                f"Using the following sphere mask path: {sphere_mask_path}"
+                                f"Using the following sphere mask path: {seed_mask_path}"
                             )
                             beta_coefficient_df[f"glm_individual_seed_beta"] = (
                                 compute_average_betas(
                                     beta_coefficient_df,
                                     glm_subject_beta_filenames,
-                                    sphere_mask_path,
+                                    seed_mask_path,
                                 )
                             )
                             beta_coefficient_df[
