@@ -185,9 +185,7 @@ def main(
         task, analysis_type, caller="identify_cluster_regions"
     )
     first_level_gltlabel_list = list(
-        itertools.product(
-            first_level_gltlabel, get_second_level_glt_codes(analysis_type)
-        )
+        itertools.product(first_level_gltlabel, get_second_level_glt_codes())
     )
     for first_level_gltlabel, second_level_glt_code in first_level_gltlabel_list:
         entity_key = get_contrast_entity_key(first_level_gltlabel)

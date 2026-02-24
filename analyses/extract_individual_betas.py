@@ -310,7 +310,7 @@ def main(
         data_table["participant_id"] = data_table["participant_id"].astype(str)
         data_table["dose"] = data_table["dose"].astype(int)
         data_table[f"{analysis_type}_cluster_beta"] = np.nan
-        for second_level_glt_code in get_second_level_glt_codes(analysis_type):
+        for second_level_glt_code in get_second_level_glt_codes():
             LGR.info(
                 f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
             )
@@ -433,7 +433,6 @@ def main(
                                 mask_origin="seed",
                                 analysis_type="glm",
                             )
-                            beta_coefficient_df[f"seed_mni_coordinate"]
 
                     save_tabular_data(
                         beta_coefficient_df,

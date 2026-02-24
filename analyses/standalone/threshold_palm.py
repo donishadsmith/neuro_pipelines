@@ -86,7 +86,7 @@ def main(analysis_dir, dst_dir, task, analysis_type, cluster_correction_p):
             analysis_dir, task, first_level_gltlabel
         )
         # Positive codes are the anchors and the only ones that need to be created
-        glt_codes_dict = {"positive": get_second_level_glt_codes(analysis_type)}
+        glt_codes_dict = {"positive": get_second_level_glt_codes()}
         glt_codes_dict["positive"] = list(glt_codes_dict["positive"])[:n_codes]
 
         threshold_palm_output(

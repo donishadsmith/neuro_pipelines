@@ -47,12 +47,8 @@ def get_first_level_gltsym_codes(task, analysis_type, caller):
     )
 
 
-def get_second_level_glt_codes(analysis_type):
-    glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
-    if analysis_type == "glm":
-        glt_codes += ["mean"]
-
-    return glt_codes
+def get_second_level_glt_codes():
+    return ["5_vs_0", "10_vs_0", "10_vs_5", "mean"]
 
 
 def modify_contrast_names(contrasts):

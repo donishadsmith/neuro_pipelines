@@ -23,6 +23,13 @@ EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
 CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
 SUBJECT_CONSTANT_VARS = ["age"] + list(CATEGORICAL_VARS)
 
+GLT_CODES = (
+    "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
+    "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
+    "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
+    "-gltCode mean 'dose : {mean_code}' ",
+)
+
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(description="Perform second level analysis.")
@@ -326,21 +333,10 @@ def create_group_mask(layout, task, space, mask_threshold, beta_files):
     return intersect_masks(subject_mask_files, threshold=mask_threshold)
 
 
-def get_3dlmer_glt_codes(analysis_type):
-    index = 3 if analysis_type == "glm" else 4
-
-    return [
-        "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
-        "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
-        "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
-        "-gltCode mean 'dose : {mean_code} ",
-    ][:index]
-
-
-def get_glt_codes_str(data_table, analysis_type):
+def get_glt_codes_str(data_table):
     glt_str = ""
     available_doses = sorted(data_table["dose"].unique())
-    for glt_code in get_3dlmer_glt_codes(analysis_type):
+    for glt_code in GLT_CODES:
         level_str = glt_code.removeprefix("-gltCode").lstrip().split(" ")[0]
         if level_str == "mean":
             value = round(1 / len(available_doses), 4)
@@ -382,7 +378,7 @@ def get_centering_str(data_table):
 
 
 def convert_table_to_matrices(
-    data_table, dst_dir, task, entity_key, first_level_gltlabel, analysis_type
+    data_table, dst_dir, task, entity_key, first_level_gltlabel
 ):
     """
     Takes the data table and creates matrices for PALM.
@@ -499,18 +495,17 @@ def convert_table_to_matrices(
             glt_codes_neg.append(f"{dose_low}_vs_{dose_high}")
 
     # Add contrast for mean > 0 and < 0
-    if analysis_type == "glm":
-        dose_cols_indices = list(dose_to_col.values())
+    dose_cols_indices = list(dose_to_col.values())
 
-        vector_pos = np.zeros(design_matrix.shape[1])
-        vector_pos[dose_cols_indices] = round(1 / len(available_doses), 4)
-        contrasts_pos.append(vector_pos)
-        glt_codes_pos.append(f"mean")
+    vector_pos = np.zeros(design_matrix.shape[1])
+    vector_pos[dose_cols_indices] = round(1 / len(available_doses), 4)
+    contrasts_pos.append(vector_pos)
+    glt_codes_pos.append(f"mean")
 
-        # Zeroes will show up as negative, that is fine -0 == 0 returns True
-        vector_neg = vector_pos * -1
-        contrasts_neg.append(vector_neg)
-        glt_codes_neg.append(f"mean")
+    # Zeroes will show up as negative, that is fine -0 == 0 returns True
+    vector_neg = vector_pos * -1
+    contrasts_neg.append(vector_neg)
+    glt_codes_neg.append(f"mean")
 
     contrast_matrix_pos = np.array(contrasts_pos)
     contrast_matrix_neg = np.array(contrasts_neg)
@@ -533,7 +528,6 @@ def convert_table_to_matrices(
             f.write(f"c{i}_pos: {name.replace('_vs_', ' > ')}\n")
 
         f.write("\n# Negative direction contrasts:\n")
-
         for i, name in enumerate(glt_codes_neg, 1):
             f.write(f"c{i}_neg: {name.replace('_vs_', ' > ')}\n")
 
@@ -801,7 +795,7 @@ def main(
                 data_table_filename, sep="\t", index=False, encoding="utf-8"
             )
 
-            glt_str = get_glt_codes_str(data_table, analysis_type)
+            glt_str = get_glt_codes_str(data_table)
             model_str = get_model_str(data_table)
             center_str = get_centering_str(data_table)
 
@@ -855,7 +849,6 @@ def main(
                     task,
                     entity_key,
                     first_level_gltlabel,
-                    analysis_type,
                 )
             )
 

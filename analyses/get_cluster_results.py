@@ -429,9 +429,7 @@ def main(
         task, analysis_type, caller="get_cluster_results"
     )
     first_level_gltlabel_list = list(
-        itertools.product(
-            first_level_gltlabels, get_second_level_glt_codes(analysis_type)
-        )
+        itertools.product(first_level_gltlabels, get_second_level_glt_codes())
     )
 
     for first_level_gltlabel, second_level_glt_code in first_level_gltlabel_list:
