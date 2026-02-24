@@ -183,7 +183,7 @@ def get_task_deconvolve_cmd(task, timing_dir, nuisance_regressors_file):
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
     else:
-        # Note: simply multiply the coefficient image by -1 to get the opposite contast
+        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
         deconvolve_cmd = create_flanker_deconvolve_cmd(
             timing_dir, nuisance_regressors_file
         )
@@ -380,7 +380,6 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
-        # Create subject directory
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
         subject_dir.mkdir(parents=True, exist_ok=True)
 
@@ -390,7 +389,6 @@ def main(
             n_dummy_scans = compute_n_dummy_scans(confounds_df)
             LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
 
-        # Censor File
         censor_mask = create_censor_mask(
             confounds_df,
             column_name="framewise_displacement",
@@ -398,8 +396,6 @@ def main(
             threshold=fd,
         )
 
-        # TODO: Incorporate exclusion criteria that is appropriate given the
-        # demographics of sample
         kept = censor_mask[n_dummy_scans:]
         n_censored = np.sum(kept == 0)
         percent_censored = n_censored / kept.size
@@ -421,7 +417,6 @@ def main(
             subject_dir, subject, session, task, space, censor_mask
         )
 
-        # Regressors
         with open(confounds_json_file, "r") as f:
             confounds_meta = json.load(f)
 
@@ -470,20 +465,16 @@ def main(
             global_regressors,
         )
 
-        # Create timing files
         timing_dir = create_timing_files(subject_dir, event_file, task)
 
-        # Percent signal change data
         percent_change_nifti_file = percent_signal_change(
             subject_dir, afni_img_path, nifti_file, mask_file, censor_file
         )
 
-        # Smooth data
         smoothed_nifti_file = perform_spatial_smoothing(
             subject_dir, afni_img_path, percent_change_nifti_file, mask_file, fwhm
         )
 
-        # Create design matrix
         deconvolve_cmd = get_task_deconvolve_cmd(
             task, timing_dir, nuisance_regressors_file
         )
@@ -497,7 +488,6 @@ def main(
             cosine_regressor_names,
         )
 
-        # Perform first level
         stats_file_relm = perform_first_level(
             subject_dir,
             afni_img_path,

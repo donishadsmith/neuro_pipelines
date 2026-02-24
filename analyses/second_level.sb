@@ -17,7 +17,6 @@ module load matlab
 FMRIPREP_VERSION="25.2.3"
 
 ANALYSIS_TYPE="glm" # glm or gPPI
-DATASET="mph"
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE"
@@ -69,7 +68,6 @@ CMD="$PYTHON second_level.py \
     --analysis_dir $ANALYSIS_DIR \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
-	--dataset $DATASET \
 	--method $METHOD \
 	--task $TASK \
 	--analysis_type $ANALYSIS_TYPE \

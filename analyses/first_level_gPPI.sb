@@ -5,16 +5,23 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=16G
-# Outputs ---------------------------------------------------------------------------
+# Outputs --------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_gPPI_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_gPPI_%A_%a.err
-# -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 FMRIPREP_VERSION="25.2.3"
+
+# sbatch --array=0 first_level_gPPI.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
+# sbatch --array=1-13%3 first_level_gPPI.sb
+# sbatch --array=0-13 first_level_gPPI.sb
+
+# Can be the sphere mask or another binary mask
+SEED_MASK=""
+TASK="nback" # nback, mtle, mtlr, princess, flanker
 
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 DST_DIR="$BIDS_DIR/derivatives/gPPI"
-SEED_MASK=""
 mkdir -p $DST_DIR
 
 SCRATCH_DIR="/scratch/$USERNAME/mph-study/kids/gPPI"
@@ -22,12 +29,6 @@ mkdir -p $SCRATCH_DIR
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
-
-TASK="nback" # nback, mtle, mtlr, princess, flanker
-
-# sbatch --array=0 first_level_gPPI.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
-# sbatch --array=1-13%3 first_level_gPPI.sb
-# sbatch --array=0-13 first_level_gPPI.sb
 
 # Extract one subject from the like corresponding to the current
 # slurm job value; essentially extracting sub-{id}
@@ -44,10 +45,10 @@ fi
 
 CMD="$PYTHON first_level_gPPI.py \
 	--bids_dir $BIDS_DIR \
+	--seed_mask $SEED_MASK \
 	--scratch_dir $SCRATCH_DIR \
 	--afni_img_path $AFNI_IMG_PATH \
 	--deriv_dir $DERIV_DIR \
-    --seed_mask $SEED_MASK \
 	--dst_dir $DST_DIR \
 	--subject ${SUBJECT#sub-} \
 	--task $TASK"

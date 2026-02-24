@@ -23,12 +23,6 @@ EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
 CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
 SUBJECT_CONSTANT_VARS = ["age"] + list(CATEGORICAL_VARS)
 
-GLT_CODES = (
-    "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
-    "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
-    "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
-)
-
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(description="Perform second level analysis.")
@@ -64,13 +58,6 @@ def _get_cmd_args():
         default="MNIPediatricAsym_cohort-1_res-2",
         required=False,
         help="Template space.",
-    )
-    parser.add_argument(
-        "--dataset",
-        dest="dataset",
-        default="mph",
-        required=False,
-        help="Name of dataset.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
@@ -339,14 +326,31 @@ def create_group_mask(layout, task, space, mask_threshold, beta_files):
     return intersect_masks(subject_mask_files, threshold=mask_threshold)
 
 
-def get_glt_codes_str(data_table):
+def get_3dlmer_glt_codes(analysis_type):
+    index = 3 if analysis_type == "glm" else 4
+
+    return [
+        "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
+        "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
+        "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
+        "-gltCode mean 'dose : {mean_code} ",
+    ][:index]
+
+
+def get_glt_codes_str(data_table, analysis_type):
     glt_str = ""
-    available_doses = data_table["dose"].unique()
-    for glt_code in GLT_CODES:
+    available_doses = sorted(data_table["dose"].unique())
+    for glt_code in get_3dlmer_glt_codes(analysis_type):
         level_str = glt_code.removeprefix("-gltCode").lstrip().split(" ")[0]
-        dose_list = level_str.split("_vs_")
-        if all(dose in available_doses for dose in dose_list):
-            glt_str += glt_code
+        if level_str == "mean":
+            value = round(1 / len(available_doses), 4)
+            dose_list = [f"'{x}'" for x in available_doses]
+            mean_code = f"{value}*" + f" +{value}*".join(dose_list)
+            glt_str += glt_code.format(mean_code=mean_code)
+        else:
+            dose_list = level_str.split("_vs_")
+            if all(dose in available_doses for dose in dose_list):
+                glt_str += glt_code
 
     return glt_str
 
@@ -378,7 +382,7 @@ def get_centering_str(data_table):
 
 
 def convert_table_to_matrices(
-    data_table, dst_dir, task, entity_key, first_level_gltlabel, dataset
+    data_table, dst_dir, task, entity_key, first_level_gltlabel, analysis_type
 ):
     """
     Takes the data table and creates matrices for PALM.
@@ -425,16 +429,11 @@ def convert_table_to_matrices(
     design_components = [dose_dummies]
 
     # Including subject regressors in fixed effects model so drop columns that are constant within subjects
-    if dataset.lower().startswith("mph"):
-        for col in SUBJECT_CONSTANT_VARS:
-            if col in data_table.columns:
-                data_table = data_table.drop(col, axis=1)
+    for col in SUBJECT_CONSTANT_VARS:
+        if col in data_table.columns:
+            data_table = data_table.drop(col, axis=1)
 
-        categorical_cols = []
-    else:
-        categorical_cols = list(
-            CATEGORICAL_VARS.intersection(data_table.columns.tolist())
-        )
+    categorical_cols = []
 
     continuous_cols = [
         col
@@ -499,16 +498,30 @@ def convert_table_to_matrices(
             contrasts_neg.append(vector_neg)
             glt_codes_neg.append(f"{dose_low}_vs_{dose_high}")
 
+    # Add contrast for mean > 0 and < 0
+    if analysis_type == "glm":
+        dose_cols_indices = list(dose_to_col.values())
+
+        vector_pos = np.zeros(design_matrix.shape[1])
+        vector_pos[dose_cols_indices] = round(1 / len(available_doses), 4)
+        contrasts_pos.append(vector_pos)
+        glt_codes_pos.append(f"mean")
+
+        # Zeroes will show up as negative, that is fine -0 == 0 returns True
+        vector_neg = vector_pos * -1
+        contrasts_neg.append(vector_neg)
+        glt_codes_neg.append(f"mean")
+
     contrast_matrix_pos = np.array(contrasts_pos)
     contrast_matrix_neg = np.array(contrasts_neg)
 
     LGR.info(f"Positive contrast names: {glt_codes_pos}")
     LGR.info(f"Saving positive contrast matrix file to: {contrast_matrix_file_pos}")
-    np.savetxt(contrast_matrix_file_pos, contrast_matrix_pos, delimiter=",", fmt="%d")
+    np.savetxt(contrast_matrix_file_pos, contrast_matrix_pos, delimiter=",", fmt="%.4f")
 
     LGR.info(f"Negative contrast names: {glt_codes_neg}")
     LGR.info(f"Saving negative contrast matrix file to: {contrast_matrix_file_neg}")
-    np.savetxt(contrast_matrix_file_neg, contrast_matrix_neg, delimiter=",", fmt="%d")
+    np.savetxt(contrast_matrix_file_neg, contrast_matrix_neg, delimiter=",", fmt="%.4f")
 
     # Save glt codes for reference
     glt_codes_file = (
@@ -703,7 +716,6 @@ def main(
     first_level_gltlabel,
     analysis_type,
     space,
-    dataset,
     mask_threshold,
     afni_img_path,
     fsl_img_path,
@@ -759,6 +771,10 @@ def main(
         # Get the beta files only in the table, these are the participants used
         filtered_beta_files = data_table["InputFile"].to_numpy(copy=True).tolist()
 
+        LGR.critical(
+            f"Using {len(filtered_beta_files)} files from {len(data_table['participant_id'].unique())} subjects for analysis"
+        )
+
         LGR.info(f"Creating group mask with threshold: {mask_threshold}")
         group_mask = create_group_mask(
             get_layout(bids_dir, deriv_dir),
@@ -785,7 +801,7 @@ def main(
                 data_table_filename, sep="\t", index=False, encoding="utf-8"
             )
 
-            glt_str = get_glt_codes_str(data_table)
+            glt_str = get_glt_codes_str(data_table, analysis_type)
             model_str = get_model_str(data_table)
             center_str = get_centering_str(data_table)
 
@@ -834,7 +850,12 @@ def main(
 
             design_matrix_file, eb_file, contrast_matrix_files_dict, glt_codes_dict = (
                 convert_table_to_matrices(
-                    data_table, dst_dir, task, entity_key, first_level_gltlabel, dataset
+                    data_table,
+                    dst_dir,
+                    task,
+                    entity_key,
+                    first_level_gltlabel,
+                    analysis_type,
                 )
             )
 

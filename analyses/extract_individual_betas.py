@@ -10,11 +10,11 @@ from _utils import (
     get_beta_names,
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
+    get_second_level_glt_codes,
+    resample_seed_img,
 )
 
 LGR = setup_logger(__name__)
-
-GLT_CODES = ("5_vs_0", "10_vs_0", "10_vs_5")
 
 
 def _get_cmd_args():
@@ -32,6 +32,27 @@ def _get_cmd_args():
         dest="dst_dir",
         required=True,
         help="The destination (output) directory.",
+    )
+    parser.add_argument(
+        "--glm_dir",
+        dest="glm_dir",
+        required=False,
+        default=None,
+        help=(
+            "Used only when ``analysis_type`` is gPPI. Used to compute the individual average beta "
+            "coefficient from the glm for the clusters."
+        ),
+    )
+    parser.add_argument(
+        "--sphere_mask_path",
+        dest="sphere_mask_path",
+        required=False,
+        default=None,
+        help=(
+            "Path to the sphere mask used as the seed for the gPPI. Used only when ``analysis_type`` is gPPI. "
+            "Used to compute the average beta coefficient from the glm for the sphere. This will only be used "
+            "if `glm_dir` is not set to None."
+        ),
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
@@ -63,14 +84,19 @@ def _get_cmd_args():
     return parser
 
 
-def get_nontarget_dose(glt_code):
+def get_nontarget_dose(second_level_glt_code):
+    if second_level_glt_code == "mean":
+        return None
+
     return list(
-        {"0", "5", "10"}.difference(glt_code.replace("PPI_", "").split("_vs_"))
+        {"0", "5", "10"}.difference(
+            second_level_glt_code.replace("PPI_", "").split("_vs_")
+        )
     )[0]
 
 
 def drop_dose_rows(data_table, dose):
-    return data_table[data_table["dose"] != int(dose)]
+    return data_table[data_table["dose"] != int(dose)] if dose else data_table
 
 
 def get_cluster_region_info(cluster_result_file, cluster_id, tail):
@@ -100,7 +126,7 @@ def save_tabular_data(
     save_excel_version,
 ):
     data_filename = dst_dir / cluster_mask_filename.name.replace(
-        "cluster_mask.nii.gz", "individual_averaged_betas.csv"
+        "cluster_mask.nii.gz", "individual_betas.csv"
     )
 
     if add_condition_entity_key:
@@ -113,24 +139,31 @@ def save_tabular_data(
         data_table.to_excel(str(data_filename).replace(".csv", ".xlsx"), index=False)
 
 
-def get_individual_interpretations(data_table, beta_name):
-    averaged_cluster_betas = data_table["averaged_cluster_beta"].to_numpy(copy=True)
+def get_individual_interpretations(data_table, beta_name, mask_origin, analysis_type):
+    betas = data_table[f"{analysis_type}_individual_{mask_origin}_beta"].to_numpy(
+        copy=True
+    )
     if "_vs_" in beta_name:
         first_condition_label, second_condition_label = beta_name.split("_vs_")
         interpretations = np.where(
-            np.isnan(averaged_cluster_betas) | (averaged_cluster_betas == 0),
+            np.isnan(betas) | (betas == 0),
             "NaN",
             np.where(
-                averaged_cluster_betas > 0,
+                betas > 0,
                 f"{first_condition_label} > {second_condition_label}",
                 f"{second_condition_label} > {first_condition_label}",
             ),
         )
     else:
+        descriptions = (
+            ("activation", "deactivation")
+            if "PPI_" in beta_name
+            else ("increased_connectivity", "decreased_connectivity")
+        )
         interpretations = np.where(
-            np.isnan(averaged_cluster_betas) | (averaged_cluster_betas == 0),
+            np.isnan(betas) | (betas == 0),
             "NaN",
-            np.where(averaged_cluster_betas > 0, "activation", "deactivation"),
+            np.where(betas > 0, descriptions[0], descriptions[1]),
         )
 
     interpretations[interpretations == "NaN"] = np.nan
@@ -139,116 +172,124 @@ def get_individual_interpretations(data_table, beta_name):
 
 
 def add_info_to_data_table(
-    cluster_result_file, cluster_mask_filename, data_table, cluster_id, tail, beta_name
+    analysis_dir,
+    cluster_mask_filename,
+    data_table,
+    beta_name,
+    mask_origin,
+    analysis_type,
 ):
+
+    tail = get_entity_value(cluster_mask_filename.name, entity="tail")
+    file_desc = cluster_mask_filename.name.split(f"tail-{tail}_")[-1]
+    file_desc = file_desc.replace("cluster_mask", "cluster_results").replace(
+        ".nii.gz", ".csv"
+    )
+    cluster_id = get_entity_value(cluster_mask_filename.name, entity="clusterid")
+    cluster_result_file = next(
+        analysis_dir.rglob(
+            f"{cluster_mask_filename.name.split('_clusterid-')[0]}_{file_desc}"
+        )
+    )
+
     data_table["units_of_beta_coefficient"] = "percent (percent_signal_change)"
-    data_table["individual_interpretation"] = get_individual_interpretations(
-        data_table, beta_name
+    data_table[f"{analysis_type}_individual_beta_interpretation"] = (
+        get_individual_interpretations(
+            data_table, beta_name, mask_origin, analysis_type
+        )
     )
-    data_table["gltlabel"] = beta_name
-    data_table["tail"] = tail
-    first_group_label, second_group_label = (
-        cluster_mask_filename.name.split("gltcode-")[-1]
-        .split("_clusterid")[0]
-        .split("_vs_")
-    )
-    data_table["group_interpretation"] = (
-        f"{first_group_label} > {second_group_label}"
-        if tail == "positive"
-        else f"{second_group_label} > {first_group_label}"
-    )
+
+    second_level_glt_code_str = cluster_mask_filename.name.split("gltcode-")[-1].split(
+        "_clusterid"
+    )[0]
+
+    if "_vs_" in second_level_glt_code_str:
+        first_group_label, second_group_label = second_level_glt_code_str.split("_vs_")
+        data_table[f"{analysis_type}_group_beta_interpretation"] = (
+            f"{first_group_label} > {second_group_label}"
+            if tail == "positive"
+            else f"{second_group_label} > {first_group_label}"
+        )
+    else:
+        data_table[f"{analysis_type}_group_beta_interpretation"] = (
+            f"Mean activation across doses > 0"
+            if tail == "positive"
+            else f"Mean activation across doses < 0"
+        )
 
     if cluster_result_file:
         region_name, mni_coord = get_cluster_region_info(
             cluster_result_file, cluster_id, tail
         )
-        data_table["cluster_region_id"] = region_name
-        data_table["mni_coordinate"] = mni_coord
+        data_table[f"cluster_region_id"] = region_name
+        data_table[f"cluster_mni_coordinate"] = mni_coord
     else:
-        data_table["cluster_region_id"] = cluster_id
-
-    return data_table
+        data_table[f"cluster_region_id"] = cluster_id
 
 
 def get_subject_beta_filenames(
-    data_table: pd.DataFrame, first_level_gltlabel, beta_name
+    data_table, first_level_gltlabel, beta_name, parent_path=None
 ):
-    subject_beta_filenames = data_table["InputFile"].to_numpy(copy=True).tolist()
+    subject_beta_filenames = data_table["InputFile"].tolist()
 
     if first_level_gltlabel == beta_name:
         return subject_beta_filenames
 
-    return [
+    subject_beta_filenames = [
         str(file).replace(f"_desc-{first_level_gltlabel}", f"_desc-{beta_name}")
         for file in subject_beta_filenames
     ]
 
+    if parent_path:
+        subject_beta_filenames = [
+            parent_path / Path(file).name for file in subject_beta_filenames
+        ]
 
-def create_tabular_data(
-    analysis_dir,
-    dst_dir,
+    return subject_beta_filenames
+
+
+def compute_average_betas(
     data_table,
     subject_beta_filenames,
-    cluster_mask_filenames,
-    beta_name,
-    first_level_gltlabel,
-    add_condition_entity_key,
+    mask_filename,
+    mask_origin="cluster",
+):
+    doses = data_table["dose"].tolist()
+    average_betas = np.full(data_table.shape[-1], np.nan)
+    mask = nib.load(mask_filename)
+
+    if mask_origin == "seed":
+        mask = resample_seed_img(mask, nib.load(subject_beta_filename[0]))
+
+    for dose, subject_beta_filename in zip(doses, subject_beta_filenames):
+        subject_beta_filename = Path(subject_beta_filename)
+        subject = get_entity_value(
+            subject_beta_filename.name, entity="sub", return_entity_prefix=True
+        )
+        contrast_img = nib.load(subject_beta_filename)
+        beta_img_fdata = contrast_img.get_fdata()
+        average_beta = beta_img_fdata[mask.get_fdata() == 1].mean()
+        mask = (data_table["participant_id"] == subject) & (data_table["dose"] == dose)
+        average_betas[mask] = average_beta
+
+    return average_betas
+
+
+def main(
+    analysis_dir,
+    dst_dir,
+    glm_dir,
+    sphere_mask_path,
+    task,
+    analysis_type,
+    method,
     save_excel_version,
 ):
-    doses = data_table["dose"].to_numpy(copy=True).tolist()
-    for cluster_mask_filename in cluster_mask_filenames:
-        cluster_mask = nib.load(cluster_mask_filename)
-        tail = get_entity_value(cluster_mask_filename.name, entity="tail")
-        for dose, subject_beta_filename in zip(doses, subject_beta_filenames):
-            subject_beta_filename = Path(subject_beta_filename)
-            subject = get_entity_value(
-                subject_beta_filename.name, entity="sub", return_entity_prefix=True
-            )
-            contrast_img = nib.load(subject_beta_filename)
-            beta_img_fdata = contrast_img.get_fdata()
-            average_beta = beta_img_fdata[cluster_mask.get_fdata() == 1].mean()
-            mask = (data_table["participant_id"] == subject) & (
-                data_table["dose"] == dose
-            )
-            data_table.loc[mask, "averaged_cluster_beta"] = average_beta
-
-        file_desc = cluster_mask_filename.name.split(f"tail-{tail}_")[-1]
-        file_desc = file_desc.replace("cluster_mask", "cluster_results").replace(
-            ".nii.gz", ".csv"
-        )
-        cluster_id = get_entity_value(cluster_mask_filename.name, entity="clusterid")
-        cluster_result_file = next(
-            analysis_dir.rglob(
-                f"{cluster_mask_filename.name.split('_clusterid-')[0]}_{file_desc}"
-            )
-        )
-
-        data_table["averaged_cluster_beta"] = data_table[
-            "averaged_cluster_beta"
-        ].astype(float)
-        data_table = add_info_to_data_table(
-            cluster_result_file,
-            cluster_mask_filename,
-            data_table,
-            cluster_id,
-            tail,
-            beta_name,
-        )
-
-        save_tabular_data(
-            data_table,
-            dst_dir,
-            cluster_mask_filename,
-            first_level_gltlabel,
-            beta_name,
-            add_condition_entity_key,
-            save_excel_version,
-        )
-
-
-def main(analysis_dir, dst_dir, task, analysis_type, method, save_excel_version):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
+    glm_dir = Path(glm_dir) or None
+    sphere_mask_path = Path(sphere_mask_path) or None
+
     first_level_gltlabels = get_first_level_gltsym_codes(
         task, analysis_type, caller="extract_individual_betas"
     )
@@ -268,45 +309,130 @@ def main(analysis_dir, dst_dir, task, analysis_type, method, save_excel_version)
         data_table = pd.read_csv(data_table_file, sep=None, engine="python")
         data_table["participant_id"] = data_table["participant_id"].astype(str)
         data_table["dose"] = data_table["dose"].astype(int)
-        data_table["averaged_cluster_beta"] = np.nan
-        for glt_code in GLT_CODES:
+        data_table[f"{analysis_type}_cluster_beta"] = np.nan
+        for second_level_glt_code in get_second_level_glt_codes(analysis_type):
             LGR.info(
-                f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, GLTCODE: {glt_code}"
+                f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
             )
             cluster_mask_filenames = list(
                 analysis_dir.rglob(
-                    f"*task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}*desc-{method}_cluster_mask.nii.gz"
+                    f"*task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}*desc-{method}_cluster_mask.nii.gz"
                 )
             )
             if not cluster_mask_filenames:
                 LGR.info(
-                    f"No cluster masks for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, GLTCODE: {glt_code}"
+                    f"No cluster masks for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
                 )
                 continue
 
-            df = drop_dose_rows(data_table, get_nontarget_dose(glt_code))
+            truncated_df = drop_dose_rows(
+                data_table, get_nontarget_dose(second_level_glt_code)
+            )
             beta_names = get_beta_names(first_level_gltlabel)
             for beta_name in beta_names:
                 add_condition_entity_key = beta_name != first_level_gltlabel
                 subject_beta_filenames = get_subject_beta_filenames(
-                    df, first_level_gltlabel, beta_name
+                    truncated_df, first_level_gltlabel, beta_name
                 )
 
                 if not subject_beta_filenames:
                     LGR.critical(f"Skipping tabular data for {beta_name}.")
                     continue
 
-                create_tabular_data(
-                    analysis_dir,
-                    dst_dir,
-                    df.drop(columns=["InputFile"]),
-                    subject_beta_filenames,
-                    cluster_mask_filenames,
-                    beta_name,
-                    first_level_gltlabel,
-                    add_condition_entity_key,
-                    save_excel_version,
-                )
+                for cluster_mask_filename in cluster_mask_filenames:
+                    beta_coefficient_df = truncated_df.copy(deep=True)
+                    beta_coefficient_df[f"{analysis_type}_individual_cluster_beta"] = (
+                        compute_average_betas(
+                            beta_coefficient_df,
+                            subject_beta_filenames,
+                            cluster_mask_filename,
+                        )
+                    )
+
+                    beta_coefficient_df[
+                        f"{analysis_type}_individual_cluster_beta_interpretation"
+                    ] = get_individual_interpretations(
+                        beta_coefficient_df,
+                        beta_name,
+                        mask_origin="cluster",
+                        analysis_type=analysis_type,
+                    )
+
+                    add_info_to_data_table(
+                        analysis_dir,
+                        cluster_mask_filename,
+                        beta_coefficient_df,
+                        beta_name,
+                        mask_origin="cluster",
+                        analysis_type=analysis_type,
+                    )
+
+                    if "_vs_" in beta_name:
+                        continue
+
+                    if analysis_type == "gPPI" and glm_dir:
+                        glm_beta_name = beta_name.removeprefix("PPI_")
+
+                        glm_subject_beta_filenames = get_subject_beta_filenames(
+                            beta_coefficient_df,
+                            first_level_gltlabel,
+                            glm_beta_name,
+                            glm_dir,
+                        )
+
+                        beta_coefficient_df.drop(columns=["InputFile"])
+
+                        beta_coefficient_df[f"glm_individual_cluster_beta"] = (
+                            compute_average_betas(
+                                beta_coefficient_df,
+                                glm_subject_beta_filenames,
+                                cluster_mask_filename,
+                            )
+                        )
+
+                        beta_coefficient_df[
+                            f"glm_individual_cluster_beta_interpretation"
+                        ] = get_individual_interpretations(
+                            beta_coefficient_df,
+                            beta_name,
+                            mask_origin="cluster",
+                            analysis_type="glm",
+                        )
+
+                        if sphere_mask_path:
+                            beta_coefficient_df[f"seed_mni_coordinate"] = (
+                                sphere_mask_path.name.split("[")[1].split("]")[0]
+                            )
+
+                            LGR.info(
+                                f"Using the following sphere mask path: {sphere_mask_path}"
+                            )
+                            beta_coefficient_df[f"glm_individual_seed_beta"] = (
+                                compute_average_betas(
+                                    beta_coefficient_df,
+                                    glm_subject_beta_filenames,
+                                    sphere_mask_path,
+                                )
+                            )
+                            beta_coefficient_df[
+                                f"glm_individual_seed_beta_interpretation"
+                            ] = get_individual_interpretations(
+                                beta_coefficient_df,
+                                beta_name,
+                                mask_origin="seed",
+                                analysis_type="glm",
+                            )
+                            beta_coefficient_df[f"seed_mni_coordinate"]
+
+                    save_tabular_data(
+                        beta_coefficient_df,
+                        dst_dir,
+                        cluster_mask_filename,
+                        first_level_gltlabel,
+                        beta_name,
+                        add_condition_entity_key,
+                        save_excel_version,
+                    )
 
 
 if __name__ == "__main__":

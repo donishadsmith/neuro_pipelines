@@ -5,11 +5,13 @@ import pandas as pd
 
 from nifti2bids.logging import setup_logger
 
-from _utils import get_contrast_entity_key, get_first_level_gltsym_codes
+from _utils import (
+    get_contrast_entity_key,
+    get_first_level_gltsym_codes,
+    get_second_level_glt_codes,
+)
 
 LGR = setup_logger(__name__)
-
-GLT_CODES = ("5_vs_0", "10_vs_0", "10_vs_5")
 
 
 def _get_cmd_args():
@@ -182,19 +184,25 @@ def main(
     first_level_gltlabel = get_first_level_gltsym_codes(
         task, analysis_type, caller="identify_cluster_regions"
     )
-    first_level_gltlabel_list = list(itertools.product(first_level_gltlabel, GLT_CODES))
-    for first_level_gltlabel, glt_code in first_level_gltlabel_list:
+    first_level_gltlabel_list = list(
+        itertools.product(
+            first_level_gltlabel, get_second_level_glt_codes(analysis_type)
+        )
+    )
+    for first_level_gltlabel, second_level_glt_code in first_level_gltlabel_list:
         entity_key = get_contrast_entity_key(first_level_gltlabel)
         cluster_table_filename = list(
             analysis_dir.rglob(
-                f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
+                f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
             )
         )
 
         if not cluster_table_filename:
             continue
 
-        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, GLTCODE: {glt_code}")
+        LGR.info(
+            f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
+        )
 
         cluster_table_filename = cluster_table_filename[0]
         add_region_information_to_data(

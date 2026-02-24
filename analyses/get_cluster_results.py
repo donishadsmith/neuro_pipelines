@@ -3,21 +3,25 @@ from pathlib import Path
 
 import nibabel as nib, numpy as np, pandas as pd
 from nilearn.image import threshold_img
+from nilearn.masking import _unmask_3d
+from nilearn.maskers import nifti_spheres_masker
+from nilearn.plotting import plot_stat_map, plot_roi
 from nilearn.reporting import get_clusters_table
-from nilearn.plotting import plot_stat_map
 from scipy.stats import norm
 
 from nifti2bids.logging import setup_logger
 
-from _utils import get_contrast_entity_key, get_first_level_gltsym_codes
+from _utils import (
+    get_contrast_entity_key,
+    get_first_level_gltsym_codes,
+    get_second_level_glt_codes,
+)
 
 LGR = setup_logger(__name__)
 
 # For nonparametric approach which is already thresholded
 ZERO_STAT_THRESHOLD = 0
 ZERO_CLUSTER_SIZE = 0
-
-GLT_CODES = ("5_vs_0", "10_vs_0", "10_vs_5")
 
 
 def _get_cmd_args():
@@ -87,6 +91,17 @@ def _get_cmd_args():
         default=None,
         help="Path to a template image to use for plotting.",
     )
+    parser.add_argument(
+        "--sphere_radius",
+        dest="sphere_radius",
+        required=False,
+        default=5,
+        help=(
+            "The radius of the sphere for the MNI coordinate. If `analysis_type` is 'glm', "
+            "seed masks are only created for the mean `second_level_glt_code`, which are the maps denoting activation and "
+            "deactivation for all subjects. This is done so that seeds are not deliberately biased towards a specific group."
+        ),
+    )
 
     return parser
 
@@ -96,7 +111,12 @@ def p_to_z(p_value, two_sided=True):
 
 
 def get_zscore_map_and_mask(
-    analysis_dir, afni_img_path, task, entity_key, first_level_gltlabel, glt_code
+    analysis_dir,
+    afni_img_path,
+    task,
+    entity_key,
+    first_level_gltlabel,
+    second_level_glt_code,
 ):
     stats_filename = next(
         analysis_dir.rglob(
@@ -104,16 +124,17 @@ def get_zscore_map_and_mask(
         )
     )
     zcore_map_filename = str(stats_filename).replace(
-        "_desc-parametric_stats", f"_gltcode-{glt_code}_desc-parametric_z_map"
+        "_desc-parametric_stats",
+        f"_gltcode-{second_level_glt_code}_desc-parametric_z_map",
     )
 
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
-        f"{stats_filename}'[{glt_code} Z]' "
+        f"{stats_filename}'[{second_level_glt_code} Z]' "
         f"-prefix {zcore_map_filename} "
         "-overwrite"
     )
-    LGR.info(f"Extracting {glt_code} z score map: {cmd}")
+    LGR.info(f"Extracting {second_level_glt_code} z score map: {cmd}")
 
     try:
         subprocess.run(cmd, shell=True, check=True)
@@ -165,8 +186,8 @@ def get_cluster_size(
     )
 
 
-def get_interpretation_labels(glt_code):
-    first_label, second_label = glt_code.split("_vs_")
+def get_interpretation_labels(second_level_glt_code):
+    first_label, second_label = second_level_glt_code.split("_vs_")
 
     return first_label, second_label
 
@@ -180,7 +201,7 @@ def identify_clusters(
     task,
     entity_key,
     first_level_gltlabel,
-    glt_code,
+    second_level_glt_code,
 ):
     clusters_table, labels_map_list = get_clusters_table(
         thresholded_img,
@@ -195,7 +216,7 @@ def identify_clusters(
     cluster_table_filename = (
         analysis_dir
         / "cluster_results"
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_desc-{method}_cluster_results.csv"
+        / f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -204,7 +225,6 @@ def identify_clusters(
         clusters_table["Statistic Name"] = (
             ["Z-score"] * n_rows if method == "parametric" else ["T-score"] * n_rows
         )
-        first_label, second_label = get_interpretation_labels(glt_code)
 
         clusters_table["Cluster ID"] = clusters_table["Cluster ID"].astype(str)
 
@@ -213,12 +233,22 @@ def identify_clusters(
         mask_pos = mask_primary & (peaks > 0)
         mask_neg = mask_primary & (peaks < 0)
 
-        clusters_table.loc[mask_pos, "Interpretation"] = (
-            f"{first_label} mg MPH > {second_label} mg MPH"
-        )
-        clusters_table.loc[mask_neg, "Interpretation"] = (
-            f"{second_label} mg MPH > {first_label} mg MPH"
-        )
+        if second_level_glt_code == "mean":
+            clusters_table.loc[mask_pos, "Interpretation"] = (
+                f"Mean activation across doses > 0"
+            )
+            clusters_table.loc[mask_neg, "Interpretation"] = (
+                f"Mean activation across doses < 0"
+            )
+        else:
+            first_label, second_label = get_interpretation_labels(second_level_glt_code)
+
+            clusters_table.loc[mask_pos, "Interpretation"] = (
+                f"{first_label} mg MPH > {second_label} mg MPH"
+            )
+            clusters_table.loc[mask_neg, "Interpretation"] = (
+                f"{second_label} mg MPH > {first_label} mg MPH"
+            )
 
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
 
@@ -266,7 +296,7 @@ def identify_clusters(
                     label_mask_fdata, label_map.affine, label_map.header
                 )
                 label_mask_filename = label_base_dir / (
-                    f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_clusterid-{cluster_id}"
+                    f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_clusterid-{cluster_id}"
                     f"_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
                 )
 
@@ -282,7 +312,7 @@ def plot_thresholded_img(
     task,
     entity_key,
     first_level_gltlabel,
-    glt_code,
+    second_level_glt_code,
     method,
 ):
     kwargs = {"stat_map_img": thresholded_img}
@@ -295,10 +325,13 @@ def plot_thresholded_img(
     else:
         first_level_code = first_level_gltlabel
 
-    first_label, second_label = get_interpretation_labels(glt_code)
-    first_group = f"{first_label} mg MPH"
-    second_group = f"{second_label} mg MPH"
-    title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} GROUP CONTRAST: {first_group} > {second_group}"
+    if second_level_glt_code == "mean":
+        title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} INTERCEPT: Mean across doses"
+    else:
+        first_label, second_label = get_interpretation_labels(second_level_glt_code)
+        first_group = f"{first_label} mg MPH"
+        second_group = f"{second_label} mg MPH"
+        title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} GROUP CONTRAST: {first_group} > {second_group}"
 
     for mode in ["ortho", "x", "y", "z"]:
         display = plot_stat_map(**kwargs, display_mode=mode)
@@ -310,10 +343,67 @@ def plot_thresholded_img(
         plot_filename = (
             analysis_dir
             / "stat_plots"
-            / f"task-{task}_{entity_key}-{first_level_code}_gltcode-{glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
+            / f"task-{task}_{entity_key}-{first_level_code}_gltcode-{second_level_glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
 
+        display.savefig(plot_filename, dpi=720)
+
+        display.close()
+
+
+def create_seed_masks(
+    analysis_dir,
+    cluster_table_filename,
+    template_img_path,
+    thresholded_img,
+    sphere_radius,
+):
+    sphere_parent_path = Path(analysis_dir) / "sphere_masks"
+    sphere_parent_path.mkdir(parents=True, exist_ok=True)
+
+    plot_parent_path = sphere_parent_path / "plots"
+    plot_parent_path.mkdir(parents=True, exist_ok=True)
+
+    clusters_table = pd.read_csv(cluster_table_filename, sep=",")
+    template_img = nib.load(template_img_path)
+
+    mask_primary = clusters_table["Cluster ID"].str.isdigit()
+
+    truncated_clusters_table = clusters_table.loc[mask_primary, ["X", "Y", "Z"]]
+    for index in truncated_clusters_table.index.to_list():
+        coord = truncated_clusters_table.loc[index, ["X", "Y", "Z"]].to_list()
+
+        # https://neurostars.org/t/create-a-10mm-sphere-roi-mask-around-a-given-coordinate/28853/3
+
+        _, A = nifti_spheres_masker._apply_mask_and_get_affinity(
+            seeds=[set(coord)],
+            niimg=None,
+            radius=sphere_radius,
+            allow_overlap=False,
+            mask_img=template_img,
+        )
+
+        sphere_mask = _unmask_3d(
+            X=A.toarray().flatten(), mask=thresholded_img.get_fdata().astype(bool)
+        )
+
+        sphere_mask = nib.nifti1.Nifti1Image(sphere_mask, thresholded_img.affine)
+
+        coord_name = ",".join([str(x) for x in coord])
+        sphere_name = (
+            cluster_table_filename.name.replace("_cluster_results.csv", "_sphere_mask_")
+            + f"[{coord_name}].nii.gz"
+        )
+        sphere_filename = sphere_parent_path / sphere_name
+
+        nib.save(sphere_mask, sphere_filename)
+
+        display = plot_roi(sphere_filename, bg_img=template_img)
+
+        plot_filename = plot_parent_path / sphere_filename.name.replace(
+            ".nii.gz", ".png"
+        )
         display.savefig(plot_filename, dpi=720)
 
         display.close()
@@ -329,6 +419,7 @@ def main(
     voxel_correction_p,
     cluster_correction_p,
     template_img_path,
+    sphere_radius,
 ):
     analysis_dir = Path(analysis_dir)
 
@@ -338,12 +429,16 @@ def main(
         task, analysis_type, caller="get_cluster_results"
     )
     first_level_gltlabel_list = list(
-        itertools.product(first_level_gltlabels, GLT_CODES)
+        itertools.product(
+            first_level_gltlabels, get_second_level_glt_codes(analysis_type)
+        )
     )
 
-    for first_level_gltlabel, glt_code in first_level_gltlabel_list:
+    for first_level_gltlabel, second_level_glt_code in first_level_gltlabel_list:
         entity_key = get_contrast_entity_key(first_level_gltlabel)
-        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, GLTCODE: {glt_code}")
+        LGR.info(
+            f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
+        )
 
         if method == "parametric":
             if not afni_img_path:
@@ -356,11 +451,11 @@ def main(
                 task,
                 entity_key,
                 first_level_gltlabel,
-                glt_code,
+                second_level_glt_code,
             )
             if not zcore_map_filename.exists():
                 LGR.warning(
-                    f"Skipping the following glt code due to file not existing: {glt_code}"
+                    f"Skipping the following glt code due to file not existing: {second_level_glt_code}"
                 )
                 continue
 
@@ -386,11 +481,13 @@ def main(
             try:
                 thresholded_filename = next(
                     analysis_dir.rglob(
-                        f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
+                        f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
                     )
                 )
             except Exception:
-                LGR.critical(f"Skipping {glt_code}: no thresholded file found")
+                LGR.critical(
+                    f"Skipping {second_level_glt_code}: no thresholded file found"
+                )
                 continue
 
             thresholded_img = nib.load(thresholded_filename)
@@ -404,15 +501,15 @@ def main(
             task,
             entity_key,
             first_level_gltlabel,
-            glt_code,
+            second_level_glt_code,
         )
 
-        base_str = f"TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel} GLTCODE: {glt_code}"
+        base_str = f"TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel} SECOND LEVEL GLTCODE: {second_level_glt_code}"
         if not cluster_table_filename.exists():
-            LGR.info(f"No significant clusters for {base_str}")
+            LGR.info(f"NO SIGNIFICANT CLUSTERS FOUND FOR {base_str}")
             continue
         else:
-            LGR.info(f"Significant clusters found for {base_str}")
+            LGR.info(f"***SIGNIFICANT CLUSTERS FOUND FOR {base_str}***")
 
         plot_thresholded_img(
             analysis_dir,
@@ -421,9 +518,18 @@ def main(
             task,
             entity_key,
             first_level_gltlabel,
-            glt_code,
+            second_level_glt_code,
             method,
         )
+
+        if analysis_type == "glm" and second_level_glt_code == "mean":
+            create_seed_masks(
+                analysis_dir,
+                cluster_table_filename,
+                template_img_path,
+                thresholded_img,
+                sphere_radius,
+            )
 
 
 if __name__ == "__main__":

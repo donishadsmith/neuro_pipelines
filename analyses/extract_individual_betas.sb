@@ -26,6 +26,11 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
+# Specific mask used as the seed for the gPPI
+GLM_DIR="$BIDS_DIR/derivatives/glm"
+SPHERE_MASK_NAME=""
+# $BIDS_DIR/derivatives/glm/$TASK/sphere_mask/$SPHERE_MASK_NAME
+SPHERE_MASK_PATH=""
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
 DST_DIR="$ANALYSIS_DIR/individual_betas_files"
 mkdir -p $DST_DIR
@@ -37,6 +42,13 @@ CMD="$PYTHON extract_individual_betas.py \
     --analysis_type $ANALYSIS_TYPE \
     --dst_dir $DST_DIR"
 
+if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
+    CMD+=" --glm_dir $GLM_DIR"
+fi
+
+if [[ $ANALYSIS_TYPE == "gPPI" && -n $SPHERE_MASK_NAME ]]; then
+	CMD+=" --sphere_mask_path $SPHERE_MASK_NAME"
+fi
 
 # hostname
 # id

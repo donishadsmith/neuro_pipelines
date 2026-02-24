@@ -4,10 +4,11 @@ from pathlib import Path
 import shutil, subprocess
 
 import nibabel as nib, numpy as np
-from nilearn.image import new_img_like
+from nilearn.image import new_img_like, resample_to_img
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
+from nifti2bids.metadata import needs_resampling
 from nifti2bids.io import replace_ext
 
 LGR = setup_logger(__name__)
@@ -44,6 +45,14 @@ def get_first_level_gltsym_codes(task, analysis_type, caller):
         if caller == "extract_betas"
         else contrasts
     )
+
+
+def get_second_level_glt_codes(analysis_type):
+    glt_codes = ["5_vs_0", "10_vs_0", "10_vs_5"]
+    if analysis_type == "glm":
+        glt_codes += ["mean"]
+
+    return glt_codes
 
 
 def modify_contrast_names(contrasts):
@@ -87,6 +96,15 @@ def get_contrast_entity_key(input_str):
     return "contrast" if "_vs_" in input_str else "condition"
 
 
+def resample_seed_img(seed_img, subject_nifti_img):
+    if needs_resampling(seed_img, subject_nifti_img):
+        seed_img = resample_to_img(
+            seed_img, subject_nifti_img, interpolation="nearest", copy_header=True
+        )
+
+    return seed_img
+
+
 def create_beta_files(
     stats_file,
     beta_dir,
@@ -100,6 +118,7 @@ def create_beta_files(
         task, analysis_type, caller="extract_betas"
     )
     beta_names = get_beta_names(first_level_gltsyms, add_coef_str=True)
+
     for beta_name in beta_names:
         beta_file = beta_dir / stats_file.name.replace(
             "stats", beta_name.replace("#0_Coef", "_betas")

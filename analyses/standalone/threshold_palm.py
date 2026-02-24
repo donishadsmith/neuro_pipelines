@@ -10,11 +10,10 @@ from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
     threshold_palm_output,
+    get_second_level_glt_codes,
 )
 
 LGR = setup_logger(__name__)
-
-GLT_CODES = ("5_vs_0", "10_vs_0", "10_vs_5")
 
 
 def _get_cmd_args():
@@ -30,20 +29,6 @@ def _get_cmd_args():
         dest="dst_dir",
         required=True,
         help="The destination directory for analysis.",
-    )
-    parser.add_argument(
-        "--dataset",
-        dest="dataset",
-        default="mph",
-        required=False,
-        help="Name of dataset.",
-    )
-    parser.add_argument(
-        "--cohort",
-        dest="cohort",
-        default="kids",
-        required=False,
-        help="The cohort.",
     )
     parser.add_argument(
         "--cluster_correction_p",
@@ -69,15 +54,6 @@ def _get_cmd_args():
     return parser
 
 
-def create_glt_dict(dataset, cohort):
-    # Positive codes are the anchors and the only ones that need to be created
-    glt_codes_dict = {"positive": None}
-    if dataset == "mph" and cohort == "kids":
-        glt_codes_dict["positive"] = list(GLT_CODES)
-
-    return glt_codes_dict
-
-
 def get_output_prefixes(analysis_dir, task, first_level_gltlabel):
     # Positive files are the anchors and the only ones that need to be retrieved
     output_prefixes = {"positive": None}
@@ -96,9 +72,7 @@ def get_output_prefixes(analysis_dir, task, first_level_gltlabel):
     )
 
 
-def main(
-    analysis_dir, dst_dir, dataset, cohort, task, analysis_type, cluster_correction_p
-):
+def main(analysis_dir, dst_dir, task, analysis_type, cluster_correction_p):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
 
@@ -111,7 +85,8 @@ def main(
         output_prefixes, n_codes = get_output_prefixes(
             analysis_dir, task, first_level_gltlabel
         )
-        glt_codes_dict = create_glt_dict(dataset, cohort)
+        # Positive codes are the anchors and the only ones that need to be created
+        glt_codes_dict = {"positive": get_second_level_glt_codes(analysis_type)}
         glt_codes_dict["positive"] = list(glt_codes_dict["positive"])[:n_codes]
 
         threshold_palm_output(
