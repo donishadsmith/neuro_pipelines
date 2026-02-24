@@ -253,6 +253,8 @@ def extract_seed_timeseries(
     seed_mask_file,
     afni_img_path,
 ):
+    LGR.info(f"Using the following seed mask file: {seed_mask_file}")
+
     suffix = "".join(seed_mask_file.suffixes)
     seed_timeseries_file = (
         subject_analysis_dir
