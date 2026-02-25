@@ -5,13 +5,12 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
-#SBATCH --exclude=cpu149
 # Outputs ----------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.err
 # -------------------------------------------------------------------------------------
-ANALYSIS_TYPE="glm" # glm or gPPI
-METHOD="nonparametric"
+ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
+METHOD=${METHOD:-nonparametric}
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
@@ -28,13 +27,16 @@ else
 fi
 
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
-TEMPLATE_IMG_PATH='/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz'
+
+TEMPLATE_MASK_PATH=${TEMPLATE_MASK_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz"}
+TEMPLATE_IMG_PATH=${TEMPLATE_IMG_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz"}
 
 CMD="$PYTHON get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
     --method $METHOD \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE \
+    --template_mask_path $TEMPLATE_MASK_PATH \
     --template_img_path $TEMPLATE_IMG_PATH"
 
 if [[ $METHOD == "parametric" ]]; then

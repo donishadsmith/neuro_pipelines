@@ -9,8 +9,6 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/threshold_palm_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/threshold_palm_%A_%a.err
 # -------------------------------------------------------------------------------
-DATASET="mph"
-COHORT="kids"
 ANALYSIS_TYPE="glm" # glm or gPPI
 CLUSTER_CORRECTION_P=0.05
 
@@ -37,8 +35,6 @@ CMD="$PYTHON threshold_palm.py \
 	--dst_dir $DST_DIR \
     --task $TASK \
     --analysis_type $ANALYSIS_TYPE \
-    --dataset $DATASET \
-    --cohort $COHORT \
     --cluster_correction_p $CLUSTER_CORRECTION_P"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID

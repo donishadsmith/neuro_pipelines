@@ -5,15 +5,20 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
-#SBATCH --exclude=cpu149
 # Outputs ---------------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_individual_betas_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_individual_betas_%A_%a.err
 # ------------------------------------------------------------------------------------------
-ANALYSIS_TYPE="glm" # glm or gPPI
-METHOD="nonparametric"
+ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
+METHOD=${METHOD:-nonparametric}
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+
+# Specific mask used as the seed for the gPPI
+GLM_DIR="$BIDS_DIR/derivatives/glm"
+# $BIDS_DIR/derivatives/glm/$TASK/sphere_mask/{path}
+SEED_MASK_PATH=${SEED_MASK_PATH:-}
+
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
@@ -26,11 +31,6 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
-# Specific mask used as the seed for the gPPI
-GLM_DIR="$BIDS_DIR/derivatives/glm"
-SEED_MASK_NAME=""
-# $BIDS_DIR/derivatives/glm/$TASK/sphere_mask/$SEED_MASK_NAME
-SEED_MASK_PATH=""
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
 DST_DIR="$ANALYSIS_DIR/individual_betas_files"
 mkdir -p $DST_DIR
@@ -46,8 +46,8 @@ if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
     CMD+=" --glm_dir $GLM_DIR"
 fi
 
-if [[ $ANALYSIS_TYPE == "gPPI" && -n $SEED_MASK_NAME ]]; then
-	CMD+=" --seed_mask_path $SEED_MASK_NAME"
+if [[ $ANALYSIS_TYPE == "gPPI" && -n $SEED_MASK_PATH ]]; then
+	CMD+=" --seed_mask_path $SEED_MASK_PATH"
 fi
 
 # hostname

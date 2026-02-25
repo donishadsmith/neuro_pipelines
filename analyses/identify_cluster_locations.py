@@ -1,4 +1,4 @@
-import argparse, itertools, subprocess
+import argparse, itertools, os, subprocess
 from pathlib import Path
 
 import pandas as pd
@@ -59,8 +59,11 @@ def _get_cmd_args():
         "--orient",
         dest="orient",
         required=False,
-        default="lpi",
-        help="The orientation to use.",
+        default=None,
+        help=(
+            "The orientation to use. If not set, it will first get the environmental variable "
+            "AFNI_ORIENT and if this is empty will default to 'lpi'."
+        ),
     )
     parser.add_argument(
         "--atlas",
@@ -84,6 +87,10 @@ def _get_cmd_args():
 
 
 def identify_mni_regions(afni_img_path, coord_filename, orient, atlas):
+    orient = orient or os.getenv("AFNI_ORIENT", "lpi")
+
+    LGR.info(f"Using the following orientation: {orient}")
+
     cmd = (
         f"apptainer exec -B /scratch:/scratch -B /projects:/projects {afni_img_path} whereami "
         f"-{orient.lower()} -coord_file {coord_filename} -space MNI -atlas {atlas}"

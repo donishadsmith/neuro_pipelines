@@ -9,6 +9,7 @@ from nifti2bids.logging import setup_logger
 from _utils import (
     get_beta_names,
     get_contrast_entity_key,
+    get_coordinate_from_filename,
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
     resample_seed_img,
@@ -102,7 +103,7 @@ def drop_dose_rows(data_table, dose):
 def get_cluster_region_info(cluster_result_file, cluster_id, tail):
     df = pd.read_csv(cluster_result_file, sep=None, engine="python")
     cluster_id_mask = df["Cluster ID"].astype(str) == cluster_id
-    tail_mask = df["Peak Stat"] > 0 if tail == "positive" else df["Peak_Stat"] < 0
+    tail_mask = df["Peak Stat"] > 0 if tail == "positive" else df["Peak Stat"] < 0
     mask = (cluster_id_mask) & (tail_mask)
 
     if "Region" in df.columns:
@@ -157,7 +158,7 @@ def get_individual_interpretations(data_table, beta_name, mask_origin, analysis_
     else:
         descriptions = (
             ("activation", "deactivation")
-            if "PPI_" in beta_name
+            if "PPI_" not in beta_name
             else ("increased_connectivity", "decreased_connectivity")
         )
         interpretations = np.where(
@@ -192,7 +193,6 @@ def add_info_to_data_table(
         )
     )
 
-    data_table["units_of_beta_coefficient"] = "percent (percent_signal_change)"
     data_table[f"{analysis_type}_individual_beta_interpretation"] = (
         get_individual_interpretations(
             data_table, beta_name, mask_origin, analysis_type
@@ -255,22 +255,24 @@ def compute_average_betas(
     mask_origin="cluster",
 ):
     doses = data_table["dose"].tolist()
-    average_betas = np.full(data_table.shape[-1], np.nan)
-    mask = nib.load(mask_filename)
+    average_betas = np.full(data_table.shape[0], np.nan)
+    mask_img = nib.load(mask_filename)
 
     if mask_origin == "seed":
-        mask = resample_seed_img(mask, nib.load(subject_beta_filename[0]))
+        mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filename[0]))
 
     for dose, subject_beta_filename in zip(doses, subject_beta_filenames):
         subject_beta_filename = Path(subject_beta_filename)
         subject = get_entity_value(
             subject_beta_filename.name, entity="sub", return_entity_prefix=True
         )
-        contrast_img = nib.load(subject_beta_filename)
-        beta_img_fdata = contrast_img.get_fdata()
-        average_beta = beta_img_fdata[mask.get_fdata() == 1].mean()
-        mask = (data_table["participant_id"] == subject) & (data_table["dose"] == dose)
-        average_betas[mask] = average_beta
+        beta_img = nib.load(subject_beta_filename)
+        beta_img_fdata = beta_img.get_fdata()
+        average_beta = beta_img_fdata[mask_img.get_fdata() == 1].mean()
+        subject_mask = (data_table["participant_id"] == subject) & (
+            data_table["dose"] == dose
+        )
+        average_betas[subject_mask] = average_beta
 
     return average_betas
 
@@ -287,8 +289,8 @@ def main(
 ):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
-    glm_dir = Path(glm_dir) or None
-    seed_mask_path = Path(seed_mask_path) or None
+    glm_dir = Path(glm_dir) if glm_dir else None
+    seed_mask_path = Path(seed_mask_path) if seed_mask_path else None
 
     first_level_gltlabels = get_first_level_gltsym_codes(
         task, analysis_type, caller="extract_individual_betas"
@@ -309,7 +311,6 @@ def main(
         data_table = pd.read_csv(data_table_file, sep=None, engine="python")
         data_table["participant_id"] = data_table["participant_id"].astype(str)
         data_table["dose"] = data_table["dose"].astype(int)
-        data_table[f"{analysis_type}_cluster_beta"] = np.nan
         for second_level_glt_code in get_second_level_glt_codes():
             LGR.info(
                 f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
@@ -349,15 +350,6 @@ def main(
                         )
                     )
 
-                    beta_coefficient_df[
-                        f"{analysis_type}_individual_cluster_beta_interpretation"
-                    ] = get_individual_interpretations(
-                        beta_coefficient_df,
-                        beta_name,
-                        mask_origin="cluster",
-                        analysis_type=analysis_type,
-                    )
-
                     add_info_to_data_table(
                         analysis_dir,
                         cluster_mask_filename,
@@ -380,8 +372,6 @@ def main(
                             glm_dir,
                         )
 
-                        beta_coefficient_df.drop(columns=["InputFile"])
-
                         beta_coefficient_df[f"glm_individual_cluster_beta"] = (
                             compute_average_betas(
                                 beta_coefficient_df,
@@ -400,29 +390,24 @@ def main(
                         )
 
                         if seed_mask_path:
-                            if all(x in seed_mask_path.name for x in ["[", "]", ","]):
-                                possible_coordinate = seed_mask_path.name.split("[")[
-                                    1
-                                ].split("]")[0]
-                                suffix = "".join(seed_mask_path.suffixes)
-                                possible_coordinate = possible_coordinate.removesuffix(
-                                    suffix
+                            possible_coordinate = get_coordinate_from_filename(
+                                seed_mask_path
+                            )
+                            if possible_coordinate:
+                                beta_coefficient_df[f"seed_mni_coordinate"] = (
+                                    possible_coordinate
                                 )
-                                if all(
-                                    x.isdigit() for x in possible_coordinate.split(",")
-                                ):
-                                    beta_coefficient_df[f"seed_mni_coordinate"] = (
-                                        seed_mask_path.name.split("[")[1].split("]")[0]
-                                    )
 
                             LGR.info(
                                 f"Using the following sphere mask path: {seed_mask_path}"
                             )
+
                             beta_coefficient_df[f"glm_individual_seed_beta"] = (
                                 compute_average_betas(
                                     beta_coefficient_df,
                                     glm_subject_beta_filenames,
                                     seed_mask_path,
+                                    mask_origin="seed",
                                 )
                             )
                             beta_coefficient_df[
@@ -433,6 +418,13 @@ def main(
                                 mask_origin="seed",
                                 analysis_type="glm",
                             )
+
+                    beta_coefficient_df["units_of_beta_coefficient"] = (
+                        "percent (percent_signal_change)"
+                    )
+
+                    if "InputFile" in beta_coefficient_df.columns:
+                        beta_coefficient_df.drop(columns=["InputFile"])
 
                     save_tabular_data(
                         beta_coefficient_df,

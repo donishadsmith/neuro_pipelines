@@ -15,6 +15,7 @@ from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
+    resample_seed_img,
 )
 
 LGR = setup_logger(__name__)
@@ -85,11 +86,18 @@ def _get_cmd_args():
         help="P-value for cluster correction. Only used for the parametric approach.",
     )
     parser.add_argument(
+        "--template_mask_path",
+        dest="template_mask_path",
+        required=False,
+        default=None,
+        help="Path to a template brain mask image to use for creating sphere masks.",
+    )
+    parser.add_argument(
         "--template_img_path",
         dest="template_img_path",
         required=False,
         default=None,
-        help="Path to a template image to use for plotting.",
+        help="Path to a T1w template image to use for plotting.",
     )
     parser.add_argument(
         "--sphere_radius",
@@ -355,6 +363,7 @@ def plot_thresholded_img(
 def create_seed_masks(
     analysis_dir,
     cluster_table_filename,
+    template_mask_path,
     template_img_path,
     thresholded_img,
     sphere_radius,
@@ -366,7 +375,7 @@ def create_seed_masks(
     plot_parent_path.mkdir(parents=True, exist_ok=True)
 
     clusters_table = pd.read_csv(cluster_table_filename, sep=",")
-    template_img = nib.load(template_img_path)
+    template_mask = nib.load(template_mask_path)
 
     mask_primary = clusters_table["Cluster ID"].str.isdigit()
 
@@ -376,30 +385,33 @@ def create_seed_masks(
 
         # https://neurostars.org/t/create-a-10mm-sphere-roi-mask-around-a-given-coordinate/28853/3
 
-        _, A = nifti_spheres_masker._apply_mask_and_get_affinity(
-            seeds=[set(coord)],
+        _, A = nifti_spheres_masker.apply_mask_and_get_affinity(
+            seeds=[tuple(coord)],
             niimg=None,
             radius=sphere_radius,
             allow_overlap=False,
-            mask_img=template_img,
+            mask_img=template_mask,
         )
 
         sphere_mask = _unmask_3d(
-            X=A.toarray().flatten(), mask=thresholded_img.get_fdata().astype(bool)
+            X=A.toarray().flatten(), mask=template_mask.get_fdata().astype(bool)
         )
 
-        sphere_mask = nib.nifti1.Nifti1Image(sphere_mask, thresholded_img.affine)
+        sphere_mask = nib.nifti1.Nifti1Image(
+            sphere_mask, template_mask.affine, template_mask.header
+        )
+        sphere_mask = resample_seed_img(sphere_mask, thresholded_img)
 
-        coord_name = ",".join([str(x) for x in coord])
+        coord_name = "_".join([str(x) for x in coord])
         sphere_name = (
             cluster_table_filename.name.replace("_cluster_results.csv", "_sphere_mask_")
-            + f"[{coord_name}].nii.gz"
+            + f"{coord_name}.nii.gz"
         )
         sphere_filename = sphere_parent_path / sphere_name
 
         nib.save(sphere_mask, sphere_filename)
 
-        display = plot_roi(sphere_filename, bg_img=template_img)
+        display = plot_roi(sphere_filename, bg_img=template_img_path)
 
         plot_filename = plot_parent_path / sphere_filename.name.replace(
             ".nii.gz", ".png"
@@ -418,6 +430,7 @@ def main(
     connectivity,
     voxel_correction_p,
     cluster_correction_p,
+    template_mask_path,
     template_img_path,
     sphere_radius,
 ):
@@ -524,6 +537,7 @@ def main(
             create_seed_masks(
                 analysis_dir,
                 cluster_table_filename,
+                template_mask_path,
                 template_img_path,
                 thresholded_img,
                 sphere_radius,

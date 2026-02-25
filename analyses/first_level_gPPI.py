@@ -76,6 +76,7 @@ from _models import create_design_matrix, perform_first_level
 from _utils import (
     create_beta_files,
     get_beta_names,
+    get_coordinate_from_filename,
     get_first_level_gltsym_codes,
     resample_seed_img,
 )
@@ -126,8 +127,8 @@ def _get_cmd_args():
         help="Root of the derivatives directory.",
     )
     parser.add_argument(
-        "--seed_mask_file",
-        dest="seed_mask_file",
+        "--seed_mask_path",
+        dest="seed_mask_path",
         required=True,
         help="The mask of the seed region.",
     )
@@ -160,8 +161,8 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--fd",
-        dest="fd",
+        "--fd_threshold",
+        dest="fd_threshold",
         default=0.9,
         type=float,
         required=False,
@@ -208,7 +209,7 @@ def _get_cmd_args():
         "--n_global_parameters",
         dest="n_global_parameters",
         default=1,
-        choices=[1, 2, 3, 4],
+        choices=[0, 1, 2, 3, 4],
         required=False,
         help=(
             "Global signal regression. If 0, no global signal parameters used. "
@@ -250,25 +251,33 @@ def extract_seed_timeseries(
     subject_analysis_dir,
     subject_scratch_dir,
     subject_nifti_file,
-    seed_mask_file,
+    seed_mask_path,
     afni_img_path,
 ):
-    LGR.info(f"Using the following seed mask file: {seed_mask_file}")
+    LGR.info(f"Using the following seed mask file: {seed_mask_path}")
 
-    suffix = "".join(seed_mask_file.suffixes)
+    possible_coordinate = get_coordinate_from_filename(
+        seed_mask_path, replace_underscore=False
+    )
+    if possible_coordinate:
+        seed_name = f"seed_{possible_coordinate}"
+    else:
+        seed_name = f"seed"
+
+    suffix = "".join(seed_mask_path.suffixes)
     seed_timeseries_file = (
         subject_analysis_dir
-        / f"seed_desc-timeseries.{seed_mask_file.name.replace(suffix, '1D')}"
+        / f"{seed_name}_desc-timeseries.{seed_mask_path.name.replace(suffix, '1D')}"
     )
 
-    seed_img = resample_seed_img(nib.load(seed_mask_file), nib.load(subject_nifti_file))
+    seed_img = resample_seed_img(nib.load(seed_mask_path), nib.load(subject_nifti_file))
 
-    resampled_seed_file = subject_scratch_dir / f"resampled_{seed_mask_file.name}"
+    resampled_seed_file = subject_scratch_dir / f"resampled_{seed_mask_path.name}"
     nib.save(seed_img, resampled_seed_file)
 
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "3dmaskave '
-        f"-mask {seed_mask_file} -q "
+        f"-mask {seed_mask_path} -q "
         f"{resampled_seed_file} "
         f" > {seed_timeseries_file} && "
         f'1dtranspose {seed_timeseries_file} {seed_timeseries_file}"'
@@ -336,10 +345,12 @@ def denoise_seed_timeseries(
 def get_task_deconvolve_cmd(
     task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
 ):
+    seed_name = seed_timeseries_file.split("_desc")[0]
+
     if task == "nback":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 8 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 seed "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
             f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
@@ -355,7 +366,7 @@ def get_task_deconvolve_cmd(
     elif task == "mtle":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 seed "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
             f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 4 PPI_indoor"
@@ -364,7 +375,7 @@ def get_task_deconvolve_cmd(
     elif task == "mtlr":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 seed "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
             f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 4 PPI_seen"
@@ -373,7 +384,7 @@ def get_task_deconvolve_cmd(
     elif task == "princess":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 5 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 seed "
+            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 2 switch "
             f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 3 nonswitch "
             f"-stim_file {ppi_dir / 'PPI_switch.1D'} -stim_label 4 PPI_switch"
@@ -384,7 +395,7 @@ def get_task_deconvolve_cmd(
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contrast
         deconvolve_cmd = create_flanker_deconvolve_cmd(
-            timing_dir, nuisance_regressors_file
+            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
 
     return deconvolve_cmd
@@ -437,7 +448,8 @@ def create_flanker_deconvolve_cmd(
     keep_trial_regressors += keep_ppi_regressors
 
     # Only keep stims without empty files
-    stims = f"-stim_file {seed_timeseries_file} -stim_label 1 seed "
+    seed_name = seed_timeseries_file.split("_desc")[0]
+    stims = f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
     for label, regressor in enumerate(keep_trial_regressors, start=2):
         bool_list = [
             regressor == stim_string.rstrip().split(" ")[-1]
@@ -616,13 +628,13 @@ def main(
     afni_img_path,
     dst_dir,
     deriv_dir,
-    seed_mask_file,
+    seed_mask_path,
     space,
     subject,
     task,
     n_motion_parameters,
     n_global_parameters,
-    fd,
+    fd_threshold,
     exclusion_criteria,
     n_dummy_scans,
     n_acompcor,
@@ -745,7 +757,7 @@ def main(
             confounds_df,
             column_name="framewise_displacement",
             n_dummy_scans=n_dummy_scans,
-            threshold=fd,
+            threshold=fd_threshold,
         )
 
         kept = censor_mask[n_dummy_scans:]
@@ -753,7 +765,7 @@ def main(
         percent_censored = n_censored / kept.size
         LGR.critical(
             f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
-            f"proportion of steady state volumes removed at an fd > {fd} mm: "
+            f"proportion of steady state volumes removed at an fd threshold > {fd_threshold} mm: "
             f" {percent_censored}"
         )
 
@@ -824,7 +836,7 @@ def main(
         )
 
         # gPPI preparation
-        seed_mask_file = Path(seed_mask_file)
+        seed_mask_path = Path(seed_mask_path)
 
         tr = get_tr(nifti_file)
         n_volumes = get_n_volumes(nifti_file)
@@ -836,7 +848,7 @@ def main(
             subject_analysis_dir,
             subject_scratch_dir,
             percent_change_nifti_file,
-            seed_mask_file,
+            seed_mask_path,
             afni_img_path,
         )
         denoised_seed_timeseries_file = denoise_seed_timeseries(
@@ -922,3 +934,9 @@ def main(
         create_beta_files(
             stats_file_relm, betas_dir, afni_img_path, task, analysis_type="gPPI"
         )
+
+
+if __name__ == "__main__":
+    cmd_args = _get_cmd_args()
+    args = cmd_args.parse_args()
+    main(**vars(args))

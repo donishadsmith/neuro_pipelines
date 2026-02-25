@@ -5,14 +5,15 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
-#SBATCH --exclude=cpu149
-# Outputs ----------------------------------------------------------------------------
+# Outputs ------------------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.err
-# -------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
 USERNAME=${HOME#/home/}
-ANALYSIS_TYPE="glm" # glm or gPPI
-METHOD="nonparametric"
+ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
+METHOD=${METHOD:-nonparametric}
+WHEREAMI_ATLAS=${WHEREAMI_ATLAS:-"Haskins_Pediatric_Nonlinear_1.0"}
+
 BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
@@ -38,6 +39,7 @@ CMD="$PYTHON identify_cluster_locations.py \
 	--afni_img_path $AFNI_IMG_PATH \
 	--task $TASK \
     --method $METHOD \
+    --atlas $WHEREAMI_ATLAS \
     --analysis_type $ANALYSIS_TYPE"
 
 # hostname

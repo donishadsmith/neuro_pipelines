@@ -101,6 +101,19 @@ def resample_seed_img(seed_img, subject_nifti_img):
     return seed_img
 
 
+def get_coordinate_from_filename(seed_mask_path, replace_underscore=True):
+    seed_mask_path = Path(seed_mask_path)
+    possible_coordinate = ""
+    if "_sphere_mask_" in seed_mask_path.name:
+        possible_coordinate = seed_mask_path.name.split("_sphere_mask_")[1]
+        suffix = "".join(seed_mask_path.suffixes)
+        possible_coordinate = possible_coordinate.removesuffix(suffix)
+        if replace_underscore:
+            possible_coordinate = possible_coordinate.replace("_", ",")
+
+    return possible_coordinate
+
+
 def create_beta_files(
     stats_file,
     beta_dir,

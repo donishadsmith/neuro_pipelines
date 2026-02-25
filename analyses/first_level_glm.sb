@@ -9,6 +9,10 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_glm_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_glm_%A_%a.err
 # ----------------------------------------------------------------------------------
+# sbatch --array=0 first_level_glm.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
+# sbatch --array=1-13%3 first_level_glm.sb
+# sbatch --array=0-13 first_level_glm.sb
+
 FMRIPREP_VERSION="25.2.3"
 
 USERNAME=${HOME#/home/}
@@ -17,14 +21,18 @@ DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 DST_DIR="$BIDS_DIR/derivatives/glm"
 mkdir -p $DST_DIR
 
+TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
+
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
-TASK="nback" # nback, mtle, mtlr, princess, flanker
-
-# sbatch --array=0 first_level_glm.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
-# sbatch --array=1-13%3 first_level_glm.sb
-# sbatch --array=0-13 first_level_glm.sb
+N_MOTION_PARAMETERS=${N_MOTION_PARAMETERS:-12}      # Choose 6, 12, 18, 24
+N_ACOMPCORS=${N_ACOMPCORS:-5}                       # Recommend choosing 5 or 6
+ACOMPCOR_STRATEGY=${ACOMPCOR_STRATEGY:-"combined"}  # Choose "combined" or "separate"
+N_GLOBAL_PARAMETERS=${N_GLOBAL_PARAMETERS:-1}       # Choose 0, 1, 2, 3, or 4
+FD_THRESHOLD=${FD_THRESHOLD:-0.9}                   # Choose a float between 0-1.0
+EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.4}       # Choose a float between 0.20-0.40
+FWHM=${FWHM:-6}                                     # Choose integer
 
 # Extract one subject from the like corresponding to the current
 # slurm job value; essentially extracting sub-{id}
@@ -45,7 +53,18 @@ CMD="$PYTHON first_level_glm.py \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
 	--subject ${SUBJECT#sub-} \
-	--task $TASK"
+	--task $TASK \
+	--n_motion_parameters $N_MOTION_PARAMETERS \
+	--n_acompcor $N_ACOMPCORS \
+	--acompcor_strategy $ACOMPCOR_STRATEGY \
+	--n_global_parameters $N_GLOBAL_PARAMETERS \
+	--fd_threshold $FD_THRESHOLD \
+	--exclusion_criteria $EXCLUSION_CRITERIA \
+	--fwhm $FWHM"
+
+# hostname
+# id
+# getent passwd "$(id -u)" || echo "getent failed"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD

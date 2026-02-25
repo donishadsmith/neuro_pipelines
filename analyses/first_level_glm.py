@@ -78,8 +78,8 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--fd",
-        dest="fd",
+        "--fd_threshold",
+        dest="fd_threshold",
         default=0.9,
         type=float,
         required=False,
@@ -126,7 +126,7 @@ def _get_cmd_args():
         "--n_global_parameters",
         dest="n_global_parameters",
         default=1,
-        choices=[1, 2, 3, 4],
+        choices=[0, 1, 2, 3, 4],
         required=False,
         help=(
             "Global signal regression. If 0, no global signal parameters used. "
@@ -279,7 +279,7 @@ def main(
     task,
     n_motion_parameters,
     n_global_parameters,
-    fd,
+    fd_threshold,
     exclusion_criteria,
     n_dummy_scans,
     n_acompcor,
@@ -393,7 +393,7 @@ def main(
             confounds_df,
             column_name="framewise_displacement",
             n_dummy_scans=n_dummy_scans,
-            threshold=fd,
+            threshold=fd_threshold,
         )
 
         kept = censor_mask[n_dummy_scans:]
@@ -401,7 +401,7 @@ def main(
         percent_censored = n_censored / kept.size
         LGR.critical(
             f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
-            f"proportion of steady state volumes removed at an fd > {fd} mm: "
+            f"proportion of steady state volumes removed at an fd threshold > {fd_threshold} mm: "
             f" {percent_censored}"
         )
 
