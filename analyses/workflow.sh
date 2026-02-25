@@ -97,7 +97,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         fi
 
     else
-        FIRST_LEVEL_GLT_LABELS=("")
+        FIRST_LEVEL_GLT_LABELS=("placeholder")
     fi
 
     JOB_ID_1=""
@@ -125,7 +125,11 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =======================================================
     if [ $RUN_SECOND_LEVEL = true ]; then
         for FIRST_LEVEL_GLT_LABEL in ${FIRST_LEVEL_GLT_LABELS[@]}; do
-            export FIRST_LEVEL_GLTLABEL=$FIRST_LEVEL_GLT_LABEL
+            if [[ $FIRST_LEVEL_GLT_LABEL != "placeholder" ]]; then
+                export FIRST_LEVEL_GLTLABEL=$FIRST_LEVEL_GLT_LABEL
+            else
+                export FIRST_LEVEL_GLTLABEL=""
+            fi
 
             if [[ -n $JOB_ID_1 ]]; then
                 JOB_ID_2=$(sbatch --parsable --dependency=afterok:$JOB_ID_1 --array=0 second_level.sb $CURRENT_TASK)
@@ -133,7 +137,11 @@ for CURRENT_TASK in "${TASKS[@]}"; do
                 JOB_ID_2=$(sbatch --parsable --array=0 second_level.sb $CURRENT_TASK)
             fi
 
-            echo -e "- SECOND LEVEL SUBMITTED FOR $FIRST_LEVEL_GLT_LABEL (JOB ID: $JOB_ID_2)\n"
+            if [[ $FIRST_LEVEL_GLT_LABEL != "placeholder" ]]; then
+                echo -e "- SECOND LEVEL SUBMITTED FOR $FIRST_LEVEL_GLT_LABEL (JOB ID: $JOB_ID_2)\n"
+            else
+                echo -e "- SECOND LEVEL SUBMITTED (JOB ID: $JOB_ID_2)\n"
+            fi
 
             if [[ -z $SECOND_LEVEL_JOB_IDS ]]; then
                 SECOND_LEVEL_JOB_IDS=$JOB_ID_2
