@@ -17,7 +17,10 @@ AFNI:
 2) PSC scaling of NIfTI image, compute mean for censored files
 3) Resample mask to NIfTI (if needed) then extract timeseries
 4) Tranpose the seed timeseries to a column vector
-5) Denoise seed timeseries not too aggressively
+5) Denoise seed timeseries not too aggressively. Note that smoothing is not done prior
+to extracting the seed, the timeseries is already averaged which helps with spatial noise
+reduction. More importantly, smoothing blur signal outside of the voxels of interest into
+the will result in your seed timeseries containing signal from voxels outside of your mask
 
 For each condition in task (6-9):
 6) Upsample seed timeseries and task regressor to 0.1
@@ -31,7 +34,7 @@ For each condition in task (6-9):
 9) Downsample the PPI term back down to the true TR grid
 
 After:
-10) For nifti image, smooth use 3ddeconvolve. Ensure to model everything
+10) For NIfTI image, smooth, then use 3ddeconvolve. Ensure to model everything
    from nuisance regressors, all main effect conditions (convolved), the
    denoised seed signal, and the PPI interaction terms (already convolved
    in previous step). Create contrasts of the interaction terms (+ means
