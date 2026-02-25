@@ -72,6 +72,7 @@ from _gen_afni_files import (
     create_timing_files,
     create_nuisance_regressor_file,
 )
+from _argparse_typing import n_dummy_type
 from _models import create_design_matrix, perform_first_level
 from _utils import (
     create_beta_files,
@@ -183,6 +184,7 @@ def _get_cmd_args():
         "--n_dummy_scans",
         dest="n_dummy_scans",
         default="auto",
+        type=n_dummy_type,
         required=False,
         help=(
             "Number of dummy scans to remove. If 'auto' computes number of dummy scans "
@@ -202,6 +204,7 @@ def _get_cmd_args():
         dest="acompcor_strategy",
         default="combined",
         choices=["combined", "separate"],
+        type=str,
         required=False,
         help="Whether to use combined aCompCor components or 'separate' components.",
     )
@@ -210,6 +213,7 @@ def _get_cmd_args():
         dest="n_global_parameters",
         default=1,
         choices=[0, 1, 2, 3, 4],
+        type=int,
         required=False,
         help=(
             "Global signal regression. If 0, no global signal parameters used. "
@@ -230,6 +234,7 @@ def _get_cmd_args():
         "--upsample_dt",
         dest="upsample_dt",
         default=0.1,
+        type=float,
         required=False,
         help="Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution ",
     )
@@ -238,6 +243,7 @@ def _get_cmd_args():
         dest="faltung_penalty_syntax",
         default="012 0",
         required=False,
+        type=str,
         help=(
             "Deconvolution penalty syntax to pass to the FALTUNG parameter in 3dTfitter "
             "(fset fpre pen fac). See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"
