@@ -25,7 +25,7 @@ export METHOD="nonparametric"                           # Choose "parametric" or
 export SEED_MASK_PATH=""                                # Add path if using gPPI
 
 # For first level
-SUBJECTS_IDS=("")                                       # Set to ("") if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
+SUBJECTS_IDS=()                                       # Set to () if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
 NUM_SUBJECTS=19                                         # Set to "" if using SUBJECTS_IDS else set to max number of subjects
 
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
@@ -59,17 +59,18 @@ export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0" # Options - https://afni
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
 # ======================================
-if [[ $ANALYSIS_TYPE == "gPPI" && -z $SEED_MASK_PATH ]]; then
-    echo "SEED_MASK_PATH must be set when ANALYSIS_TYPE='gPPI'"
-    exit 1
+if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
 
-    if [[ ! -s $SEED_MASK_PATH ]]; then
+    if [[ -z $SEED_MASK_PATH ]]; then
+        echo "SEED_MASK_PATH must be set when ANALYSIS_TYPE='gPPI'"
+        exit 1
+    fi
+
+    if [[ ! -f $SEED_MASK_PATH ]]; then
         echo "The following SEED_MASK_PATH does not exist: $SEED_MASK_PATH"
         exit 1
     fi
-fi
 
-if [[ $ANALYSIS_TYPE=="gPPI" ]]; then
     FIRST_LEVEL_SCRIPT="first_level_gPPI.sb"
 else
     FIRST_LEVEL_SCRIPT="first_level_glm.sb"

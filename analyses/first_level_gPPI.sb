@@ -15,6 +15,7 @@ FMRIPREP_VERSION="25.2.3"
 # sbatch --array=1-13%3 first_level_gPPI.sb
 # sbatch --array=0-13 first_level_gPPI.sb
 
+USERNAME=${HOME#/home/}
 # Can be the sphere mask or another binary mask
 SEED_MASK_PATH=${SEED_MASK_PATH:-}
 TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
