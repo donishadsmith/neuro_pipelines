@@ -424,7 +424,9 @@ def main(
                     )
 
                     if "InputFile" in beta_coefficient_df.columns:
-                        beta_coefficient_df.drop(columns=["InputFile"])
+                        beta_coefficient_df = beta_coefficient_df.drop(
+                            columns=["InputFile"]
+                        )
 
                     save_tabular_data(
                         beta_coefficient_df,
