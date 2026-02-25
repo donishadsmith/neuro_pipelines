@@ -26,7 +26,7 @@ export SEED_MASK_PATH=""                                # Add path if using gPPI
 
 # For first level
 SUBJECTS_IDS=()                                       # Set to () if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
-NUM_SUBJECTS=19                                         # Set to "" if using SUBJECTS_IDS else set to max number of subjects
+NUM_SUBJECTS=20                                         # Set to "" if using SUBJECTS_IDS else set to max number of subjects
 
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
 # TASKS=("nback")
