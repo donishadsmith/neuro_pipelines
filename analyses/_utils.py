@@ -32,7 +32,7 @@ def get_first_level_gltsym_codes(task, analysis_type, caller):
             "congruent_vs_neutral",
             "incongruent_vs_neutral",
             "nogo_vs_neutral",
-            "congruent_vs_incongruent",
+            "incongruent_vs_congruent",
             "congruent_vs_nogo",
             "incongruent_vs_nogo",
         )
