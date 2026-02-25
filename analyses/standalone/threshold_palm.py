@@ -89,9 +89,7 @@ def main(analysis_dir, dst_dir, task, analysis_type, cluster_correction_p):
         glt_codes_dict = {"positive": get_second_level_glt_codes()}
         glt_codes_dict["positive"] = list(glt_codes_dict["positive"])[:n_codes]
 
-        threshold_palm_output(
-            output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir
-        )
+        threshold_palm_output(output_prefixes, glt_codes_dict, cluster_correction_p)
 
 
 if __name__ == "__main__":

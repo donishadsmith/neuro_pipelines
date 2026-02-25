@@ -27,12 +27,17 @@ GLT_CODES = (
     "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
     "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
     "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
+    "-gltCode 0 'dose : 1*'0'' ",
+    "-gltCode 5 'dose : 1*'5'' ",
+    "-gltCode 10 'dose : 1*'10'' ",
     "-gltCode mean 'dose : {mean_code}' ",
 )
 
 
 def _get_cmd_args():
-    parser = argparse.ArgumentParser(description="Perform second level analysis.")
+    parser = argparse.ArgumentParser(
+        description="Perform second level analysis. Cool paper: https://onlinelibrary.wiley.com/doi/10.1002/hbm.70437"
+    )
     parser.add_argument(
         "--bids_dir", dest="bids_dir", required=True, help="Path to BIDS directory."
     )
@@ -335,7 +340,7 @@ def create_group_mask(layout, task, space, mask_threshold, beta_files):
 
 def get_glt_codes_str(data_table):
     glt_str = ""
-    available_doses = sorted(data_table["dose"].unique())
+    available_doses = sorted(data_table["dose"].astype(str).unique())
     for glt_code in GLT_CODES:
         level_str = glt_code.removeprefix("-gltCode").lstrip().split(" ")[0]
         if level_str == "mean":
@@ -343,6 +348,8 @@ def get_glt_codes_str(data_table):
             dose_list = [f"'{x}'" for x in available_doses]
             mean_code = f"{value}*" + f" +{value}*".join(dose_list)
             glt_str += glt_code.format(mean_code=mean_code)
+        elif "_vs_" not in glt_code:
+            glt_str += glt_code if level_str in available_doses else ""
         else:
             dose_list = level_str.split("_vs_")
             if all(dose in available_doses for dose in dose_list):
@@ -481,6 +488,9 @@ def convert_table_to_matrices(
 
     dose_to_col = {dose: index for index, dose in enumerate(available_doses)}
 
+    # Not the pretiest code but done to be as clear as posible on what is happening
+
+    # Across doses
     for index, dose_high in enumerate(available_doses):
         for dose_low in available_doses[:index]:
             # Positive direction: dose_high > dose_low (e.g., 5_vs_0)
@@ -497,9 +507,22 @@ def convert_table_to_matrices(
             contrasts_neg.append(vector_neg)
             glt_codes_neg.append(f"{dose_low}_vs_{dose_high}")
 
-    # Add contrast for mean > 0 and < 0
-    dose_cols_indices = list(dose_to_col.values())
+    # Within dose (> 0 and < 0) (i.e within placebo only, within 5 mph)
+    for dose in available_doses:
+        # Positive direction: dose > 0
+        vector_pos = np.zeros(design_matrix.shape[1])
+        vector_pos[dose_to_col[dose]] = 1
+        contrasts_pos.append(vector_pos)
+        glt_codes_pos.append(str(dose))
 
+        # Negative direction: dose < 0
+        vector_neg = np.zeros(design_matrix.shape[1])
+        vector_neg[dose_to_col[dose]] = -1
+        contrasts_neg.append(vector_neg)
+        glt_codes_neg.append(str(dose))
+
+    # Add contrast for mean > 0 and < 0 (all doses)
+    dose_cols_indices = list(dose_to_col.values())
     vector_pos = np.zeros(design_matrix.shape[1])
     vector_pos[dose_cols_indices] = round(1 / len(available_doses), 4)
     contrasts_pos.append(vector_pos)
@@ -883,7 +906,6 @@ def main(
                 output_prefixes,
                 glt_codes_dict,
                 cluster_correction_p,
-                dst_dir=dst_dir,
             )
 
 

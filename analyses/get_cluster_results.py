@@ -255,6 +255,10 @@ def identify_clusters(
             clusters_table.loc[mask_neg, "Interpretation"] = (
                 f"Mean activation across doses < 0"
             )
+        elif "_vs_" not in second_level_glt_code:
+            clusters_table["Group"] = f"Within {second_level_glt_code} mg MPH only"
+            clusters_table.loc[mask_pos, "Interpretation"] = f"Activation"
+            clusters_table.loc[mask_neg, "Interpretation"] = f"Deactivation"
         else:
             first_label, second_label = get_interpretation_labels(second_level_glt_code)
 
@@ -342,6 +346,8 @@ def plot_thresholded_img(
 
     if second_level_glt_code == "mean":
         title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} INTERCEPT: Mean across doses"
+    elif "_vs_" not in second_level_glt_code:
+        title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} GROUP: Within {second_level_glt_code} mg MPH"
     else:
         first_label, second_label = get_interpretation_labels(second_level_glt_code)
         first_group = f"{first_label} mg MPH"
@@ -515,7 +521,7 @@ def main(
             thresholded_img = nib.load(thresholded_filename)
 
         cluster_table_filename = identify_clusters(
-            analysis_dir,
+            dst_dir,
             thresholded_img,
             method,
             ZERO_STAT_THRESHOLD,
@@ -534,7 +540,7 @@ def main(
             LGR.info(f"***SIGNIFICANT CLUSTERS FOUND FOR {base_str}***")
 
         plot_thresholded_img(
-            analysis_dir,
+            dst_dir,
             thresholded_img,
             template_img_path,
             task,
@@ -546,7 +552,7 @@ def main(
 
         if analysis_type == "glm" and second_level_glt_code == "mean":
             create_seed_masks(
-                analysis_dir,
+                dst_dir,
                 method,
                 cluster_table_filename,
                 template_mask_path,

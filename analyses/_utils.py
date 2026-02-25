@@ -48,7 +48,7 @@ def get_first_level_gltsym_codes(task, analysis_type, caller):
 
 
 def get_second_level_glt_codes():
-    return ["5_vs_0", "10_vs_0", "10_vs_5", "mean"]
+    return ["0", "5", "10", "5_vs_0", "10_vs_0", "10_vs_5", "mean"]
 
 
 def modify_contrast_names(contrasts):
@@ -221,9 +221,7 @@ def perform_cluster_simulation(
     subprocess.run(cmd, shell=True, check=True)
 
 
-def threshold_palm_output(
-    output_prefixes, glt_codes_dict, cluster_correction_p, dst_dir
-):
+def threshold_palm_output(output_prefixes, glt_codes_dict, cluster_correction_p):
     logp_threshold = -np.log10(cluster_correction_p)
     LGR.info(
         f"Using -log10(p) threshold: {logp_threshold:.4f} "

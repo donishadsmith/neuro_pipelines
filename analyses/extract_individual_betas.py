@@ -93,11 +93,11 @@ def get_nontarget_dose(second_level_glt_code):
         {"0", "5", "10"}.difference(
             second_level_glt_code.replace("PPI_", "").split("_vs_")
         )
-    )[0]
+    )
 
 
-def drop_dose_rows(data_table, dose):
-    return data_table[data_table["dose"] != int(dose)] if dose else data_table
+def drop_dose_rows(data_table, dose_list):
+    return data_table[~data_table["dose"].isin(dose_list)] if dose_list else data_table
 
 
 def get_cluster_region_info(cluster_result_file, cluster_id, tail):
