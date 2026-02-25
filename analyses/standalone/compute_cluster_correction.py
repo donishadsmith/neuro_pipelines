@@ -24,6 +24,12 @@ def _get_cmd_args():
         help="Path to directory containing second level results.",
     )
     parser.add_argument(
+        "--dst_dir",
+        dest="dst_dir",
+        required=True,
+        help="The destination directory for analysis.",
+    )
+    parser.add_argument(
         "--afni_img_path",
         dest="afni_img_path",
         required=True,
@@ -41,8 +47,9 @@ def _get_cmd_args():
     return parser
 
 
-def main(analysis_dir, afni_img_path, task, analysis_type):
+def main(analysis_dir, dst_dir, afni_img_path, task, analysis_type):
     analysis_dir = Path(analysis_dir)
+    dst_dir = Path(dst_dir)
 
     LGR.info(f"TASK: {task}")
 
@@ -65,7 +72,7 @@ def main(analysis_dir, afni_img_path, task, analysis_type):
         )
 
         acf_parameters_filename = estimate_noise_smoothness(
-            analysis_dir,
+            dst_dir,
             afni_img_path,
             group_mask_filename,
             residual_filename,
@@ -73,7 +80,6 @@ def main(analysis_dir, afni_img_path, task, analysis_type):
         )
 
         perform_cluster_simulation(
-            analysis_dir,
             afni_img_path,
             group_mask_filename,
             acf_parameters_filename,

@@ -30,6 +30,7 @@ ANALYSIS_DIR="$BIDS_DIR/derivatives/glm/$TASK"
 
 CMD="$PYTHON compute_cluster_correction.py \
     --analysis_dir $ANALYSIS_DIR \
+	--dst_dir $ANALYSIS_DIR \
 	--afni_img_path $AFNI_IMG_PATH \
 	--task $TASK \
 	--analysis_type $ANALYSIS_TYPE"

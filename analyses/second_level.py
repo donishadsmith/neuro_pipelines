@@ -392,25 +392,28 @@ def convert_table_to_matrices(
     - beta_files_dict: Dict with "positive" and "negative" contrast matrix files
     - glt_codes_dict: Dict with "positive" and "negative" glt code lists
     """
+    output_dir = dst_dir / "second_level_outputs" / "nonparametric"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     design_matrix_file = (
-        dst_dir
+        output_dir
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-design_matrix.csv"
     )
     eb_file = (
-        dst_dir
+        output_dir
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-exchangeability_blocks.csv"
     )
     contrast_matrix_file_pos = (
-        dst_dir
+        output_dir
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-contrast_matrix_pos.csv"
     )
     contrast_matrix_file_neg = (
-        dst_dir
+        output_dir
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-contrast_matrix_neg.csv"
     )
 
     header_file = (
-        dst_dir
+        output_dir
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-header_names.txt"
     )
 
@@ -520,7 +523,8 @@ def convert_table_to_matrices(
 
     # Save glt codes for reference
     glt_codes_file = (
-        dst_dir / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-glt_codes.txt"
+        output_dir
+        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-glt_codes.txt"
     )
     with open(glt_codes_file, "w") as f:
         f.write("# Positive direction contrasts:\n")
@@ -586,6 +590,8 @@ def perform_palm(
 ):
     concatenated_filename = (
         dst_dir
+        / "second_level_outputs"
+        / "nonparametric"
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_concatenated.nii.gz"
     )
 
@@ -605,13 +611,10 @@ def perform_palm(
     LGR.info(f"Concatenating images: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
-    base_dir = dst_dir / "palm_outputs"
-    base_dir.mkdir(parents=True, exist_ok=True)
-
     output_prefixes = {}
     for direction in ["positive", "negative"]:
         output_prefix = (
-            base_dir
+            concatenated_filename.parent
             / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-nonparametric_{direction}"
         )
         contrast_matrix_file = contrast_matrix_files_dict[direction]
@@ -670,6 +673,8 @@ def perform_3dlmer(
 ):
     output_filename = (
         dst_dir
+        / "second_level_outputs"
+        / "parametric"
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_stats.nii.gz"
     )
     output_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -822,7 +827,6 @@ def main(
             )
 
             perform_cluster_simulation(
-                dst_dir,
                 afni_img_path,
                 group_mask_filename,
                 acf_parameters_filename,

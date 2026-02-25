@@ -120,15 +120,22 @@ def get_cluster_region_info(cluster_result_file, cluster_id, tail):
 def save_tabular_data(
     data_table,
     dst_dir,
+    method,
     cluster_mask_filename,
     first_level_gltlabel,
     beta_name,
     add_condition_entity_key,
     save_excel_version,
 ):
-    data_filename = dst_dir / cluster_mask_filename.name.replace(
-        "cluster_mask.nii.gz", "individual_betas.csv"
+    data_filename = (
+        dst_dir
+        / "individual_betas_files"
+        / method
+        / cluster_mask_filename.name.replace(
+            "cluster_mask.nii.gz", "individual_betas.csv"
+        )
     )
+    data_filename.parent.mkdir(parents=True, exist_ok=True)
 
     if add_condition_entity_key:
         data_filename = str(data_filename).replace(
@@ -431,6 +438,7 @@ def main(
                     save_tabular_data(
                         beta_coefficient_df,
                         dst_dir,
+                        method,
                         cluster_mask_filename,
                         first_level_gltlabel,
                         beta_name,

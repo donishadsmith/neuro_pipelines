@@ -32,15 +32,13 @@ else
 fi
 
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
-DST_DIR="$ANALYSIS_DIR/individual_betas_files"
-mkdir -p $DST_DIR
 
 CMD="$PYTHON extract_individual_betas.py \
     --analysis_dir $ANALYSIS_DIR \
+    --dst_dir $ANALYSIS_DIR \
     --method $METHOD \
 	--task $TASK \
-    --analysis_type $ANALYSIS_TYPE \
-    --dst_dir $DST_DIR"
+    --analysis_type $ANALYSIS_TYPE"
 
 if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
     CMD+=" --glm_dir $GLM_DIR"

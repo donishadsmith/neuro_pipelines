@@ -157,7 +157,7 @@ def create_beta_files(
 
 
 def estimate_noise_smoothness(
-    analysis_dir,
+    dst_dir,
     afni_img_path,
     group_mask_filename,
     residual_filename,
@@ -166,8 +166,9 @@ def estimate_noise_smoothness(
     task = get_entity_value(group_mask_filename.name, "task")
     entity_key = get_contrast_entity_key(group_mask_filename)
     acf_parameters_filename = (
-        analysis_dir
-        / "acf_parameters"
+        dst_dir
+        / "second_level_outputs"
+        / "parametric"
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-acf_parameters.txt"
     )
     acf_parameters_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -189,7 +190,6 @@ def estimate_noise_smoothness(
 
 
 def perform_cluster_simulation(
-    analysis_dir,
     afni_img_path,
     group_mask_filename,
     acf_parameters_filename,
@@ -199,8 +199,7 @@ def perform_cluster_simulation(
     entity_key = get_contrast_entity_key(group_mask_filename)
     # Partial filename
     output_filename_prefix = (
-        analysis_dir
-        / "cluster_correction"
+        acf_parameters_filename.parent
         / f"task-{task}_{entity_key}-{first_level_glt}_desc-cluster_correction"
     )
     output_filename_prefix.parent.mkdir(parents=True, exist_ok=True)
@@ -293,7 +292,7 @@ def threshold_palm_output(
         # Use glt_code in filename (e.g., 5_vs_0)
         prefix = prefix_positive.split("_desc")[0]
         combined_thresholded_file = (
-            dst_dir / f"{prefix}_gltcode-{glt_code}_"
+            output_dir / f"{prefix}_gltcode-{glt_code}_"
             "desc-nonparametric_thresholded_bisided.nii.gz"
         )
         nib.save(combined_thresholded_img, combined_thresholded_file)

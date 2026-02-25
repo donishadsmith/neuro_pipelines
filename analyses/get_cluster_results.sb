@@ -33,6 +33,7 @@ TEMPLATE_IMG_PATH=${TEMPLATE_IMG_PATH:-"/projects/bigos_lab/templateflow/tpl-MNI
 
 CMD="$PYTHON get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
+    --dst_dir $ANALYSIS_DIR \
     --method $METHOD \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE \

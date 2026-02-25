@@ -42,6 +42,12 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
+        "--dst_dir",
+        dest="dst_dir",
+        required=True,
+        help="The destination (output) directory.",
+    )
+    parser.add_argument(
         "--afni_img_path",
         dest="afni_img_path",
         required=False,
@@ -201,7 +207,7 @@ def get_interpretation_labels(second_level_glt_code):
 
 
 def identify_clusters(
-    analysis_dir,
+    dst_dir,
     thresholded_img,
     method,
     stat_threshold,
@@ -222,8 +228,9 @@ def identify_clusters(
     )
 
     cluster_table_filename = (
-        analysis_dir
+        dst_dir
         / "cluster_results"
+        / method
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -261,7 +268,7 @@ def identify_clusters(
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
 
         # Get label map
-        label_base_dir = analysis_dir / "cluster_masks"
+        label_base_dir = dst_dir / "cluster_masks" / method
         label_base_dir.mkdir(parents=True, exist_ok=True)
         for label_map in labels_map_list:
             label_ids = np.unique(label_map.get_fdata()[label_map.get_fdata() != 0])
@@ -314,7 +321,7 @@ def identify_clusters(
 
 
 def plot_thresholded_img(
-    analysis_dir,
+    dst_dir,
     thresholded_img,
     template_img_path,
     task,
@@ -349,8 +356,9 @@ def plot_thresholded_img(
         display._cbar.set_label(f"{statistic} Intensity")
 
         plot_filename = (
-            analysis_dir
+            dst_dir
             / "stat_plots"
+            / method
             / f"task-{task}_{entity_key}-{first_level_code}_gltcode-{second_level_glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -361,14 +369,15 @@ def plot_thresholded_img(
 
 
 def create_seed_masks(
-    analysis_dir,
+    dst_dir,
+    method,
     cluster_table_filename,
     template_mask_path,
     template_img_path,
     thresholded_img,
     sphere_radius,
 ):
-    sphere_parent_path = Path(analysis_dir) / "sphere_masks"
+    sphere_parent_path = dst_dir / "sphere_masks" / method
     sphere_parent_path.mkdir(parents=True, exist_ok=True)
 
     plot_parent_path = sphere_parent_path / "plots"
@@ -423,6 +432,7 @@ def create_seed_masks(
 
 def main(
     analysis_dir,
+    dst_dir,
     afni_img_path,
     task,
     analysis_type,
@@ -435,6 +445,7 @@ def main(
     sphere_radius,
 ):
     analysis_dir = Path(analysis_dir)
+    dst_dir = Path(dst_dir)
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
@@ -536,6 +547,7 @@ def main(
         if analysis_type == "glm" and second_level_glt_code == "mean":
             create_seed_masks(
                 analysis_dir,
+                method,
                 cluster_table_filename,
                 template_mask_path,
                 template_img_path,
