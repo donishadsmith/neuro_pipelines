@@ -266,7 +266,7 @@ def compute_average_betas(
     mask_img = nib.load(mask_filename)
 
     if mask_origin == "seed":
-        mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filename[0]))
+        mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filenames[0]))
 
     for dose, subject_beta_filename in zip(doses, subject_beta_filenames):
         subject_beta_filename = Path(subject_beta_filename)

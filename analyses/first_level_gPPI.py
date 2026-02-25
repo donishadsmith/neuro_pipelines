@@ -41,13 +41,10 @@ After:
 12) Extract PPI interaction contrasts betas for downstream analyses
 """
 
-import argparse, subprocess
+import argparse, subprocess, json, subprocess, sys
 from pathlib import Path
 
 import nibabel as nib, numpy as np
-
-import argparse, json, subprocess, sys
-from pathlib import Path
 
 import bids, numpy as np, pandas as pd
 

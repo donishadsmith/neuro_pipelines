@@ -174,7 +174,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =========================
     # RUN_CLUSTER_MNI_LOCATIONS
     # =========================
-    if [ $RUN_CLUSTER_RESULTS = true ]; then
+    if [ $RUN_CLUSTER_MNI_LOCATIONS = true ]; then
         if [[ -n $JOB_ID_3 ]]; then
             JOB_ID_4=$(sbatch --parsable --dependency=afterok:$JOB_ID_3 --array=0 identify_cluster_locations.sb $CURRENT_TASK)
         else
