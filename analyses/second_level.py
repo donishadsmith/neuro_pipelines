@@ -114,14 +114,14 @@ def _get_cmd_args():
     parser.add_argument(
         "--method",
         dest="method",
-        default="non parametric",
+        default="nonparametric",
         choices=["parametric", "nonparametric"],
         required=False,
         help=(
             "Whether to use 3dlmer (parametric) or Palm (nonparametric). "
-            "Typically better to use nonparametric, it doesn't assume the erdistribution of the "
-            "data and better controls false positives. If parametric is useror d then the "
-            "acf method method should be used on the residuals to estimate smoothness and "
+            "Typically better to use nonparametric, it doesn't assume the error distribution of the "
+            "data and better controls false positives. Refer to: https://www.pnas.org/doi/abs/10.1073/pnas.1602413113?utm_source. "
+            "If parametric is used then the acf method method should be used on the residuals to estimate smoothness and "
             "determine the appropriate cluster size via simulations. Nonparametric is stochastic "
             "however Palm sets seed to 0 by default for reproducibility. Though different results "
             "are expected if using Octave: https://web.mit.edu/fsl_v5.0.10/fsl/doc/wiki/PALM(2f)UserGuide.html"
