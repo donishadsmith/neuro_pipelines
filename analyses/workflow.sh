@@ -2,6 +2,7 @@
 #!/bin/bash
 
 # SLURM MANUAL https://slurm.schedmd.com/sbatch.html
+# GNU https://www.gnu.org/software/bash/manual/html_node/Bash-Conditional-Expressions.html
 # or do man slurm
 # Run `bash workflow.sh`
 # If debugging run `bash -x workflow.sh`
@@ -62,7 +63,7 @@ if [[ $ANALYSIS_TYPE == "gPPI" && -z $SEED_MASK_PATH ]]; then
     echo "SEED_MASK_PATH must be set when ANALYSIS_TYPE='gPPI'"
     exit 1
 
-    if [[ ! -f $SEED_MASK_PATH ]]; then
+    if [[ ! -s $SEED_MASK_PATH ]]; then
         echo "The following SEED_MASK_PATH does not exist: $SEED_MASK_PATH"
         exit 1
     fi
