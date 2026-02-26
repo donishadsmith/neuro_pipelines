@@ -25,7 +25,7 @@ export METHOD="nonparametric"                           # Choose "parametric" or
 export SEED_MASK_PATH=""                                # Add path if using gPPI
 
 # For first level
-SUBJECTS_IDS=()                                       # Set to () if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
+SUBJECTS_IDS=()                                         # Set to () if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
 NUM_SUBJECTS=20                                         # Set to "" if using SUBJECTS_IDS else set to max number of subjects
 
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
@@ -198,6 +198,6 @@ for CURRENT_TASK in "${TASKS[@]}"; do
 
         echo -e "- EXTRACT INDIVIDUAL BETAS SUBMITTED (JOB ID: $JOB_ID_5)\n"
     else
-        echo -e "- EXTRACT INDIVIDUAL BETAS JOB\n"
+        echo -e "- SKIPPING EXTRACT INDIVIDUAL BETAS JOB\n"
     fi
 done

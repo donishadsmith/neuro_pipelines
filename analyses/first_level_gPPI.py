@@ -92,6 +92,9 @@ CONDITION_DURATIONS = {
     "princess": 52,
     "mtle": 18,
     "mtlr": 18,
+    "instruction_nback": 2,
+    "instruction_mtle": 2,
+    "instruction_mtlr": 2,
 }
 
 
@@ -291,7 +294,7 @@ def extract_seed_timeseries(
 
 
 def denoise_seed_timeseries(
-    subject_scratch_dir,
+    subject_analysis_dir,
     subject,
     session,
     task,
@@ -316,7 +319,7 @@ def denoise_seed_timeseries(
 
     censor_mask = np.loadtxt(censor_file)
     seed_nuisance_regressor_file = create_nuisance_regressor_file(
-        subject_scratch_dir,
+        subject_analysis_dir,
         subject,
         session,
         task,
@@ -352,15 +355,16 @@ def get_task_deconvolve_cmd(
 
     if task == "nback":
         deconvolve_cmd = {
-            "num_stimts": "-num_stimts 8 ",
+            "num_stimts": "-num_stimts 9 ",
             "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 1 {timing_dir / 'instruction_nback.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
             f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
             f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 5 2-back "
-            f"-stim_file {ppi_dir / 'PPI_0-back.1D'} -stim_label 6 PPI_0-back"
-            f"-stim_file {ppi_dir / 'PPI_1-back.1D'} -stim_label 7 PPI_1-back"
-            f"-stim_file {ppi_dir / 'PPI_2-back.1D'} -stim_label 8 PPI_2-back"
+            f"-stim_file {ppi_dir / 'PPI_instruction_nback.1D'} -stim_label 6 PPI_instruction"
+            f"-stim_file {ppi_dir / 'PPI_0-back.1D'} -stim_label 7 PPI_0-back"
+            f"-stim_file {ppi_dir / 'PPI_1-back.1D'} -stim_label 8 PPI_1-back"
+            f"-stim_file {ppi_dir / 'PPI_2-back.1D'} -stim_label 9 PPI_2-back"
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_1-back -1*PPI_0-back' -glt_label 1 PPI_1-back_vs_PPI_0-back "
             "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back "
@@ -368,20 +372,22 @@ def get_task_deconvolve_cmd(
         }
     elif task == "mtle":
         deconvolve_cmd = {
-            "num_stimts": "-num_stimts 4 ",
+            "num_stimts": "-num_stimts 5 ",
             "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 1 {timing_dir / 'instruction_mtle.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
-            f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 4 PPI_indoor"
+            f"-stim_file {ppi_dir / 'PPI_instruction_mtle.1D'} -stim_label 4 PPI_instruction"
+            f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 5 PPI_instruction"
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
         deconvolve_cmd = {
-            "num_stimts": "-num_stimts 4 ",
+            "num_stimts": "-num_stimts 5 ",
             "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 1 {timing_dir / 'instruction_mtlr.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
-            f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 4 PPI_seen"
+            f"-stim_file {ppi_dir / 'PPI_instruction_mtlr.1D'} -stim_label 4 PPI_instruction"
+            f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 5 PPI_seen"
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "princess":
@@ -502,6 +508,13 @@ def create_flanker_deconvolve_cmd(
     return deconvolve_cmd
 
 
+def get_instruction_name(task, condition_filenames):
+    if task in ["nback", "mtle", "mtlr"]:
+        return condition_filenames + [f"instruction_{task}"]
+    else:
+        return condition_filenames
+
+
 def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
     if method == "upsample":
         resampled_filename = target_file.parent / target_file.name.replace(
@@ -548,7 +561,7 @@ def deconvolve_seed_timeseries(
     # upsampled seed timeseries and an impulse response function, while also adding a penalty for better/smoother
     # estimation
     cmd = (
-        f'apptainer exec -B /projects:/projects {afni_img_path} "waver '
+        f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "waver '
         f"-dt {upsample_dt} -GAM -inline 1@1 > {gamma_file_name} && "
         f"3dTfitter -RHS {upsampled_seed_timeseries_file} "
         f'-FALTUNG {gamma_file_name} {deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
@@ -561,24 +574,31 @@ def deconvolve_seed_timeseries(
 
 
 def upsample_condition_regressor(
-    timing_file, task, n_volumes, upsample_dt, afni_img_path
+    timing_file, task, tr, n_volumes, upsample_dt, afni_img_path
 ):
+    condition_name = timing_file.name.removesuffix(".1D")
+
     upsampled_condition_regressor_file = (
-        timing_file.parent
-        / "upsampled"
-        / f"{timing_file.name.removesuffix('.1D')}_desc-upsampled.1D"
+        timing_file.parent / "upsampled" / f"{condition_name}_desc-upsampled.1D"
     )
     upsampled_condition_regressor_file.parent.mkdir(parents=True, exist_ok=True)
+
+    duration = (
+        CONDITION_DURATIONS[task]
+        if not condition_name.startswith("instruction")
+        else CONDITION_DURATIONS[condition_name]
+    )
 
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} timing_tool.py "
         f"-timing {timing_file} "
         f"-tr {upsample_dt} "
-        f"-run_len {n_volumes} "
-        f"-stim_dir {CONDITION_DURATIONS[task]}"
+        f"-run_len {tr * n_volumes} "
+        f"-stim_dir {duration} "
+        f"-timing_to_1D {upsampled_condition_regressor_file}"
     )
 
-    LGR.info(f"Upsampling condition {timing_file.name}: {cmd}")
+    LGR.info(f"Upsampling condition {condition_name} to {upsample_dt} s: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
     return upsampled_condition_regressor_file
@@ -609,14 +629,14 @@ def create_convolved_ppi_term(
     # Then reconvolve the interaction term to get the estimated HRF, ensure no extended tail due to convolution
     # So regressor can be properly downsampled
     cmd = (
-        f'apptainer exec -B /projects:/projects bash -c {afni_img_path} "1deval '
+        f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "1deval '
         f"-a {deconvolved_seed_timeseries_file}\\' -b {upsampled_condition_regressor_file} "
         f"expr 'a*b' > {neural_interaction_file} && "
         f"waver -GAM -peak 1 -TR {upsample_dt} "
         f'-input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"'
     )
 
-    LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
+    LGR.info(f"Reconvolving upsampled PPI regressor: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
     return ppi_regressor_file
@@ -852,7 +872,7 @@ def main(
             afni_img_path,
         )
         denoised_seed_timeseries_file = denoise_seed_timeseries(
-            subject_scratch_dir,
+            subject_analysis_dir,
             subject,
             session,
             task,
@@ -884,9 +904,10 @@ def main(
             for condition in get_beta_names(first_level_gltsym_codes)
             if "_vs_" not in condition
         ]
+        condition_filenames = get_instruction_name(task, condition_filenames)
         for condition_filename in condition_filenames:
             upsampled_condition_regressor_file = upsample_condition_regressor(
-                condition_filename, task, n_volumes, upsample_dt, afni_img_path
+                condition_filename, task, tr, n_volumes, upsample_dt, afni_img_path
             )
             ppi_regressor_file = create_convolved_ppi_term(
                 ppi_dir,
