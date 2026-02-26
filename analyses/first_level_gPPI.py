@@ -270,23 +270,18 @@ def extract_seed_timeseries(
     else:
         seed_name = f"seed"
 
-    suffix = "".join(seed_mask_path.suffixes)
-    seed_timeseries_file = (
-        subject_analysis_dir
-        / f"{seed_name}_desc-timeseries.{seed_mask_path.name.replace(suffix, '1D')}"
-    )
+    seed_timeseries_file = subject_analysis_dir / f"{seed_name}_desc-timeseries.1D"
 
     seed_img = resample_seed_img(nib.load(seed_mask_path), nib.load(subject_nifti_file))
 
     resampled_seed_file = subject_scratch_dir / f"resampled_{seed_mask_path.name}"
     nib.save(seed_img, resampled_seed_file)
 
+    # Note: output is a column vector
     cmd = (
-        f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "3dmaskave '
-        f"-mask {seed_mask_path} -q "
-        f"{resampled_seed_file} "
-        f" > {seed_timeseries_file} && "
-        f'1dtranspose {seed_timeseries_file} {seed_timeseries_file}"'
+        f"apptainer exec -B /projects:/projects -B /scratch:/scratch {afni_img_path} 3dmaskave "
+        f"-mask {resampled_seed_file} "
+        f"-q {subject_nifti_file} > {seed_timeseries_file}"
     )
 
     LGR.info(f"Extracting seed: {cmd}")
@@ -332,14 +327,16 @@ def denoise_seed_timeseries(
         regressor_file_prefix="seed",
     )
 
+    # Note: Some Afni functions only accept rows and require \', using \\' to
+    # make the backslash literal
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "
-        f"-input {seed_timeseries_file} "
+        f"-input {seed_timeseries_file}\\' "
         f"-ort {seed_nuisance_regressor_file} "
         f"-polort A "
         f"-censor {censor_file} "
-        "cenmode ZERO "
-        f"prefix {denoised_seed_timeseries_file}"
+        "-cenmode ZERO "
+        f"-prefix {denoised_seed_timeseries_file}"
     )
 
     LGR.info(f"Denoising seed: {cmd}")
@@ -506,28 +503,26 @@ def create_flanker_deconvolve_cmd(
 
 
 def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
-    resampled_filename = None
     if method == "upsample":
         resampled_filename = target_file.parent / target_file.name.replace(
             "_desc-denoised", "_desc-upsampled"
         )
-        # Note: Some Afni functions only accept rows and require \', using \\' to
-        # make the backslash literal
+
+        # New length of interpolated timseries is (tr / upsample_dt) * n_original_volumes
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 1dUpsample {int(tr / upsample_dt)} "
-            f"{str(target_file)}\\' "
-            f"> {resampled_filename}"
+            f"{str(target_file)}\\' > {resampled_filename}"
         )
 
         LGR.info(f"Upsampling seed timeseries from {tr} to {upsample_dt}: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
     else:
         # original TR divided by sub_TR, starts at the first tr (0) and takes every
-        # (original_tr / sub_tr) point
+        # (tr / upsample_dt) point
+        resampled_filename = target_file.parent / target_file.name("_upsampled", "")
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 1dcat "
-            f"{target_file}'{{0..$({int(tr / upsample_dt)})}}' "
-            f"> {target_file}"
+            f"'{target_file}{{0..$({int(tr / upsample_dt)})}}' > {target_file}"
         )
 
         LGR.info(
@@ -554,8 +549,7 @@ def deconvolve_seed_timeseries(
     # estimation
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} "waver '
-        f"-dt {upsample_dt} "
-        f"-GAM -inline 1@1 > {gamma_file_name} && "
+        f"-dt {upsample_dt} -GAM -inline 1@1 > {gamma_file_name} && "
         f"3dTfitter -RHS {upsampled_seed_timeseries_file} "
         f'-FALTUNG {gamma_file_name} {deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
     )
@@ -606,7 +600,7 @@ def create_convolved_ppi_term(
         )
     )
     ppi_regressor_file = ppi_dir / upsampled_condition_regressor_file.name.replace(
-        "_desc-upsampled", "_desc-PPI"
+        "_desc-upsampled", "_desc-PPI_upsampled"
     )
 
     numout = np.loadtxt(deconvolved_seed_timeseries_file).size
