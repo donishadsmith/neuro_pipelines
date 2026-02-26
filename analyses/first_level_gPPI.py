@@ -71,6 +71,7 @@ from _gen_afni_files import (
     create_censor_file,
     create_timing_files,
     create_nuisance_regressor_file,
+    is_timing_file_empty,
 )
 from _argparse_typing import n_dummy_type
 from _models import create_design_matrix, perform_first_level
@@ -445,9 +446,7 @@ def create_flanker_deconvolve_cmd(
     }
 
     files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
-    empty_mask = np.array(
-        [np.loadtxt(timing_dir / file, delimiter=" ").size == 0 for file in files]
-    )
+    empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
     nonempty_files = np.array(files)[~empty_mask]
     keep_trial_regressors = [file.removesuffix(".1D") for file in nonempty_files]
@@ -593,8 +592,8 @@ def upsample_condition_regressor(
         f"apptainer exec -B /projects:/projects {afni_img_path} timing_tool.py "
         f"-timing {timing_file} "
         f"-tr {upsample_dt} "
+        f"-stim_dur {duration} "
         f"-run_len {tr * n_volumes} "
-        f"-stim_dir {duration} "
         f"-timing_to_1D {upsampled_condition_regressor_file}"
     )
 
@@ -906,6 +905,9 @@ def main(
         ]
         condition_filenames = get_instruction_name(task, condition_filenames)
         for condition_filename in condition_filenames:
+            if is_timing_file_empty(condition_filename):
+                continue
+
             upsampled_condition_regressor_file = upsample_condition_regressor(
                 condition_filename, task, tr, n_volumes, upsample_dt, afni_img_path
             )

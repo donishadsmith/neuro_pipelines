@@ -27,6 +27,8 @@ export SEED_MASK_PATH=""                                # Add path if using gPPI
 # For first level
 SUBJECTS_IDS=()                                         # Set to () if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
 NUM_SUBJECTS=20                                         # Set to "" if using SUBJECTS_IDS else set to max number of subjects
+                                                        # NOTE: NUM_SUBJECTS does not have to be exact, just as long as it is equal to or more than your
+                                                        # subjects it is fine, jobs with nonexisting subjects will be cancelled automatically
 
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
 # TASKS=("nback")

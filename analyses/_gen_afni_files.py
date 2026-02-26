@@ -67,11 +67,15 @@ def create_nuisance_regressor_file(
     return regressor_file
 
 
+def is_timing_file_empty(timing_file):
+    return np.loadtxt(timing_file, delimiter=" ").size == 0
+
+
 def save_event_file(timing_dir, trial_type, timing_data):
     filename = timing_dir / f"{trial_type}.1D"
     timing_str = " ".join(timing_data)
     with open(filename, "w") as f:
-        f.write(timing_str)
+        f.write(f"{timing_str}")
 
 
 def create_timing_files(subject_dir, event_file, task):

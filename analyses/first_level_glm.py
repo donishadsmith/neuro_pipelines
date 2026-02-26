@@ -19,6 +19,7 @@ from _gen_afni_files import (
     create_censor_file,
     create_timing_files,
     create_nuisance_regressor_file,
+    is_timing_file_empty,
 )
 from _argparse_typing import n_dummy_type
 from _models import create_design_matrix, perform_first_level
@@ -221,9 +222,7 @@ def create_flanker_deconvolve_cmd(timing_dir, nuisance_regressors_file):
     }
 
     files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
-    empty_mask = np.array(
-        [np.loadtxt(timing_dir / file, delimiter=" ").size == 0 for file in files]
-    )
+    empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
     nonempty_files = np.array(files)[~empty_mask]
     keep_trial_types = [file.removesuffix(".1D") for file in nonempty_files]
