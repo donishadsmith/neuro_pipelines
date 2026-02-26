@@ -406,7 +406,7 @@ def main(
                                 )
 
                             LGR.info(
-                                f"Using the following sphere mask path: {seed_mask_path}"
+                                f"Using the following seed mask path: {seed_mask_path}"
                             )
 
                             beta_coefficient_df[f"glm_individual_seed_beta"] = (

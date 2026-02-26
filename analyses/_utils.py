@@ -38,7 +38,7 @@ def get_first_level_gltsym_codes(task, analysis_type, caller):
         )
 
     if analysis_type == "gPPI":
-        contrasts = modify_contrast_names(task, contrasts)
+        contrasts = modify_contrast_names(contrasts)
 
     return (
         (f"{contrast}#0_Coef" for contrast in contrasts)
@@ -66,11 +66,10 @@ def modify_contrast_names(contrasts):
 
 
 def get_beta_names(gltsyms, add_coef_str=False):
-    beta_names = []
-
     if isinstance(gltsyms, str):
         gltsyms = [gltsyms]
 
+    beta_names = []
     for gltsym in gltsyms:
         names = [] if "_vs_" not in gltsym else gltsym.split("_vs_")
         names += [gltsym]

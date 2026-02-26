@@ -87,6 +87,8 @@ LGR = setup_logger(__name__)
 
 # Using constant durations instead of BIDS one, which have small
 # stimulus presentation delays
+# Instruction has the same duration for all three tasks but in the
+# code for clarity
 CONDITION_DURATIONS = {
     "flanker": 0.5,
     "nback": 32,
@@ -274,7 +276,10 @@ def extract_seed_timeseries(
     else:
         seed_name = f"seed"
 
-    seed_timeseries_file = subject_analysis_dir / f"{seed_name}_desc-timeseries.1D"
+    seed_timeseries_file = (
+        subject_analysis_dir / "seed" / f"{seed_name}_desc-timeseries.1D"
+    )
+    seed_timeseries_file.parent.mkdir(parents=True, exist_ok=True)
 
     seed_img = resample_seed_img(nib.load(seed_mask_path), nib.load(subject_nifti_file))
 
@@ -352,20 +357,20 @@ def denoise_seed_timeseries(
 def get_task_deconvolve_cmd(
     task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
 ):
-    seed_name = seed_timeseries_file.split("_desc")[0]
+    seed_name = str(seed_timeseries_file).split("_desc")[0]
 
     if task == "nback":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 9 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'instruction_nback.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
-            f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
-            f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 5 2-back "
-            f"-stim_file {ppi_dir / 'PPI_instruction_nback.1D'} -stim_label 6 PPI_instruction"
-            f"-stim_file {ppi_dir / 'PPI_0-back.1D'} -stim_label 7 PPI_0-back"
-            f"-stim_file {ppi_dir / 'PPI_1-back.1D'} -stim_label 8 PPI_1-back"
-            f"-stim_file {ppi_dir / 'PPI_2-back.1D'} -stim_label 9 PPI_2-back"
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
+            f"-stim_times 4 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
+            f"-stim_times 5 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 5 2-back "
+            f"-stim_file 6 {ppi_dir / 'PPI_instruction.1D'} -stim_label 6 PPI_instruction "
+            f"-stim_file 7 {ppi_dir / 'PPI_0-back.1D'} -stim_label 7 PPI_0-back "
+            f"-stim_file 8 {ppi_dir / 'PPI_1-back.1D'} -stim_label 8 PPI_1-back "
+            f"-stim_file 9 {ppi_dir / 'PPI_2-back.1D'} -stim_label 9 PPI_2-back "
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_1-back -1*PPI_0-back' -glt_label 1 PPI_1-back_vs_PPI_0-back "
             "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back "
@@ -374,31 +379,31 @@ def get_task_deconvolve_cmd(
     elif task == "mtle":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 5 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'instruction_mtle.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
-            f"-stim_file {ppi_dir / 'PPI_instruction_mtle.1D'} -stim_label 4 PPI_instruction"
-            f"-stim_file {ppi_dir / 'PPI_indoor.1D'} -stim_label 5 PPI_instruction"
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
+            f"-stim_file 4 {ppi_dir / 'PPI_instruction.1D'} -stim_label 4 PPI_instruction "
+            f"-stim_file 5 {ppi_dir / 'PPI_indoor.1D'} -stim_label 5 PPI_instruction "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 5 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'instruction_mtlr.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
-            f"-stim_file {ppi_dir / 'PPI_instruction_mtlr.1D'} -stim_label 4 PPI_instruction"
-            f"-stim_file {ppi_dir / 'PPI_seen.1D'} -stim_label 5 PPI_seen"
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
+            f"-stim_file 4 {ppi_dir / 'PPI_instruction.1D'} -stim_label 4 PPI_instruction "
+            f"-stim_file 5 {ppi_dir / 'PPI_seen.1D'} -stim_label 5 PPI_seen "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "princess":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 5 ",
-            "args": f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 2 switch "
-            f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 3 nonswitch "
-            f"-stim_file {ppi_dir / 'PPI_switch.1D'} -stim_label 4 PPI_switch"
-            f"-stim_file {ppi_dir / 'PPI_nonswitch.1D'} -stim_label 5 PPI_nonswitch"
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 2 switch "
+            f"-stim_times 3 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 3 nonswitch "
+            f"-stim_file 4 {ppi_dir / 'PPI_switch.1D'} -stim_label 4 PPI_switch "
+            f"-stim_file 5 {ppi_dir / 'PPI_nonswitch.1D'} -stim_label 5 PPI_nonswitch "
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_switch -1*PPI_nonswitch' -glt_label 1 PPI_switch_vs_PPI_nonswitch ",
         }
@@ -456,8 +461,8 @@ def create_flanker_deconvolve_cmd(
     keep_trial_regressors += keep_ppi_regressors
 
     # Only keep stims without empty files
-    seed_name = seed_timeseries_file.split("_desc")[0]
-    stims = f"-stim_file {seed_timeseries_file} -stim_label 1 {seed_name} "
+    seed_name = str(seed_timeseries_file).split("_desc")[0]
+    stims = f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
     for label, regressor in enumerate(keep_trial_regressors, start=2):
         bool_list = [
             regressor == stim_string.rstrip().split(" ")[-1]
@@ -472,7 +477,7 @@ def create_flanker_deconvolve_cmd(
             )
         else:
             stims += stim_string.format(
-                time_label=label - 1,
+                time_label=label,
                 label=label,
                 timing_file=timing_dir / f"{regressor}.1D",
             )
@@ -507,9 +512,9 @@ def create_flanker_deconvolve_cmd(
     return deconvolve_cmd
 
 
-def get_instruction_name(task, condition_filenames):
+def get_instruction_name(timing_dir, task, condition_filenames):
     if task in ["nback", "mtle", "mtlr"]:
-        return condition_filenames + [f"instruction_{task}"]
+        return condition_filenames + [timing_dir / f"instruction.1D"]
     else:
         return condition_filenames
 
@@ -531,10 +536,13 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
     else:
         # original TR divided by sub_TR, starts at the first tr (0) and takes every
         # (tr / upsample_dt) point
-        resampled_filename = target_file.parent / target_file.name("_upsampled", "")
+        resampled_filename = (
+            target_file.parent
+            / f"PPI_{target_file.name.replace('_desc-PPI_upsampled.1D', '.1D')}"
+        )
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 1dcat "
-            f"'{target_file}{{0..$({int(tr / upsample_dt)})}}' > {target_file}"
+            f"'{target_file}{{0..$({int(tr / upsample_dt)})}}' > {resampled_filename}"
         )
 
         LGR.info(
@@ -556,7 +564,7 @@ def deconvolve_seed_timeseries(
         )
     )
 
-    # Created impulse response function and performs deconvolution to estimate the neural response given the observec
+    # Create impulse response function (GAM) and perform deconvolution to estimate the neural response given the
     # upsampled seed timeseries and an impulse response function, while also adding a penalty for better/smoother
     # estimation
     cmd = (
@@ -585,7 +593,7 @@ def upsample_condition_regressor(
     duration = (
         CONDITION_DURATIONS[task]
         if not condition_name.startswith("instruction")
-        else CONDITION_DURATIONS[condition_name]
+        else CONDITION_DURATIONS[f"{condition_name}_{task}"]
     )
 
     cmd = (
@@ -630,7 +638,7 @@ def create_convolved_ppi_term(
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "1deval '
         f"-a {deconvolved_seed_timeseries_file}\\' -b {upsampled_condition_regressor_file} "
-        f"expr 'a*b' > {neural_interaction_file} && "
+        f"-expr 'a*b' > {neural_interaction_file} && "
         f"waver -GAM -peak 1 -TR {upsample_dt} "
         f'-input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"'
     )
@@ -757,12 +765,12 @@ def main(
             LGR.info(f"Using the following mask file: {nifti_file}")
 
         subject_analysis_dir = (
-            Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
+            Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
         )
         subject_analysis_dir.mkdir(parents=True, exist_ok=True)
 
         subject_scratch_dir = (
-            Path(scratch_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
+            Path(scratch_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
         )
         subject_scratch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -848,7 +856,8 @@ def main(
             global_regressors,
         )
 
-        timing_dir = create_timing_files(subject_analysis_dir, event_file, task)
+        # Note, only leaving task black because subject_analysis_dir includes the task name
+        timing_dir = create_timing_files(subject_analysis_dir, event_file, task="")
 
         percent_change_nifti_file = percent_signal_change(
             subject_analysis_dir, afni_img_path, nifti_file, mask_file, censor_file
@@ -903,7 +912,9 @@ def main(
             for condition in get_beta_names(first_level_gltsym_codes)
             if "_vs_" not in condition
         ]
-        condition_filenames = get_instruction_name(task, condition_filenames)
+        condition_filenames = get_instruction_name(
+            timing_dir, task, condition_filenames
+        )
         for condition_filename in condition_filenames:
             if is_timing_file_empty(condition_filename):
                 continue

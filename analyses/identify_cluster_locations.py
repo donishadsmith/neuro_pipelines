@@ -140,11 +140,14 @@ def add_region_information_to_data(
     cluster_table_filename,
     scratch_dir,
     afni_img_path,
+    task,
     orient,
     atlas,
     save_excel_version,
 ):
-    coord_filename = scratch_dir / cluster_table_filename.name.replace(".csv", ".1D")
+    coord_filename = (
+        scratch_dir / task / cluster_table_filename.name.replace(".csv", ".1D")
+    )
     coord_filename.parent.mkdir(parents=True, exist_ok=True)
 
     cluster_table = pd.read_csv(cluster_table_filename, sep=None, engine="python")
@@ -214,6 +217,7 @@ def main(
             cluster_table_filename,
             scratch_dir,
             afni_img_path,
+            task,
             orient,
             atlas,
             save_excel_version,
