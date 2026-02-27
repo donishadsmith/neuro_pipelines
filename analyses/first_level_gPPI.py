@@ -934,7 +934,7 @@ def main(
             )
 
         smoothed_nifti_file = perform_spatial_smoothing(
-            subject_analysis_dir,
+            subject_analysis_dir.parent,
             afni_img_path,
             percent_change_nifti_file,
             mask_file,
@@ -945,7 +945,7 @@ def main(
             task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
         design_matrix_file = create_design_matrix(
-            subject_analysis_dir,
+            subject_analysis_dir.parent,
             afni_img_path,
             smoothed_nifti_file,
             mask_file,
@@ -955,7 +955,7 @@ def main(
         )
 
         stats_file_relm = perform_first_level(
-            subject_analysis_dir,
+            subject_analysis_dir.parent,
             afni_img_path,
             design_matrix_file,
             smoothed_nifti_file,
