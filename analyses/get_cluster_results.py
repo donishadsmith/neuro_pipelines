@@ -392,6 +392,7 @@ def create_seed_masks(
     clusters_table = pd.read_csv(cluster_table_filename, sep=",")
     template_mask = nib.load(template_mask_path)
 
+    clusters_table["Cluster ID"] = clusters_table["Cluster ID"].astype(str)
     mask_primary = clusters_table["Cluster ID"].str.isdigit()
 
     truncated_clusters_table = clusters_table.loc[mask_primary, ["X", "Y", "Z"]]
