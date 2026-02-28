@@ -22,18 +22,21 @@ def get_cosine_regressors(confounds_df):
 
 
 def get_motion_regressors(confounds_df, n_motion_parameters):
-    motion_params = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
+    base_motion_params = ("trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z")
+    motion_params = list(base_motion_params)
     if n_motion_parameters in [12, 18, 24]:
-        derivatives = [f"{param}_derivative1" for param in motion_params]
+        derivatives = [f"{param}_derivative1" for param in base_motion_params]
         motion_params += derivatives
 
     if n_motion_parameters in [18, 24]:
-        derivatives = [f"{param}_power2" for param in motion_params]
-        motion_params += derivatives
+        power = [f"{param}_power2" for param in base_motion_params]
+        motion_params += power
 
     if n_motion_parameters == 24:
-        power = [f"{param}_derivative1_power2" for param in motion_params]
-        motion_params += power
+        derivative_power = [
+            f"{param}_derivative1_power2" for param in base_motion_params
+        ]
+        motion_params += derivative_power
 
     LGR.info(f"Using motion parameters: {motion_params}")
 
