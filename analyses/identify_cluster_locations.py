@@ -191,17 +191,18 @@ def main(
 
     LGR.info(f"TASK: {task}")
 
-    first_level_gltlabel = get_first_level_gltsym_codes(
+    first_level_glt_label = get_first_level_gltsym_codes(
         task, analysis_type, caller="identify_cluster_regions"
     )
-    first_level_gltlabel_list = list(
-        itertools.product(first_level_gltlabel, get_second_level_glt_codes())
+    first_level_glt_label_list = list(
+        itertools.product(first_level_glt_label, get_second_level_glt_codes())
     )
-    for first_level_gltlabel, second_level_glt_code in first_level_gltlabel_list:
-        entity_key = get_contrast_entity_key(first_level_gltlabel)
+    for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
+        entity_key = get_contrast_entity_key(first_level_glt_label)
         cluster_table_filename = list(
             analysis_dir.rglob(
-                f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
+                f"task-{task}_{entity_key}-{first_level_glt_label}"
+                f"_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
             )
         )
 
@@ -209,7 +210,8 @@ def main(
             continue
 
         LGR.info(
-            f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
+            f"FIRST LEVEL GLTLABEL: {first_level_glt_label} "
+            f"SECOND LEVEL GLTCODE: {second_level_glt_code}"
         )
 
         cluster_table_filename = cluster_table_filename[0]

@@ -121,12 +121,6 @@ def _get_cmd_args():
         help="The destination (output) directory.",
     )
     parser.add_argument(
-        "--scratch_dir",
-        dest="scratch_dir",
-        required=True,
-        help="Path to the scratch directory.",
-    )
-    parser.add_argument(
         "--deriv_dir",
         dest="deriv_dir",
         required=False,
@@ -261,7 +255,6 @@ def _get_cmd_args():
 
 def extract_seed_timeseries(
     subject_analysis_dir,
-    subject_scratch_dir,
     subject_nifti_file,
     seed_mask_path,
     afni_img_path,
@@ -283,18 +276,20 @@ def extract_seed_timeseries(
 
     seed_img = resample_seed_img(nib.load(seed_mask_path), nib.load(subject_nifti_file))
 
-    resampled_seed_file = subject_scratch_dir / f"resampled_{seed_mask_path.name}"
+    resampled_seed_file = subject_analysis_dir / f"resampled_{seed_mask_path.name}"
     nib.save(seed_img, resampled_seed_file)
 
     # Note: output is a column vector
     cmd = (
-        f"apptainer exec -B /projects:/projects -B /scratch:/scratch {afni_img_path} 3dmaskave "
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dmaskave "
         f"-mask {resampled_seed_file} "
         f"-q {subject_nifti_file} > {seed_timeseries_file}"
     )
 
     LGR.info(f"Extracting seed: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
+
+    resampled_seed_file.unlink()
 
     return seed_timeseries_file
 
@@ -651,7 +646,6 @@ def create_convolved_ppi_term(
 
 def main(
     bids_dir,
-    scratch_dir,
     afni_img_path,
     dst_dir,
     deriv_dir,
@@ -769,11 +763,6 @@ def main(
         )
         subject_analysis_dir.mkdir(parents=True, exist_ok=True)
 
-        subject_scratch_dir = (
-            Path(scratch_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
-        )
-        subject_scratch_dir.mkdir(parents=True, exist_ok=True)
-
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
         if n_dummy_scans == "auto":
@@ -874,7 +863,6 @@ def main(
 
         seed_timeseries_file = extract_seed_timeseries(
             subject_analysis_dir,
-            subject_scratch_dir,
             percent_change_nifti_file,
             seed_mask_path,
             afni_img_path,
@@ -955,7 +943,7 @@ def main(
         )
 
         stats_file_relm = perform_first_level(
-            subject_analysis_dir.parent,
+            subject_analysis_dir,
             afni_img_path,
             design_matrix_file,
             smoothed_nifti_file,

@@ -1,4 +1,4 @@
-import argparse, math, shutil, subprocess, sys
+import argparse, shutil, subprocess, sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -9,9 +9,14 @@ from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
 from nifti2bids.qc import get_n_censored_volumes
 
+from _denoising import remove_collinear_columns
 from _utils import (
+    drop_dose_rows,
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
+    get_second_level_glt_codes,
+    get_nontarget_dose,
+    get_interpretation_labels,
     estimate_noise_smoothness,
     perform_cluster_simulation,
     threshold_palm_output,
@@ -19,9 +24,16 @@ from _utils import (
 
 LGR = setup_logger(__name__)
 
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_columns", None)
+pd.set_option("display.width", None)
+pd.set_option("display.max_colwidth", None)
+
 EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
-CATEGORICAL_VARS = set(["race", "ethnicity", "sex"])
+CATEGORICAL_VARS = set(["sex", "race", "ethnicity"])
 SUBJECT_CONSTANT_VARS = ["age"] + list(CATEGORICAL_VARS)
+# From most to least
+DEPRIORITIZED_REGRESSORS = ["ethnicity", "race", "sex", "age", "n_censored_volumes"]
 
 GLT_CODES = (
     "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
@@ -73,8 +85,8 @@ def _get_cmd_args():
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
-        "--first_level_gltlabel",
-        dest="first_level_gltlabel",
+        "--first_level_glt_label",
+        dest="first_level_glt_label",
         required=False,
         default=None,
         help=(
@@ -139,9 +151,10 @@ def _get_cmd_args():
         required=False,
         help=(
             "If method is nonparametric, the number of permutations to pass to Palm. "
-            "For 'auto' the permutation is computed by doing 1dose!^n * 2dose!^n * .... "
+            "For 'auto' the permutation is computed by doing 2^N since each contrast be "
+            "either positive or negative in the two sample paired case or the single sample test. "
             "If the max permutation exceeds 10,000, then the permutation is set to 10,000. "
-            "Lowest p-value -log10(1/1e4)."
+            "Lowest p-value -log10(1/1e4) in that case."
         ),
     )
     parser.add_argument(
@@ -173,13 +186,6 @@ def _get_cmd_args():
             "The connectivity to use for the nonparametric approach. "
             "See https://www.fmrib.ox.ac.uk/datasets/techrep/tr08ss1/tr08ss1.pdf"
         ),
-    )
-    parser.add_argument(
-        "--use_sign_flipping",
-        dest="use_sign_flipping",
-        default=False,
-        required=False,
-        help="If nonparametric, uses sign flipping for PALM",
     )
     parser.add_argument(
         "--cluster_correction_p",
@@ -215,9 +221,9 @@ def _get_cmd_args():
     return parser
 
 
-def get_beta_files(analysis_dir, task, first_level_gltlabel):
+def get_beta_files(analysis_dir, task, first_level_glt_label):
     return sorted(
-        list(Path(analysis_dir).rglob(f"*{task}*{first_level_gltlabel}*betas*.nii.gz"))
+        list(Path(analysis_dir).rglob(f"*{task}*{first_level_glt_label}*betas*.nii.gz"))
     )
 
 
@@ -240,6 +246,16 @@ def exclude_beta_files(beta_files, exclude_niftis_file):
 
 def get_subjects(beta_files):
     return sorted([get_entity_value(file.name, "sub") for file in beta_files])
+
+
+def drop_constant_columns(data_table):
+    constant_columns = [
+        col for col in data_table.columns if data_table[col].nunique() == 1
+    ]
+
+    LGR.info(f"Dropping the following constant columns: {constant_columns}")
+
+    return data_table.drop(columns=constant_columns)
 
 
 def create_data_table(bids_dir, subject_list, beta_files):
@@ -296,19 +312,16 @@ def create_data_table(bids_dir, subject_list, beta_files):
     )
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
-    data_table["dose"] = data_table["dose"].astype(int)
+    data_table["dose"] = data_table["dose"].astype(int).astype(str)
+    # Make life easier conceptually by organizing data by dose: smallest -> largest
+    data_table = data_table.sort_values(by="dose", ascending=True)
 
     exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
     continuous_vars = set(data_table.columns).difference(exclude)
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
-    nonconstant_columns = [
-        col for col in data_table.columns if data_table[col].nunique() > 1
-    ]
-    data_table = data_table[nonconstant_columns]
-
-    return data_table
+    return drop_constant_columns(data_table)
 
 
 @lru_cache()
@@ -316,11 +329,38 @@ def get_layout(bids_dir, deriv_dir):
     return bids.BIDSLayout(bids_dir, derivatives=deriv_dir or None)
 
 
-def create_group_mask(layout, task, space, mask_threshold, beta_files):
+def create_group_mask(
+    dst_dir,
+    layout,
+    task,
+    space,
+    mask_threshold,
+    filtered_beta_files,
+    method,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code=None,
+):
+    if second_level_glt_code:
+        group_mask_filename = (
+            dst_dir
+            / "group_masks"
+            / method
+            / f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-group_mask.nii.gz"
+        )
+    else:
+        group_mask_filename = (
+            dst_dir
+            / "group_masks"
+            / method
+            / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-group_mask.nii.gz"
+        )
+    group_mask_filename.parent.mkdir(parents=True, exist_ok=True)
+
     subject_mask_files = []
-    for beta_file in beta_files:
-        sub_id = get_entity_value(beta_file, "sub")
-        ses_id = get_entity_value(beta_file, "ses")
+    for filtered_beta_file in filtered_beta_files:
+        sub_id = get_entity_value(filtered_beta_file, "sub")
+        ses_id = get_entity_value(filtered_beta_file, "ses")
 
         mask_files = layout.get(
             scope="derivatives",
@@ -335,7 +375,11 @@ def create_group_mask(layout, task, space, mask_threshold, beta_files):
         mask_files = [mask_file for mask_file in mask_files if space in str(mask_file)]
         subject_mask_files.extend(mask_files)
 
-    return intersect_masks(subject_mask_files, threshold=mask_threshold)
+    group_mask = intersect_masks(subject_mask_files, threshold=mask_threshold)
+
+    nib.save(group_mask, group_mask_filename)
+
+    return group_mask_filename
 
 
 def get_glt_codes_str(data_table):
@@ -384,307 +428,429 @@ def get_centering_str(data_table):
     return centering_str
 
 
-def convert_table_to_matrices(
-    data_table, dst_dir, task, entity_key, first_level_gltlabel
+def generate_matrices_filenames(
+    output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
 ):
-    """
-    Takes the data table and creates matrices for PALM.
-
-    For one-tailed tests, we create separate contrast matrices for positive
-    and negative directions.
-
-    Returns:
-    - design_matrix_file: Design matrix CSV
-    - eb_file: Exchangeability blocks file
-    - beta_files_dict: Dict with "positive" and "negative" contrast matrix files
-    - glt_codes_dict: Dict with "positive" and "negative" glt code lists
-    """
-    output_dir = dst_dir / "second_level_outputs" / "nonparametric"
+    matrices_filenames_dict = {}
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    design_matrix_file = (
-        output_dir
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-design_matrix.csv"
-    )
-    eb_file = (
-        output_dir
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-exchangeability_blocks.csv"
-    )
-    contrast_matrix_file_pos = (
-        output_dir
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-contrast_matrix_pos.csv"
-    )
-    contrast_matrix_file_neg = (
-        output_dir
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-contrast_matrix_neg.csv"
+    prefix = (
+        f"task-{task}_{entity_key}-{first_level_glt_label}"
+        f"_gltcode-{second_level_glt_code}"
     )
 
-    header_file = (
-        output_dir
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-header_names.txt"
+    if "_vs_" in second_level_glt_code:
+        matrices_filenames_dict["eb_file"] = (
+            output_dir / f"{prefix}_desc-exchangeability_blocks.csv"
+        )
+    else:
+        matrices_filenames_dict["eb_file"] = None
+
+    matrices_filenames_dict["design_matrix_file"] = (
+        output_dir / f"{prefix}_desc-design_matrix.csv"
+    )
+    matrices_filenames_dict["header_file"] = (
+        output_dir / f"{prefix}_desc-header_names.txt"
+    )
+    matrices_filenames_dict["contrast_matrix_file"] = (
+        output_dir / f"{prefix}_desc-contrast_matrix.csv"
     )
 
-    eb_data = data_table["participant_id"].factorize()[0] + 1
-    LGR.info(f"Saving eb file to: {eb_file}")
-    np.savetxt(eb_file, eb_data, delimiter=",", fmt="%d")
+    return matrices_filenames_dict
 
-    available_doses = list(map(int, sorted(data_table["dose"].unique())))
-    LGR.info(f"Available doses: {available_doses}")
 
-    dose_dummies = pd.get_dummies(data_table["dose"], prefix="dose").astype(int)
-    design_components = [dose_dummies]
+def prioritize_regressors(design_matrix):
+    if design_matrix.shape[0] <= design_matrix.shape[1]:
+        for regressor in DEPRIORITIZED_REGRESSORS:
+            if drop_columns := [
+                col for col in design_matrix.columns if col.startswith(regressor)
+            ]:
+                LGR.info(
+                    f"Dropping the following regressor(s) to save dof: {drop_columns}"
+                )
+                design_matrix = design_matrix.drop(columns=drop_columns)
 
-    # Including subject regressors in fixed effects model so drop columns that are constant within subjects
-    for col in SUBJECT_CONSTANT_VARS:
-        if col in data_table.columns:
-            data_table = data_table.drop(col, axis=1)
+            LGR.info(
+                f"N OBSERVATIONS: {design_matrix.shape[0]}; N COLUMNS: {design_matrix.shape[0]}"
+            )
+            if design_matrix.shape[0] >= design_matrix.shape[1]:
+                break
 
-    categorical_cols = []
+    return design_matrix
+
+
+def create_design_matrix(
+    glt_data_table,
+    include_intercept,
+    average_within_subjects=False,
+    second_level_glt_code=None,
+):
+    design_matrix = pd.DataFrame()
+    categorical_cols = [
+        col for col in glt_data_table.columns if col in CATEGORICAL_VARS
+    ]
 
     continuous_cols = [
         col
-        for col in data_table.columns
+        for col in glt_data_table.columns
         if col not in EXCLUDE_COLS and col not in categorical_cols
     ]
 
-    if continuous_cols:
-        covariates = data_table[continuous_cols]
-        for col in continuous_cols:
-            covariates[col] = covariates[col] - covariates[col].mean()
+    for col in categorical_cols:
+        glt_data_table[col] = glt_data_table[col].astype(str)
 
-        design_components.append(covariates)
+    # Assumed to be the mean glt code
+    if average_within_subjects:
+        numeric_table = (
+            glt_data_table.groupby("participant_id")
+            .mean(numeric_only=True)
+            .reset_index(drop=True)
+        )
+        if "participant_id" in numeric_table.columns:
+            numeric_table = numeric_table.drop(columns=["participant_id"])
 
-    if categorical_cols:
-        for col in categorical_cols:
-            # Dropping first of other categorical columns to avoid
-            # linear dependency
-            dummies = pd.get_dummies(
-                data_table[col], prefix=col, drop_first=True
-            ).astype(int)
-            design_components.append(dummies)
+        categorical_table = (
+            glt_data_table.groupby("participant_id")[categorical_cols]
+            .first()
+            .reset_index(drop=True)
+        )
+        if "participant_id" in categorical_table.columns:
+            categorical_table = categorical_table.drop(columns=["participant_id"])
 
-    # Create intercept for each subject except the first one to account for
-    # within subject variance for repeat design
-    subject_regressors = pd.get_dummies(
-        data_table["participant_id"], prefix="", prefix_sep="", drop_first=True
-    ).astype(int)
-    design_components.append(subject_regressors)
+        glt_data_table = pd.concat([numeric_table, categorical_table], axis=1)
 
-    design_matrix = pd.concat(design_components, axis=1)
+    design_components = {}
+    mean_center = lambda arr: arr - arr.mean()
+    for col in continuous_cols:
+        design_components.update({col: mean_center(glt_data_table[col].to_numpy())})
 
+    # All categorical variables are constant across sessions and have been dropped
+    # previously for dose pairisons to avoid rank deficiency
+    # Categorical cols need to be mean centered so that no group can be coded as 0
+    # If one categorical variable is binary (0 and 1), then
+    # for 0 E[Y] = B0 + B1E[Xc] = E[Y] = B0 + B1(0), which forces the intercept to be
+    # the reference group
+    for col in categorical_cols:
+        dummies = pd.get_dummies(
+            glt_data_table[col], prefix=col, drop_first=True
+        ).astype(int)
+        design_components.update(
+            {col: mean_center(dummies[col].to_numpy()) for col in dummies.columns}
+        )
+
+    design_matrix = pd.concat([design_matrix, pd.DataFrame(design_components)], axis=1)
+
+    if include_intercept:
+        intercept = [1] * design_matrix.shape[0]
+        design_matrix.insert(0, "intercept", intercept)
+    else:
+        first_label, _ = get_interpretation_labels(second_level_glt_code)
+        dose_codes = np.where(glt_data_table["dose"].astype(str) == first_label, 1, -1)
+        design_matrix.insert(0, "dose", dose_codes)
+        subject_regressors = pd.get_dummies(
+            glt_data_table["participant_id"], prefix="", prefix_sep=""
+        ).astype(int)
+        design_matrix = pd.concat(
+            [
+                design_matrix.reset_index(drop=True),
+                subject_regressors.reset_index(drop=True),
+            ],
+            axis=1,
+        )
+
+    regressor_positions = {
+        index: col for index, col in enumerate(design_matrix.columns)
+    }
+    design_arr, regressor_positions = remove_collinear_columns(
+        design_matrix.to_numpy(), regressor_positions
+    )
+    filtered_design_matrix = pd.DataFrame(
+        design_arr, columns=list(regressor_positions.values())
+    )
+
+    return prioritize_regressors(filtered_design_matrix)
+
+
+def create_contrast_matrix(design_matrix, contrast_matrix_filename):
+    vector_pos = np.zeros(design_matrix.shape[1])
+    vector_pos[0] = 1
+    # Zeroes will show up as negative, that is fine -0 == 0 returns True
+    vector_neg = vector_pos * -1
+
+    np.savetxt(
+        contrast_matrix_filename,
+        np.array([vector_pos, vector_neg]),
+        delimiter=",",
+        fmt="%.4f",
+    )
+
+
+def create_header_file(design_matrix, header_file):
     with open(header_file, "w") as f:
         f.write(f"{','.join(design_matrix.columns.tolist())}")
 
-    LGR.info(f"Design matrix columns: {design_matrix.columns.tolist()}")
-    LGR.info(f"Saving design matrix file to: {design_matrix_file}")
 
-    design_matrix.to_csv(design_matrix_file, sep=",", header=False, index=False)
+def write_contrast_direction_file(
+    output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
+):
+    prefix = f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+    contrast_direction_file = output_dir / f"{prefix}_desc-contrast_direction.txt"
 
-    # Build contrasts for both directions
-    contrasts_pos = []
-    contrasts_neg = []
-    glt_codes_pos = []
-    glt_codes_neg = []
+    if "_vs_" in second_level_glt_code:
+        first_label, second_label = get_interpretation_labels(second_level_glt_code)
+        positive_label = f"{first_label} > {second_label}"
+        negative_label = f"{second_label} > {first_label}"
+    else:
+        positive_label = "above mean of 0"
+        negative_label = "below mean of 0"
 
-    dose_to_col = {dose: index for index, dose in enumerate(available_doses)}
+    with open(contrast_direction_file, "w") as f:
+        f.write("# Positive direction contrast:\n")
+        f.write(f"c1: {positive_label}\n")
+        f.write("\n# Negative direction contrast:\n")
+        f.write(f"c2: {negative_label}\n")
 
-    # Not the pretiest code but done to be as clear as posible on what is happening
 
-    # Across doses
-    for index, dose_high in enumerate(available_doses):
-        for dose_low in available_doses[:index]:
-            # Positive direction: dose_high > dose_low (e.g., 5_vs_0)
-            vector_pos = np.zeros(design_matrix.shape[1])
-            vector_pos[dose_to_col[dose_high]] = 1
-            vector_pos[dose_to_col[dose_low]] = -1
-            contrasts_pos.append(vector_pos)
-            glt_codes_pos.append(f"{dose_high}_vs_{dose_low}")
+def create_mean_matrices(
+    glt_data_table,
+    output_dir,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+):
+    """
+    Takes the data table and creates matrices for PALM specifically for means
+    (e.g., 5, mean, etc).
 
-            # Negative direction: dose_low > dose_high (e.g., 0_vs_5)
-            vector_neg = np.zeros(design_matrix.shape[1])
-            vector_neg[dose_to_col[dose_low]] = 1
-            vector_neg[dose_to_col[dose_high]] = -1
-            contrasts_neg.append(vector_neg)
-            glt_codes_neg.append(f"{dose_low}_vs_{dose_high}")
+    # PALM GUIDE: https://web.mit.edu/fsl_v5.0.10/fsl/doc/wiki/PALM(2f)UserGuide.html
 
-    # Within dose (> 0 and < 0) (i.e within placebo only, within 5 mph)
-    for dose in available_doses:
-        # Positive direction: dose > 0
-        vector_pos = np.zeros(design_matrix.shape[1])
-        vector_pos[dose_to_col[dose]] = 1
-        contrasts_pos.append(vector_pos)
-        glt_codes_pos.append(str(dose))
-
-        # Negative direction: dose < 0
-        vector_neg = np.zeros(design_matrix.shape[1])
-        vector_neg[dose_to_col[dose]] = -1
-        contrasts_neg.append(vector_neg)
-        glt_codes_neg.append(str(dose))
-
-    # Add contrast for mean > 0 and < 0 (all doses)
-    dose_cols_indices = list(dose_to_col.values())
-    vector_pos = np.zeros(design_matrix.shape[1])
-    vector_pos[dose_cols_indices] = round(1 / len(available_doses), 4)
-    contrasts_pos.append(vector_pos)
-    glt_codes_pos.append(f"mean")
-
-    # Zeroes will show up as negative, that is fine -0 == 0 returns True
-    vector_neg = vector_pos * -1
-    contrasts_neg.append(vector_neg)
-    glt_codes_neg.append(f"mean")
-
-    contrast_matrix_pos = np.array(contrasts_pos)
-    contrast_matrix_neg = np.array(contrasts_neg)
-
-    LGR.info(f"Positive contrast names: {glt_codes_pos}")
-    LGR.info(f"Saving positive contrast matrix file to: {contrast_matrix_file_pos}")
-    np.savetxt(contrast_matrix_file_pos, contrast_matrix_pos, delimiter=",", fmt="%.4f")
-
-    LGR.info(f"Negative contrast names: {glt_codes_neg}")
-    LGR.info(f"Saving negative contrast matrix file to: {contrast_matrix_file_neg}")
-    np.savetxt(contrast_matrix_file_neg, contrast_matrix_neg, delimiter=",", fmt="%.4f")
-
-    # Save glt codes for reference
-    glt_codes_file = (
-        output_dir
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-glt_codes.txt"
+    According to the PALM guide, FSL design matrices need to be used.
+    This is the guide for FSL design matrices:
+    https://fsl.fmrib.ox.ac.uk/fsl/docs/statistics/glm.html?h=design
+    """
+    matrices_filenames_dict = generate_matrices_filenames(
+        output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
-    with open(glt_codes_file, "w") as f:
-        f.write("# Positive direction contrasts:\n")
-        for i, name in enumerate(glt_codes_pos, 1):
-            f.write(f"c{i}_pos: {name.replace('_vs_', ' > ')}\n")
 
-        f.write("\n# Negative direction contrasts:\n")
-        for i, name in enumerate(glt_codes_neg, 1):
-            f.write(f"c{i}_neg: {name.replace('_vs_', ' > ')}\n")
-
-    beta_files_dict = {
-        "positive": contrast_matrix_file_pos,
-        "negative": contrast_matrix_file_neg,
-    }
-    glt_codes_dict = {
-        "positive": glt_codes_pos,
-        "negative": glt_codes_neg,
-    }
-
-    return design_matrix_file, eb_file, beta_files_dict, glt_codes_dict
-
-
-def compute_n_permutation(data_table, use_sign_flipping):
-    # TODO: Possibly put in utils and add (n1 + n2)!/(n1! * n2!) or 2^N option
-    factor = 2 if use_sign_flipping else 1
-    n_available_doses_counts = (
-        data_table["participant_id"].value_counts().value_counts()
+    design_matrix = create_design_matrix(
+        glt_data_table,
+        include_intercept=True,
+        average_within_subjects=(second_level_glt_code == "mean"),
     )
-    counts_list = list(
-        zip(n_available_doses_counts.index, n_available_doses_counts.values)
+    design_matrix.to_csv(
+        matrices_filenames_dict["design_matrix_file"],
+        sep=",",
+        header=False,
+        index=False,
     )
-    products = [
-        math.factorial(int(k)) ** (int(n_subjects)) * factor ** (int(n_subjects))
-        for k, n_subjects in counts_list
-    ]
-    product = math.prod(products)
-    LGR.info(f"Maximum permutations possible: {product}")
+    create_header_file(design_matrix, matrices_filenames_dict["header_file"])
 
-    n_permutations = min(product, 10000)
+    create_contrast_matrix(
+        design_matrix, matrices_filenames_dict["contrast_matrix_file"]
+    )
+    write_contrast_direction_file(
+        output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
+    )
+
+    return matrices_filenames_dict
+
+
+def create_comparison_matrices(
+    glt_data_table,
+    output_dir,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+):
+    """
+    Takes the data table and creates matrices for PALM specifically for comparisons
+    (e.g., 5_vs_0).
+
+    # PALM GUIDE: https://web.mit.edu/fsl_v5.0.10/fsl/doc/wiki/PALM(2f)UserGuide.html
+
+    According to the PALM guide, FSL design matrices need to be used.
+    This is the guide for FSL design matrices:
+    https://fsl.fmrib.ox.ac.uk/fsl/docs/statistics/glm.html?h=design
+    """
+    matrices_filenames_dict = generate_matrices_filenames(
+        output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
+    )
+
+    for col in SUBJECT_CONSTANT_VARS:
+        if col in glt_data_table.columns:
+            glt_data_table = glt_data_table.drop(col, axis=1)
+
+    eb_data = glt_data_table["participant_id"].factorize()[0] + 1
+    np.savetxt(matrices_filenames_dict["eb_file"], eb_data, delimiter=",", fmt="%d")
+
+    design_matrix = create_design_matrix(
+        glt_data_table,
+        include_intercept=False,
+        second_level_glt_code=second_level_glt_code,
+    )
+    design_matrix.to_csv(
+        matrices_filenames_dict["design_matrix_file"],
+        sep=",",
+        header=False,
+        index=False,
+    )
+    create_header_file(design_matrix, matrices_filenames_dict["header_file"])
+
+    create_contrast_matrix(
+        design_matrix, matrices_filenames_dict["contrast_matrix_file"]
+    )
+    write_contrast_direction_file(
+        output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
+    )
+
+    return matrices_filenames_dict
+
+
+def compute_n_permutation(glt_data_table):
+    n_subjects = len(glt_data_table["participant_id"].unique())
+    max_permutation = 2**n_subjects
+    LGR.info(f"Maximum permutations possible: {max_permutation}")
+
+    n_permutations = min(max_permutation, 10000)
     LGR.info(f"Setting number of permutations to: {n_permutations}")
 
     return n_permutations
 
 
+def create_concatenated_image(
+    output_dir,
+    glt_data_table,
+    fsl_img_path,
+    use_native_fsl,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+):
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    prefix = f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+    concatenated_filename = output_dir / f"{prefix}_desc-group_concatenated.nii.gz"
+    if concatenated_filename.exists():
+        concatenated_filename.unlink()
+
+    fsl_merge_call = (
+        "fslmerge"
+        if use_native_fsl
+        else f"apptainer exec -B /projects:/projects {fsl_img_path} fslmerge"
+    )
+
+    fsl_maths_call = (
+        "fslmaths"
+        if use_native_fsl
+        else f"apptainer exec -B /projects:/projects {fsl_img_path} fslmaths"
+    )
+
+    if second_level_glt_code == "mean":
+        LGR.info("Averaging doses within subjects for the mean contrast.")
+
+        subject_mean_images = []
+        for subject, group in glt_data_table.groupby("participant_id"):
+            subject_files = group["InputFile"].tolist()
+            subject_temp_merged = (
+                concatenated_filename.parent / f"temp_{subject}_merged.nii.gz"
+            )
+            subject_mean_img = (
+                concatenated_filename.parent / f"temp_{subject}_mean.nii.gz"
+            )
+
+            subprocess.run(
+                f"{fsl_merge_call} -t {subject_temp_merged} {' '.join(subject_files)}",
+                shell=True,
+                check=True,
+            )
+            subprocess.run(
+                f"{fsl_maths_call} {subject_temp_merged} -Tmean {subject_mean_img}",
+                shell=True,
+                check=True,
+            )
+
+            subject_mean_images.append(str(subject_mean_img))
+            subject_temp_merged.unlink()
+
+        cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(subject_mean_images)}"
+        subprocess.run(cmd, shell=True, check=True)
+
+        for img in subject_mean_images:
+            Path(img).unlink()
+
+    else:
+        files_to_merge = glt_data_table["InputFile"].tolist()
+        cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(files_to_merge)}"
+        LGR.info(f"Concatenating paired images: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+
+    return concatenated_filename
+
+
 def perform_palm(
-    dst_dir,
-    beta_files,
+    concatenated_filename,
     group_mask_filename,
     design_matrix_file,
     eb_file,
-    contrast_matrix_files_dict,
+    contrast_matrix_file,
     fsl_img_path,
     task,
     entity_key,
-    first_level_gltlabel,
+    first_level_glt_label,
+    second_level_glt_code,
     n_permutations,
     tfce_H,
     tfce_E,
     tfce_C,
     use_native_palm,
-    use_native_fsl,
-    use_sign_flipping,
 ):
-    concatenated_filename = (
-        dst_dir
-        / "second_level_outputs"
-        / "nonparametric"
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_concatenated.nii.gz"
+    output_prefix = (
+        concatenated_filename.parent
+        / f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-nonparametric"
     )
 
-    if concatenated_filename.exists():
-        concatenated_filename.unlink()
+    palm_flags = (
+        "-noniiclass "
+        f"-i {concatenated_filename} "
+        f"-m {group_mask_filename} "
+        f"-d {design_matrix_file} "
+        f"-t {contrast_matrix_file} "
+        f"-n {n_permutations} "
+        "-T "
+        f"-tfce_H {tfce_H} "
+        f"-tfce_E {tfce_E} "
+        f"-tfce_C {tfce_C} "
+        "-logp "
+        "-savedof "
+        f"-o {output_prefix}"
+    )
 
-    fsl_call = (
-        "fslmerge"
-        if use_native_fsl
-        else f"apptainer exec -B /projects:/projects {fsl_img_path} fslmerge"
+    palm_flags += (
+        f" -eb {eb_file} -ee -within" if "_vs_" in second_level_glt_code else " -ise"
     )
-    cmd = (
-        f"{fsl_call} "
-        f"-t {concatenated_filename} "
-        f"{' '.join([str(f) for f in beta_files])}"
-    )
-    LGR.info(f"Concatenating images: {cmd}")
+
+    if use_native_palm:
+        palm_dir = Path(shutil.which("palm")).parent
+        cmd = f"matlab -nodisplay -nosplash -r \"addpath('{palm_dir}'); palm {palm_flags}; exit;\""
+    else:
+        cmd = (
+            f"apptainer exec -B /projects:/projects {fsl_img_path} "
+            f"octave --eval 'palm {palm_flags}'"
+        )
+
+    LGR.info(f"Running PALM for {second_level_glt_code}: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
-    output_prefixes = {}
-    for direction in ["positive", "negative"]:
-        output_prefix = (
-            concatenated_filename.parent
-            / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-nonparametric_{direction}"
-        )
-        contrast_matrix_file = contrast_matrix_files_dict[direction]
-
-        palm_flags = (
-            "-noniiclass "
-            f"-i {concatenated_filename} "
-            f"-m {group_mask_filename} "
-            f"-d {design_matrix_file} "
-            f"-t {contrast_matrix_file} "
-            f"-eb {eb_file} "
-            "-ee "
-            "-within "
-            f"-n {n_permutations} "
-            "-T "
-            f"-tfce_H {tfce_H} "
-            f"-tfce_E {tfce_E} "
-            f"-tfce_C {tfce_C} "
-            "-logp "
-            "-savedof "
-            f"-o {output_prefix}"
-        )
-
-        if use_sign_flipping:
-            palm_flags += " -ise"
-
-        if use_native_palm:
-            palm_dir = Path(shutil.which("palm")).parent
-            cmd = f"matlab -nodisplay -nosplash -r \"addpath('{palm_dir}'); palm {palm_flags}; exit;\""
-        else:
-            cmd = (
-                f"apptainer exec -B /projects:/projects {fsl_img_path} "
-                f"octave --eval 'palm {palm_flags}'"
-            )
-
-        LGR.info(f"Running PALM ({direction} direction): {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
-
-        output_prefixes[direction] = output_prefix
-
-    return output_prefixes
+    return str(output_prefix)
 
 
 def perform_3dlmer(
     task,
     entity_key,
-    first_level_gltlabel,
+    first_level_glt_label,
     dst_dir,
     data_table_filename,
     group_mask_filename,
@@ -698,16 +864,14 @@ def perform_3dlmer(
         dst_dir
         / "second_level_outputs"
         / "parametric"
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_stats.nii.gz"
+        / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
     )
     output_filename.parent.mkdir(parents=True, exist_ok=True)
     if output_filename.exists():
-        LGR.info("Replacing stats file")
         output_filename.unlink()
 
     residual_filename = Path(str(output_filename).replace("_stats", "_residuals"))
     if residual_filename.exists():
-        LGR.info("Replacing residual file")
         residual_filename.unlink()
 
     cmd = (
@@ -735,7 +899,7 @@ def main(
     analysis_dir,
     dst_dir,
     task,
-    first_level_gltlabel,
+    first_level_glt_label,
     analysis_type,
     space,
     mask_threshold,
@@ -746,7 +910,6 @@ def main(
     tfce_H,
     tfce_E,
     tfce_C,
-    use_sign_flipping,
     cluster_correction_p,
     n_cores,
     exclude_niftis_file,
@@ -758,23 +921,23 @@ def main(
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    if first_level_gltlabel:
-        first_level_gltlabels = [first_level_gltlabel]
+    if first_level_glt_label:
+        first_level_glt_labels = [first_level_glt_label]
     else:
-        first_level_gltlabels = get_first_level_gltsym_codes(
+        first_level_glt_labels = get_first_level_gltsym_codes(
             task, analysis_type, caller="second_level"
         )
 
-    for first_level_gltlabel in first_level_gltlabels:
-        entity_key = get_contrast_entity_key(first_level_gltlabel)
-        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}")
+    for first_level_glt_label in first_level_glt_labels:
+        entity_key = get_contrast_entity_key(first_level_glt_label)
+        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_glt_label}")
         beta_files = exclude_beta_files(
-            get_beta_files(analysis_dir, task, first_level_gltlabel),
+            get_beta_files(analysis_dir, task, first_level_glt_label),
             exclude_niftis_file,
         )
 
         if not beta_files:
-            LGR.warning(f"No beta files found for {first_level_gltlabel}")
+            LGR.warning(f"No beta files found for {first_level_glt_label}")
             continue
 
         subject_list = get_subjects(beta_files)
@@ -782,45 +945,33 @@ def main(
             f"Found {len(beta_files)} files from {len(set(subject_list))} subjects"
         )
 
-        LGR.info("Creating data table.")
         data_table = create_data_table(bids_dir, subject_list, beta_files)
-
         data_table_filename = (
             dst_dir
-            / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-data_table.txt"
+            / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-data_table.txt"
         )
-
-        # Get the beta files only in the table, these are the participants used
-        filtered_beta_files = data_table["InputFile"].to_numpy(copy=True).tolist()
-
-        LGR.critical(
-            f"Using {len(filtered_beta_files)} files from {len(data_table['participant_id'].unique())} subjects for analysis"
-        )
-
-        LGR.info(f"Creating group mask with threshold: {mask_threshold}")
-        group_mask = create_group_mask(
-            get_layout(bids_dir, deriv_dir),
-            task,
-            space,
-            mask_threshold,
-            filtered_beta_files,
-        )
-        group_mask_filename = (
-            dst_dir
-            / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_mask.nii.gz"
-        )
-        LGR.info(f"Saving group mask to: {group_mask_filename}")
-        nib.save(group_mask, group_mask_filename)
+        data_table.to_csv(data_table_filename, sep="\t", index=False, encoding="utf-8")
 
         if method == "parametric":
             if not afni_img_path:
-                LGR.critical("afni_img_path is required when method is parametric.")
+                LGR.critical("`afni_img_path` is required when method is parametric.")
                 sys.exit(1)
 
-            data_table["dose"] = data_table["dose"].astype(str)
-            LGR.info(f"Saving data table to: {data_table_filename}")
-            data_table.to_csv(
-                data_table_filename, sep="\t", index=False, encoding="utf-8"
+            LGR.critical(
+                f"Using {len(data_table['InputFile'].tolist())} files "
+                f"from {len(data_table['participant_id'].unique())} subjects for analysis "
+            )
+            LGR.info(f"Creating group mask with threshold: {mask_threshold}")
+            group_mask_filename = create_group_mask(
+                dst_dir,
+                get_layout(bids_dir, deriv_dir),
+                task,
+                space,
+                mask_threshold,
+                data_table["InputFile"].tolist(),
+                method,
+                entity_key,
+                first_level_glt_label,
             )
 
             glt_str = get_glt_codes_str(data_table)
@@ -830,7 +981,7 @@ def main(
             residual_filename = perform_3dlmer(
                 task,
                 entity_key,
-                first_level_gltlabel,
+                first_level_glt_label,
                 dst_dir,
                 data_table_filename,
                 group_mask_filename,
@@ -840,20 +991,18 @@ def main(
                 glt_str,
                 n_cores,
             )
-
             acf_parameters_filename = estimate_noise_smoothness(
                 dst_dir,
                 afni_img_path,
                 group_mask_filename,
                 residual_filename,
-                first_level_gltlabel,
+                first_level_glt_label,
             )
-
             perform_cluster_simulation(
                 afni_img_path,
                 group_mask_filename,
                 acf_parameters_filename,
-                first_level_gltlabel,
+                first_level_glt_label,
             )
         else:
             # Nonparametric (PALM)
@@ -862,51 +1011,95 @@ def main(
 
             if not fsl_img_path and not (use_native_palm or use_native_fsl):
                 LGR.critical(
-                    "fsl_img_path is required when method is nonparametric and palm and fslmerge are not in path."
+                    "`fsl_img_path` is required when method is nonparametric "
+                    "and palm and `fslmerge` are not in path."
                 )
                 sys.exit(1)
 
-            LGR.info(f"Saving data table to: {data_table_filename}")
-            data_table.to_csv(data_table_filename, sep=" ", index=False)
+            output_dir = dst_dir / "second_level_outputs" / "nonparametric"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            for second_level_glt_code in get_second_level_glt_codes():
+                LGR.info(f"Processing the following glt code: {second_level_glt_code}")
 
-            design_matrix_file, eb_file, contrast_matrix_files_dict, glt_codes_dict = (
-                convert_table_to_matrices(
-                    data_table,
+                vs_in_code = "_vs_" in second_level_glt_code
+                glt_data_table = drop_dose_rows(
+                    data_table, get_nontarget_dose(second_level_glt_code), vs_in_code
+                )
+                glt_data_table = drop_constant_columns(glt_data_table)
+
+                if glt_data_table.empty:
+                    LGR.info(
+                        f"Skipping the following second level glt code: {second_level_glt_code}"
+                    )
+                    continue
+
+                LGR.critical(
+                    f"Using {len(data_table['InputFile'].tolist())} files "
+                    f"from {len(data_table['participant_id'].unique())} subjects for analysis "
+                    f"using {second_level_glt_code}"
+                )
+                LGR.info(f"Creating group mask with threshold: {mask_threshold}")
+                group_mask_filename = create_group_mask(
                     dst_dir,
+                    get_layout(bids_dir, deriv_dir),
+                    task,
+                    space,
+                    mask_threshold,
+                    data_table["InputFile"].tolist(),
+                    method,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                )
+
+                matrix_creation_func = (
+                    create_comparison_matrices if vs_in_code else create_mean_matrices
+                )
+                matrices_output_dict = matrix_creation_func(
+                    glt_data_table,
+                    output_dir,
                     task,
                     entity_key,
-                    first_level_gltlabel,
+                    first_level_glt_label,
+                    second_level_glt_code,
                 )
-            )
-
-            if n_permutations == "auto":
-                n_permutations = compute_n_permutation(data_table, use_sign_flipping)
-
-            output_prefixes = perform_palm(
-                dst_dir,
-                filtered_beta_files,
-                group_mask_filename,
-                design_matrix_file,
-                eb_file,
-                contrast_matrix_files_dict,
-                fsl_img_path,
-                task,
-                entity_key,
-                first_level_gltlabel,
-                n_permutations,
-                tfce_H,
-                tfce_E,
-                tfce_C,
-                use_native_palm,
-                use_native_fsl,
-                use_sign_flipping,
-            )
-
-            threshold_palm_output(
-                output_prefixes,
-                glt_codes_dict,
-                cluster_correction_p,
-            )
+                n_permutations = (
+                    compute_n_permutation(glt_data_table)
+                    if n_permutations == "auto"
+                    else n_permutations
+                )
+                concatenated_filename = create_concatenated_image(
+                    output_dir,
+                    glt_data_table,
+                    fsl_img_path,
+                    use_native_fsl,
+                    task,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                )
+                output_prefix = perform_palm(
+                    concatenated_filename,
+                    group_mask_filename,
+                    matrices_output_dict["design_matrix_file"],
+                    matrices_output_dict["eb_file"],
+                    matrices_output_dict["contrast_matrix_file"],
+                    fsl_img_path,
+                    task,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                    n_permutations,
+                    tfce_H,
+                    tfce_E,
+                    tfce_C,
+                    use_native_palm,
+                )
+                threshold_palm_output(
+                    output_prefix,
+                    second_level_glt_code,
+                    cluster_correction_p,
+                )
 
 
 if __name__ == "__main__":

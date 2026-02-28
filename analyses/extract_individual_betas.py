@@ -7,11 +7,13 @@ from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
 
 from _utils import (
+    drop_dose_rows,
     get_beta_names,
     get_contrast_entity_key,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
+    get_nontarget_dose,
     resample_seed_img,
 )
 
@@ -20,13 +22,19 @@ LGR = setup_logger(__name__)
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
-        description="Extract the average beta for each cluster at the individual level for downstream analysis."
+        description=(
+            "Extract the average beta for each cluster at "
+            "the individual level for downstream analysis."
+        )
     )
     parser.add_argument(
         "--analysis_dir",
         dest="analysis_dir",
         required=True,
-        help="Root of directory containing the second level data table, cluster table results, and cluster table masks.",
+        help=(
+            "Root of directory containing the second level data table, "
+            "cluster table results, and cluster table masks"
+        ),
     )
     parser.add_argument(
         "--dst_dir",
@@ -40,8 +48,8 @@ def _get_cmd_args():
         required=False,
         default=None,
         help=(
-            "Used only when ``analysis_type`` is gPPI. Used to compute the individual average beta "
-            "coefficient from the glm for the clusters."
+            "Used only when ``analysis_type`` is gPPI. Used to compute the "
+            "individual average beta coefficient from the glm for the clusters."
         ),
     )
     parser.add_argument(
@@ -50,9 +58,10 @@ def _get_cmd_args():
         required=False,
         default=None,
         help=(
-            "Path to the seed mask used as the seed for the gPPI. Used only when ``analysis_type`` is gPPI. "
-            "Used to compute the average beta coefficient from the glm for the seed. This will only be used "
-            "if `glm_dir` is not set to None."
+            "Path to the seed mask used as the seed for the gPPI. "
+            "Used only when ``analysis_type`` is gPPI. "
+            "Used to compute the average beta coefficient from the glm for the seed. "
+            "This will only be used if `glm_dir` is not set to None."
         ),
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
@@ -85,21 +94,6 @@ def _get_cmd_args():
     return parser
 
 
-def get_nontarget_dose(second_level_glt_code):
-    if second_level_glt_code == "mean":
-        return None
-
-    return list(
-        {"0", "5", "10"}.difference(
-            second_level_glt_code.replace("PPI_", "").split("_vs_")
-        )
-    )
-
-
-def drop_dose_rows(data_table, dose_list):
-    return data_table[~data_table["dose"].isin(dose_list)] if dose_list else data_table
-
-
 def get_cluster_region_info(cluster_result_file, cluster_id, tail):
     df = pd.read_csv(cluster_result_file, sep=None, engine="python")
     cluster_id_mask = df["Cluster ID"].astype(str) == cluster_id
@@ -122,7 +116,7 @@ def save_tabular_data(
     dst_dir,
     method,
     cluster_mask_filename,
-    first_level_gltlabel,
+    first_level_glt_label,
     beta_name,
     add_condition_entity_key,
     save_excel_version,
@@ -139,7 +133,7 @@ def save_tabular_data(
 
     if add_condition_entity_key:
         data_filename = str(data_filename).replace(
-            first_level_gltlabel, f"{first_level_gltlabel}_condition-{beta_name}"
+            first_level_glt_label, f"{first_level_glt_label}_condition-{beta_name}"
         )
 
     data_table.to_csv(data_filename, sep=",", index=None)
@@ -235,15 +229,15 @@ def add_info_to_data_table(
 
 
 def get_subject_beta_filenames(
-    data_table, first_level_gltlabel, beta_name, parent_path=None
+    data_table, first_level_glt_label, beta_name, parent_path=None
 ):
     subject_beta_filenames = data_table["InputFile"].tolist()
 
-    if first_level_gltlabel == beta_name:
+    if first_level_glt_label == beta_name:
         return subject_beta_filenames
 
     subject_beta_filenames = [
-        str(file).replace(f"_desc-{first_level_gltlabel}", f"_desc-{beta_name}")
+        str(file).replace(f"_desc-{first_level_glt_label}", f"_desc-{beta_name}")
         for file in subject_beta_filenames
     ]
 
@@ -299,14 +293,14 @@ def main(
     glm_dir = Path(glm_dir) if glm_dir else None
     seed_mask_path = Path(seed_mask_path) if seed_mask_path else None
 
-    first_level_gltlabels = get_first_level_gltsym_codes(
+    first_level_glt_labels = get_first_level_gltsym_codes(
         task, analysis_type, caller="extract_individual_betas"
     )
 
-    for first_level_gltlabel in first_level_gltlabels:
-        entity_key = get_contrast_entity_key(first_level_gltlabel)
+    for first_level_glt_label in first_level_glt_labels:
+        entity_key = get_contrast_entity_key(first_level_glt_label)
         filename = (
-            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-data_table.txt"
+            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-data_table.txt"
         )
         data_table_file = next(analysis_dir.rglob(filename))
         if not data_table_file:
@@ -320,27 +314,30 @@ def main(
         data_table["dose"] = data_table["dose"].astype(int)
         for second_level_glt_code in get_second_level_glt_codes():
             LGR.info(
-                f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
+                f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: "
+                f"{first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
             )
             cluster_mask_filenames = list(
                 analysis_dir.rglob(
-                    f"*task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}*desc-{method}_cluster_mask.nii.gz"
+                    f"*task-{task}_{entity_key}-{first_level_glt_label}"
+                    f"_gltcode-{second_level_glt_code}*desc-{method}_cluster_mask.nii.gz"
                 )
             )
             if not cluster_mask_filenames:
                 LGR.info(
-                    f"No cluster masks for TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
+                    f"No cluster masks for TASK: {task}, FIRST LEVEL GLTLABEL: "
+                    f"{first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
                 )
                 continue
 
             truncated_df = drop_dose_rows(
                 data_table, get_nontarget_dose(second_level_glt_code)
             )
-            beta_names = get_beta_names(first_level_gltlabel)
+            beta_names = get_beta_names(first_level_glt_label)
             for beta_name in beta_names:
-                add_condition_entity_key = beta_name != first_level_gltlabel
+                add_condition_entity_key = beta_name != first_level_glt_label
                 subject_beta_filenames = get_subject_beta_filenames(
-                    truncated_df, first_level_gltlabel, beta_name
+                    truncated_df, first_level_glt_label, beta_name
                 )
 
                 if not subject_beta_filenames:
@@ -374,7 +371,7 @@ def main(
 
                         glm_subject_beta_filenames = get_subject_beta_filenames(
                             beta_coefficient_df,
-                            first_level_gltlabel,
+                            first_level_glt_label,
                             glm_beta_name,
                             glm_dir,
                         )
@@ -440,7 +437,7 @@ def main(
                         dst_dir,
                         method,
                         cluster_mask_filename,
-                        first_level_gltlabel,
+                        first_level_glt_label,
                         beta_name,
                         add_condition_entity_key,
                         save_excel_version,

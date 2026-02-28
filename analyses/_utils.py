@@ -220,78 +220,86 @@ def perform_cluster_simulation(
     subprocess.run(cmd, shell=True, check=True)
 
 
-def threshold_palm_output(output_prefixes, glt_codes_dict, cluster_correction_p):
+def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correction_p):
     logp_threshold = -np.log10(cluster_correction_p)
     LGR.info(
         f"Using -log10(p) threshold: {logp_threshold:.4f} "
         f"(cluster_significance={cluster_correction_p})"
     )
 
-    output_dir = output_prefixes["positive"].parent
-    prefix_positive = output_prefixes["positive"].name
-    prefix_negative = output_prefixes["negative"].name
-
     # If only one contrast, palm excludes c{index}; however
-    # a minimum of two contrasts are needed since only one tail will
+    # a minimum of two images are needed since only one tail will
     # be used
-    for index, glt_code in enumerate(glt_codes_dict["positive"], 1):
-        LGR.info(f"Processing contrasts for {index}: {glt_code}")
+    LGR.info(f"Thresholding images for the following glt code: {second_level_glt_code}")
 
-        # Forward direction (e.g., 5_vs_0)
-        positive_tstat_file = (
-            output_dir / f"{prefix_positive}_vox_tstat_c{index}.nii.gz"
+    output_prefix = str(output_prefix).removesuffix("_")
+    # Forward direction (e.g., 5_vs_0)
+    positive_tstat_file = Path(f"{output_prefix}_vox_tstat_c1.nii.gz")
+    if not positive_tstat_file.exists():
+        positive_tstat_file = replace_ext(positive_tstat_file, ".nii")
+
+    positive_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c1.nii.gz")
+    if not positive_pval_file.exists():
+        positive_pval_file = replace_ext(positive_pval_file, ".nii")
+
+    positive_tstat_img = nib.load(positive_tstat_file)
+    positive_sig_mask = (
+        nib.load(positive_pval_file).get_fdata() > logp_threshold
+    ).astype(float)
+    positive_masked_tstat = positive_tstat_img.get_fdata() * positive_sig_mask
+
+    # Reverse direction (e.g., 0_vs_5)
+    negative_tstat_file = Path(f"{output_prefix}_vox_tstat_c2.nii.gz")
+    if not negative_tstat_file.exists():
+        negative_tstat_file = replace_ext(negative_tstat_file, ".nii")
+
+    negative_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c2.nii.gz")
+    if not negative_pval_file.exists():
+        negative_pval_file = replace_ext(negative_pval_file, ".nii")
+
+    negative_tstat_img = nib.load(negative_tstat_file)
+    negative_sig_mask = (
+        nib.load(negative_pval_file).get_fdata() > logp_threshold
+    ).astype(float)
+    negative_masked_tstat = (negative_tstat_img.get_fdata() * negative_sig_mask) * -1
+
+    # Combine, significant clusters should not overlap/ mutually exclusive
+    combined_masked_tstat = positive_masked_tstat + negative_masked_tstat
+    combined_thresholded_img = new_img_like(
+        positive_tstat_img,
+        combined_masked_tstat,
+        affine=positive_tstat_img.affine,
+        copy_header=True,
+    )
+
+    # Use glt_code in filename (e.g., 5_vs_0)
+    combined_thresholded_file = f"{output_prefix}_thresholded_bisided.nii.gz"
+    nib.save(combined_thresholded_img, combined_thresholded_file)
+    LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
+
+
+def get_nontarget_dose(second_level_glt_code):
+    if second_level_glt_code == "mean":
+        return None
+
+    return list(
+        {"0", "5", "10"}.difference(
+            second_level_glt_code.replace("PPI_", "").split("_vs_")
         )
-        if not positive_tstat_file.exists():
-            positive_tstat_file = replace_ext(positive_tstat_file, ".nii")
+    )
 
-        positive_pval_file = (
-            output_dir / f"{prefix_positive}_tfce_tstat_fwep_c{index}.nii.gz"
-        )
-        if not positive_pval_file.exists():
-            positive_pval_file = replace_ext(positive_pval_file, ".nii")
 
-        positive_tstat_img = nib.load(positive_tstat_file)
-        positive_sig_mask = (
-            nib.load(positive_pval_file).get_fdata() > logp_threshold
-        ).astype(float)
-        positive_masked_tstat = positive_tstat_img.get_fdata() * positive_sig_mask
+def drop_dose_rows(data_table, dose_list, only_paired_data=False):
+    if not dose_list:
+        return data_table
 
-        # Reverse direction (e.g., 0_vs_5)
-        negative_tstat_file = (
-            output_dir / f"{prefix_negative}_vox_tstat_c{index}.nii.gz"
-        )
-        if not negative_tstat_file.exists():
-            negative_tstat_file = replace_ext(negative_tstat_file, ".nii")
+    data_table = data_table[~data_table["dose"].astype(str).isin(dose_list)]
+    if only_paired_data:
+        # Keep only subjects who have both remaining doses (i.e., appear more than once)
+        return data_table[data_table["participant_id"].duplicated(keep=False)]
 
-        negative_pval_file = (
-            output_dir / f"{prefix_negative}_tfce_tstat_fwep_c{index}.nii.gz"
-        )
-        if not negative_pval_file.exists():
-            negative_pval_file = replace_ext(negative_pval_file, ".nii")
+    return data_table
 
-        negative_tstat_img = nib.load(negative_tstat_file)
-        negative_sig_mask = (
-            nib.load(negative_pval_file).get_fdata() > logp_threshold
-        ).astype(float)
-        negative_masked_tstat = (
-            negative_tstat_img.get_fdata() * negative_sig_mask
-        ) * -1
 
-        # Combine, significant clusters should not overlap/ mutually exclusive
-        combined_masked_tstat = positive_masked_tstat + negative_masked_tstat
-        combined_thresholded_img = new_img_like(
-            positive_tstat_img,
-            combined_masked_tstat,
-            affine=positive_tstat_img.affine,
-            copy_header=True,
-        )
-
-        # Use glt_code in filename (e.g., 5_vs_0)
-        prefix = prefix_positive.split("_desc")[0]
-        combined_thresholded_file = (
-            output_dir / f"{prefix}_gltcode-{glt_code}_"
-            "desc-nonparametric_thresholded_bisided.nii.gz"
-        )
-        nib.save(combined_thresholded_img, combined_thresholded_file)
-
-        LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
+def get_interpretation_labels(second_level_glt_code):
+    return second_level_glt_code.split("_vs_")

@@ -14,6 +14,7 @@ from nifti2bids.logging import setup_logger
 from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
+    get_interpretation_labels,
     get_second_level_glt_codes,
     resample_seed_img,
 )
@@ -29,7 +30,8 @@ def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description=(
             "If parametric, apply NN1 2-sided cluster correction to data "
-            "and identify significant clusters. If nonparametric, just identifies significant clusters."
+            "and identify significant clusters. If nonparametric, just identifies "
+            " significant clusters."
         )
     )
     parser.add_argument(
@@ -112,8 +114,9 @@ def _get_cmd_args():
         default=5,
         help=(
             "The radius of the sphere for the MNI coordinate. If `analysis_type` is 'glm', "
-            "seed masks are only created for the mean `second_level_glt_code`, which are the maps denoting activation and "
-            "deactivation for all subjects. This is done so that seeds are not deliberately biased towards a specific group."
+            "seed masks are only created for the mean `second_level_glt_code`, which "
+            "are the maps denoting activation and deactivation for all subjects. "
+            "This is done so that seeds are not deliberately biased towards a specific group."
         ),
     )
 
@@ -129,12 +132,12 @@ def get_zscore_map_and_mask(
     afni_img_path,
     task,
     entity_key,
-    first_level_gltlabel,
+    first_level_glt_label,
     second_level_glt_code,
 ):
     stats_filename = next(
         analysis_dir.rglob(
-            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_stats.nii.gz"
+            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
         )
     )
     zcore_map_filename = str(stats_filename).replace(
@@ -157,7 +160,7 @@ def get_zscore_map_and_mask(
 
     group_mask_filename = next(
         analysis_dir.rglob(
-            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_mask.nii.gz"
+            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-group_mask.nii.gz"
         )
     )
 
@@ -165,11 +168,12 @@ def get_zscore_map_and_mask(
 
 
 def get_cluster_correction_table(
-    analysis_dir, task, entity_key, first_level_gltlabel, connectivity
+    analysis_dir, task, entity_key, first_level_glt_label, connectivity
 ):
     cluster_correction_filename = next(
         analysis_dir.rglob(
-            f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-cluster_correction.{connectivity}_bisided.1D"
+            f"task-{task}_{entity_key}-{first_level_glt_label}"
+            f"_desc-cluster_correction.{connectivity}_bisided.1D"
         )
     )
     cluster_correction_table = pd.DataFrame(
@@ -200,12 +204,6 @@ def get_cluster_size(
     )
 
 
-def get_interpretation_labels(second_level_glt_code):
-    first_label, second_label = second_level_glt_code.split("_vs_")
-
-    return first_label, second_label
-
-
 def identify_clusters(
     dst_dir,
     thresholded_img,
@@ -214,7 +212,7 @@ def identify_clusters(
     cluster_size,
     task,
     entity_key,
-    first_level_gltlabel,
+    first_level_glt_label,
     second_level_glt_code,
 ):
     clusters_table, labels_map_list = get_clusters_table(
@@ -231,7 +229,10 @@ def identify_clusters(
         dst_dir
         / "cluster_results"
         / method
-        / f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
+        / (
+            f"task-{task}_{entity_key}-{first_level_glt_label}"
+            f"_gltcode-{second_level_glt_code}_desc-{method}_cluster_results.csv"
+        )
     )
     cluster_table_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -315,8 +316,8 @@ def identify_clusters(
                     label_mask_fdata, label_map.affine, label_map.header
                 )
                 label_mask_filename = label_base_dir / (
-                    f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_clusterid-{cluster_id}"
-                    f"_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+                    f"_clusterid-{cluster_id}_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
                 )
 
                 nib.save(label_mask_img, label_mask_filename)
@@ -330,7 +331,7 @@ def plot_thresholded_img(
     template_img_path,
     task,
     entity_key,
-    first_level_gltlabel,
+    first_level_glt_label,
     second_level_glt_code,
     method,
 ):
@@ -339,20 +340,29 @@ def plot_thresholded_img(
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
 
-    if first_level_gltlabel not in ["seen", "indoor"]:
-        first_level_code = first_level_gltlabel.replace("_vs_", " > ")
+    if first_level_glt_label not in ["seen", "indoor"]:
+        first_level_code = first_level_glt_label.replace("_vs_", " > ")
     else:
-        first_level_code = first_level_gltlabel
+        first_level_code = first_level_glt_label
 
     if second_level_glt_code == "mean":
-        title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} INTERCEPT: Mean across doses"
+        title = (
+            f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
+            "INTERCEPT: Mean across doses"
+        )
     elif "_vs_" not in second_level_glt_code:
-        title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} GROUP: Within {second_level_glt_code} mg MPH"
+        title = (
+            f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
+            f"GROUP: Within {second_level_glt_code} mg MPH"
+        )
     else:
         first_label, second_label = get_interpretation_labels(second_level_glt_code)
         first_group = f"{first_label} mg MPH"
         second_group = f"{second_label} mg MPH"
-        title = f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} GROUP CONTRAST: {first_group} > {second_group}"
+        title = (
+            f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
+            f"GROUP CONTRAST: {first_group} > {second_group}"
+        )
 
     for mode in ["ortho", "x", "y", "z"]:
         display = plot_stat_map(**kwargs, display_mode=mode)
@@ -365,7 +375,10 @@ def plot_thresholded_img(
             dst_dir
             / "stat_plots"
             / method
-            / f"task-{task}_{entity_key}-{first_level_code}_gltcode-{second_level_glt_code}_displaymode-{mode}_desc-{method}_cluster_plot.png"
+            / (
+                f"task-{task}_{entity_key}-{first_level_code}_gltcode-{second_level_glt_code}"
+                f"_displaymode-{mode}_desc-{method}_cluster_plot.png"
+            )
         )
         plot_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -456,17 +469,17 @@ def main(
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
-    first_level_gltlabels = get_first_level_gltsym_codes(
+    first_level_glt_labels = get_first_level_gltsym_codes(
         task, analysis_type, caller="get_cluster_results"
     )
-    first_level_gltlabel_list = list(
-        itertools.product(first_level_gltlabels, get_second_level_glt_codes())
+    first_level_glt_label_list = list(
+        itertools.product(first_level_glt_labels, get_second_level_glt_codes())
     )
 
-    for first_level_gltlabel, second_level_glt_code in first_level_gltlabel_list:
-        entity_key = get_contrast_entity_key(first_level_gltlabel)
+    for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
+        entity_key = get_contrast_entity_key(first_level_glt_label)
         LGR.info(
-            f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
+            f"FIRST LEVEL GLTLABEL: {first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
         )
 
         if method == "parametric":
@@ -479,7 +492,7 @@ def main(
                 afni_img_path,
                 task,
                 entity_key,
-                first_level_gltlabel,
+                first_level_glt_label,
                 second_level_glt_code,
             )
             if not zcore_map_filename.exists():
@@ -489,7 +502,7 @@ def main(
                 continue
 
             cluster_correction_table = get_cluster_correction_table(
-                analysis_dir, task, entity_key, first_level_gltlabel, connectivity
+                analysis_dir, task, entity_key, first_level_glt_label, connectivity
             )
             cluster_size = get_cluster_size(
                 cluster_correction_table, voxel_correction_p, cluster_correction_p
@@ -510,7 +523,8 @@ def main(
             try:
                 thresholded_filename = next(
                     analysis_dir.rglob(
-                        f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
+                        f"task-{task}_{entity_key}-{first_level_glt_label}"
+                        f"_gltcode-{second_level_glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
                     )
                 )
             except Exception:
@@ -529,11 +543,14 @@ def main(
             ZERO_CLUSTER_SIZE,
             task,
             entity_key,
-            first_level_gltlabel,
+            first_level_glt_label,
             second_level_glt_code,
         )
 
-        base_str = f"TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_gltlabel} SECOND LEVEL GLTCODE: {second_level_glt_code}"
+        base_str = (
+            f"TASK: {task}, FIRST LEVEL GLTLABEL: {first_level_glt_label} "
+            f"SECOND LEVEL GLTCODE: {second_level_glt_code}"
+        )
         if not cluster_table_filename.exists():
             LGR.info(f"NO SIGNIFICANT CLUSTERS FOUND FOR {base_str}")
             continue
@@ -546,7 +563,7 @@ def main(
             template_img_path,
             task,
             entity_key,
-            first_level_gltlabel,
+            first_level_glt_label,
             second_level_glt_code,
             method,
         )

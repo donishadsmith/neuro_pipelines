@@ -54,22 +54,14 @@ def _get_cmd_args():
     return parser
 
 
-def get_output_prefixes(analysis_dir, task, first_level_gltlabel):
-    # Positive files are the anchors and the only ones that need to be retrieved
-    output_prefixes = {"positive": None}
+def get_output_prefixes(
+    analysis_dir, task, first_level_gltlabel, second_level_glt_code
+):
     entity_key = get_contrast_entity_key(first_level_gltlabel)
-    prefix = (
-        f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-nonparametric_positive"
-    )
+    prefix = f"task-{task}_{entity_key}-{first_level_gltlabel}_gltcode-{second_level_glt_code}_desc-nonparametric"
     files = list(analysis_dir.rglob(f"*{prefix}*"))
-    output_prefixes["positive"] = files[0].parent / prefix
-    output_prefixes["negative"] = files[0].parent / str(prefix).replace(
-        "positive", "negative"
-    )
 
-    return output_prefixes, len(
-        [file for file in files if "vox_tstat_fwep" in str(file)]
-    )
+    return files[0].parent / prefix
 
 
 def main(analysis_dir, dst_dir, task, analysis_type, cluster_correction_p):
@@ -82,14 +74,13 @@ def main(analysis_dir, dst_dir, task, analysis_type, cluster_correction_p):
         task, analysis_type, caller="threshold_palm_images"
     )
     for first_level_gltlabel in first_level_gltlabels:
-        output_prefixes, n_codes = get_output_prefixes(
-            analysis_dir, task, first_level_gltlabel
-        )
-        # Positive codes are the anchors and the only ones that need to be created
-        glt_codes_dict = {"positive": get_second_level_glt_codes()}
-        glt_codes_dict["positive"] = list(glt_codes_dict["positive"])[:n_codes]
-
-        threshold_palm_output(output_prefixes, glt_codes_dict, cluster_correction_p)
+        for second_level_glt_code in get_second_level_glt_codes():
+            output_prefix = get_output_prefixes(
+                analysis_dir, task, first_level_gltlabel
+            )
+            threshold_palm_output(
+                output_prefix, second_level_glt_code, cluster_correction_p
+            )
 
 
 if __name__ == "__main__":
