@@ -545,6 +545,7 @@ def main(
         cluster_table_filename = identify_clusters(
             dst_dir,
             thresholded_img,
+            analysis_type,
             method,
             ZERO_STAT_THRESHOLD,
             ZERO_CLUSTER_SIZE,
