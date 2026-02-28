@@ -43,7 +43,7 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 # If using, then pass the specific task to the shell script
 # e.g. sbatch second_level.sb nback
-FIRST_LEVEL_GLTLABEL=${FIRST_LEVEL_GLTLABEL:-}
+FIRST_LEVEL_GLT_LABEL=${FIRST_LEVEL_GLT_LABEL:-}
 
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
@@ -73,8 +73,8 @@ CMD="$PYTHON second_level.py \
 	--analysis_type $ANALYSIS_TYPE \
     --n_cores $SLURM_CPUS_PER_TASK"
 
-if [[ -n $FIRST_LEVEL_GLTLABEL ]]; then
-	CMD+=" --first_level_gltlabel $FIRST_LEVEL_GLTLABEL"
+if [[ -n $FIRST_LEVEL_GLT_LABEL ]]; then
+	CMD+=" --first_level_glt_label $FIRST_LEVEL_GLT_LABEL"
 fi
 
 if [[ -n $EXCLUDE_NIFTI_FILE ]]; then
