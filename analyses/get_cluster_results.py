@@ -207,6 +207,7 @@ def get_cluster_size(
 def identify_clusters(
     dst_dir,
     thresholded_img,
+    analysis_type,
     method,
     stat_threshold,
     cluster_size,
@@ -249,25 +250,31 @@ def identify_clusters(
         mask_pos = mask_primary & (peaks > 0)
         mask_neg = mask_primary & (peaks < 0)
 
+        positive_interpretation = (
+            "Activation" if analysis_type == "glm" else "Increased Connectivity"
+        )
+        negative_interpretation = (
+            "Deactivation" if analysis_type == "glm" else "Decreased Connectivity"
+        )
         if second_level_glt_code == "mean":
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"Mean activation across doses > 0"
+                f"Mean {positive_interpretation.removesuffix('Increased').lower()} across doses > 0"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"Mean activation across doses < 0"
+                f"Mean {positive_interpretation.removesuffix('Increased').lower()} across doses < 0"
             )
         elif "_vs_" not in second_level_glt_code:
             clusters_table["Group"] = f"Within {second_level_glt_code} mg MPH only"
-            clusters_table.loc[mask_pos, "Interpretation"] = f"Activation"
-            clusters_table.loc[mask_neg, "Interpretation"] = f"Deactivation"
+            clusters_table.loc[mask_pos, "Interpretation"] = positive_interpretation
+            clusters_table.loc[mask_neg, "Interpretation"] = negative_interpretation
         else:
             first_label, second_label = get_interpretation_labels(second_level_glt_code)
 
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"{first_label} mg MPH > {second_label} mg MPH"
+                f"{positive_interpretation}: {first_label} mg MPH > {second_label} mg MPH"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"{second_label} mg MPH > {first_label} mg MPH"
+                f"{positive_interpretation}: {second_label} mg MPH > {first_label} mg MPH"
             )
 
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
