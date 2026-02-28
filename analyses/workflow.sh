@@ -37,12 +37,12 @@ TASKS=("nback" "flanker" "mtle" "mtlr" "princess")      # Set all or specific on
 # --------------------------------
 # FIRST LEVEL DENOISING PARAMETERS
 # --------------------------------
-export N_MOTION_PARAMETERS=12                           # Choose 6, 12, 18, 24
+export N_MOTION_PARAMETERS=24                           # Choose 6, 12, 18, 24
 export N_ACOMPCORS=5                                    # Recommend choosing 5 or 6
-export ACOMPCOR_STRATEGY="combined"                     # Choose "combined" or "separate"
-export N_GLOBAL_PARAMETERS=1                            # Choose 0, 1, 2, 3, or 4
-export FD_THRESHOLD=0.9                                 # Choose a float between 0-1.0
-export EXCLUSION_CRITERIA=0.4                           # Choose a float between 0.20-0.40
+export ACOMPCOR_STRATEGY="separate"                     # Choose "combined" or "separate"
+export N_GLOBAL_PARAMETERS=0                            # Choose 0, 1, 2, 3, or 4
+export FD_THRESHOLD=0.5                                 # Choose a float between 0-1.0
+export EXCLUSION_CRITERIA=0.3                           # Choose a float between 0.20-0.40
 export FWHM=6                                           # Choose integer
 
 # ------------------------------------------------
