@@ -4,6 +4,7 @@ from pathlib import Path
 
 import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
+from nilearn.image import resample_to_img
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
@@ -23,11 +24,6 @@ from _utils import (
 )
 
 LGR = setup_logger(__name__)
-
-pd.set_option("display.max_rows", None)
-pd.set_option("display.max_columns", None)
-pd.set_option("display.width", None)
-pd.set_option("display.max_colwidth", None)
 
 EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
 CATEGORICAL_VARS = set(["sex", "race", "ethnicity"])
@@ -83,6 +79,25 @@ def _get_cmd_args():
         required=False,
         help="Template space.",
     )
+    parser.add_argument(
+        "--gm_probseg_img_path",
+        dest="gm_probseg_img_path",
+        default=None,
+        required=False,
+        help=(
+            "The probability mask for gray matter voxels. Should be in same space as the template."
+            "Used to exclude non-gray matter voxels in the group mask and exclude false activations from "
+            "white matter and ventricles. http://jpeelle.net/mri/misc/creating_explicit_mask.html"
+        ),
+    )
+    parser.add_argument(
+        "--gm_mask_threshold",
+        dest="gm_mask_threshold",
+        default=0.20,
+        type=float,
+        required=False,
+        help="The probability for gray matter voxels in the mask. See: https://pmc.ncbi.nlm.nih.gov/articles/PMC3812339/",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--first_level_glt_label",
@@ -103,8 +118,8 @@ def _get_cmd_args():
         help="The type of analysis performed (glm or gPPI).",
     )
     parser.add_argument(
-        "--mask_threshold",
-        dest="mask_threshold",
+        "--group_mask_threshold",
+        dest="group_mask_threshold",
         default=1.0,
         required=False,
         type=float,
@@ -129,6 +144,17 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
+        "--exclude_covariates",
+        dest="exclude_covariates",
+        default=None,
+        required=False,
+        nargs="+",
+        help=(
+            "Additional covariates to exclude from second level model. Each covariate should be in a single string "
+            "separated by space"
+        ),
+    )
+    parser.add_argument(
         "--method",
         dest="method",
         default="nonparametric",
@@ -137,10 +163,10 @@ def _get_cmd_args():
         help=(
             "Whether to use 3dlmer (parametric) or Palm (nonparametric). "
             "Typically better to use nonparametric, it doesn't assume the error distribution of the "
-            "data and better controls false positives. Refer to: https://www.pnas.org/doi/abs/10.1073/pnas.1602413113?utm_source. "
-            "If parametric is used then the acf method method should be used on the residuals to estimate smoothness and "
-            "determine the appropriate cluster size via simulations. Nonparametric is stochastic "
-            "however Palm sets seed to 0 by default for reproducibility. Though different results "
+            "data and better controls false positives. Refer to: https://www.pnas.org/doi/abs/10.1073/pnas.1602413113?utm_source "
+            "and https://onlinelibrary.wiley.com/doi/10.1002/hbm.23115. If parametric is used then the acf method method should "
+            "Nonparametric is stochastic be used on the residuals to estimate smoothness and determine the appropriate cluster "
+            "size via simulations. however Palm sets seed to 0 by default for reproducibility. Though different results "
             "are expected if using Octave: https://web.mit.edu/fsl_v5.0.10/fsl/doc/wiki/PALM(2f)UserGuide.html"
         ),
     )
@@ -221,9 +247,23 @@ def _get_cmd_args():
     return parser
 
 
+def append_global_exclude_covariates(exclude_covariates):
+    if exclude_covariates:
+        global EXCLUDE_COLS
+        EXCLUDE_COLS.extend(exclude_covariates)
+
+        LGR.info(
+            f"Added the following to the EXCLUDE_COLS global variable: {exclude_covariates}"
+        )
+
+
 def get_beta_files(analysis_dir, task, first_level_glt_label):
     return sorted(
-        list(Path(analysis_dir).rglob(f"*{task}*{first_level_glt_label}*betas*.nii.gz"))
+        list(
+            Path(analysis_dir).rglob(
+                f"*{task}*_desc-{first_level_glt_label}_betas.nii.gz"
+            )
+        )
     )
 
 
@@ -334,8 +374,10 @@ def create_group_mask(
     layout,
     task,
     space,
-    mask_threshold,
+    group_mask_threshold,
     filtered_beta_files,
+    gm_probseg_img_path,
+    gm_mask_threshold,
     method,
     entity_key,
     first_level_glt_label,
@@ -375,11 +417,34 @@ def create_group_mask(
         mask_files = [mask_file for mask_file in mask_files if space in str(mask_file)]
         subject_mask_files.extend(mask_files)
 
-    group_mask = intersect_masks(subject_mask_files, threshold=mask_threshold)
+    group_mask = intersect_masks(subject_mask_files, threshold=group_mask_threshold)
+    group_mask = create_gm_only_group_mask(
+        gm_probseg_img_path, gm_mask_threshold, group_mask
+    )
 
     nib.save(group_mask, group_mask_filename)
 
     return group_mask_filename
+
+
+def create_gm_only_group_mask(gm_probseg_img_path, gm_mask_threshold, group_mask):
+    if not gm_probseg_img_path:
+        return group_mask
+
+    LGR.info(
+        "Thresholding GM probability mask, any voxel with a proability greater than "
+        f"{gm_mask_threshold} will be retained in the group mask."
+    )
+
+    gm_prob_img = nib.load(gm_probseg_img_path)
+    resmapled_gm_prob_img = resample_to_img(
+        gm_prob_img, group_mask, interpolation="nearest"
+    )
+    binarized_gm_image = resmapled_gm_prob_img.get_fdata() > gm_mask_threshold
+
+    group_mask_data = group_mask.get_fdata() * binarized_gm_image
+
+    return nib.nifti1.Nifti1Image(group_mask_data, group_mask.affine, group_mask.header)
 
 
 def get_glt_codes_str(data_table):
@@ -485,7 +550,6 @@ def create_design_matrix(
     average_within_subjects=False,
     second_level_glt_code=None,
 ):
-    design_matrix = pd.DataFrame()
     categorical_cols = [
         col for col in glt_data_table.columns if col in CATEGORICAL_VARS
     ]
@@ -538,7 +602,18 @@ def create_design_matrix(
             {col: mean_center(dummies[col].to_numpy()) for col in dummies.columns}
         )
 
-    design_matrix = pd.concat([design_matrix, pd.DataFrame(design_components)], axis=1)
+    design_matrix = pd.DataFrame(design_components)
+    if design_matrix.shape[1] > 1:
+        regressor_positions = {
+            index: col for index, col in enumerate(design_matrix.columns)
+        }
+        design_arr, regressor_positions = remove_collinear_columns(
+            design_matrix.to_numpy(), regressor_positions
+        )
+        design_matrix = pd.DataFrame(
+            design_arr, columns=list(regressor_positions.values())
+        )
+        design_matrix = prioritize_regressors(design_matrix)
 
     if include_intercept:
         intercept = [1] * design_matrix.shape[0]
@@ -558,17 +633,7 @@ def create_design_matrix(
             axis=1,
         )
 
-    regressor_positions = {
-        index: col for index, col in enumerate(design_matrix.columns)
-    }
-    design_arr, regressor_positions = remove_collinear_columns(
-        design_matrix.to_numpy(), regressor_positions
-    )
-    filtered_design_matrix = pd.DataFrame(
-        design_arr, columns=list(regressor_positions.values())
-    )
-
-    return prioritize_regressors(filtered_design_matrix)
+    return design_matrix
 
 
 def create_contrast_matrix(design_matrix, contrast_matrix_filename):
@@ -902,7 +967,9 @@ def main(
     first_level_glt_label,
     analysis_type,
     space,
-    mask_threshold,
+    gm_probseg_img_path,
+    gm_mask_threshold,
+    group_mask_threshold,
     afni_img_path,
     fsl_img_path,
     method,
@@ -913,6 +980,7 @@ def main(
     cluster_correction_p,
     n_cores,
     exclude_niftis_file,
+    exclude_covariates,
 ):
     bids_dir = Path(bids_dir)
     deriv_dir = Path(deriv_dir) if deriv_dir else None
@@ -927,6 +995,8 @@ def main(
         first_level_glt_labels = get_first_level_gltsym_codes(
             task, analysis_type, caller="second_level"
         )
+
+    append_global_exclude_covariates(exclude_covariates)
 
     for first_level_glt_label in first_level_glt_labels:
         entity_key = get_contrast_entity_key(first_level_glt_label)
@@ -961,14 +1031,16 @@ def main(
                 f"Using {len(data_table['InputFile'].tolist())} files "
                 f"from {len(data_table['participant_id'].unique())} subjects for analysis "
             )
-            LGR.info(f"Creating group mask with threshold: {mask_threshold}")
+            LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
             group_mask_filename = create_group_mask(
                 dst_dir,
                 get_layout(bids_dir, deriv_dir),
                 task,
                 space,
-                mask_threshold,
+                group_mask_threshold,
                 data_table["InputFile"].tolist(),
+                gm_probseg_img_path,
+                gm_mask_threshold,
                 method,
                 entity_key,
                 first_level_glt_label,
@@ -1038,14 +1110,16 @@ def main(
                     f"from {len(data_table['participant_id'].unique())} subjects for analysis "
                     f"using {second_level_glt_code}"
                 )
-                LGR.info(f"Creating group mask with threshold: {mask_threshold}")
+                LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
                 group_mask_filename = create_group_mask(
                     dst_dir,
                     get_layout(bids_dir, deriv_dir),
                     task,
                     space,
-                    mask_threshold,
+                    group_mask_threshold,
                     data_table["InputFile"].tolist(),
+                    gm_probseg_img_path,
+                    gm_mask_threshold,
                     method,
                     entity_key,
                     first_level_glt_label,

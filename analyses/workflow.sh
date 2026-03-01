@@ -8,6 +8,10 @@
 # If debugging run `bash -x workflow.sh`
 # Use `sed -i "s/\r//" workflow.sh` if you get a "$'\r': command not found" error
 
+# NOTE: If a specific image template is needed but the file is not found in templateflow but the filename is there
+# it is a pointer to the file and needs to be downloaded. If you have download firewall issues
+# use `git annex whereis filename.nii.gz` get the download link, download it, and transfer via Globus
+
 # =============================================
 # CONTROL FLOW VARIABLES (Set to true or false)
 # =============================================
@@ -41,7 +45,7 @@ TASKS=("nback" "flanker" "mtle" "mtlr" "princess")      # Set all or specific on
 # FIRST LEVEL DENOISING PARAMETERS
 # --------------------------------
 export N_MOTION_PARAMETERS=6                            # Choose 6, 12, 18, 24
-export ACOMPCOR_STRATEGY="none"                         # Choose "combined", "separate", or "none"
+export ACOMPCOR_STRATEGY="combined"                     # Choose "combined", "separate", or "none"
 export N_ACOMPCORS=5                                    # Recommend choosing 5 or 6
 export N_GLOBAL_PARAMETERS=0                            # Choose 0, 1, 2, 3, or 4
 export FD_THRESHOLD=0.9                                 # Choose a float between 0-1.0
@@ -49,11 +53,21 @@ export EXCLUSION_CRITERIA=0.3                           # Choose a float between
 export FWHM=6                                           # Choose integer
 
 # ------------------------------------------------
+# PARAMETERS FOR SECOND LEVEL
+# ------------------------------------------------
+
+TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1"
+export EXCLUDE_COVARIATES="age sex ethnicity race n_censored_volumes" # Covariates to save dof; separated by space
+export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-2_label-GM_probseg.nii.gz" # Used to isolate gray matter voxels in group mask
+export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30
+
+# ------------------------------------------------
 # PARAMETERS USED WHEN GETTING THE CLUSTER RESULTS
 # ------------------------------------------------
+
 export SPHERE_RADIUS=5                                  # Used to create masks, choose integer
-export TEMPLATE_MASK_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz" # Used to create sphere masks
-export TEMPLATE_IMG_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz" # Used for plotting
+export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz" # Used to create sphere masks
+export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz" # Used for plotting
 
 # -------------------------------------------------------
 # PARAMETER USED FOR IDENTIFYING MNI LOCATION OF CLUSTERS

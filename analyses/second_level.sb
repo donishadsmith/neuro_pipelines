@@ -44,6 +44,9 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 # If using, then pass the specific task to the shell script
 # e.g. sbatch second_level.sb nback
 FIRST_LEVEL_GLT_LABEL=${FIRST_LEVEL_GLT_LABEL:-}
+EXCLUDE_COVARIATES=${EXCLUDE_COVARIATES:-""}
+GM_PROBSEG_IMG_PATH=${GM_PROBSEG_IMG_PATH:-""}
+GM_MASK_THRESHOLD=${GM_MASK_THRESHOLD:-0.20}
 
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
@@ -70,6 +73,7 @@ CMD="$PYTHON second_level.py \
 	--dst_dir $DST_DIR \
 	--method $METHOD \
 	--task $TASK \
+	--exclude_covariates $EXCLUDE_COVARIATES \
 	--analysis_type $ANALYSIS_TYPE \
     --n_cores $SLURM_CPUS_PER_TASK"
 
@@ -87,6 +91,10 @@ fi
 
 if [[ $METHOD == "parametric" && -n $AFNI_IMG_PATH ]]; then
 	CMD+=" --afni_img_path $AFNI_IMG_PATH"
+fi
+
+if [[ -n $GM_PROBSEG_IMG_PATH ]]; then
+	CMD+=" --gm_probseg_img_path $GM_PROBSEG_IMG_PATH --gm_mask_threshold $GM_MASK_THRESHOLD"
 fi
 
 # hostname
