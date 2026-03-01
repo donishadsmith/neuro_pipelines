@@ -234,48 +234,56 @@ def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correcti
 
     output_prefix = str(output_prefix).removesuffix("_")
     # Forward direction (e.g., 5_vs_0)
-    positive_tstat_file = Path(f"{output_prefix}_vox_tstat_c1.nii.gz")
-    if not positive_tstat_file.exists():
-        positive_tstat_file = replace_ext(positive_tstat_file, ".nii")
+    try:
+        positive_tstat_file = Path(f"{output_prefix}_vox_tstat_c1.nii.gz")
+        if not positive_tstat_file.exists():
+            positive_tstat_file = replace_ext(positive_tstat_file, ".nii")
 
-    positive_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c1.nii.gz")
-    if not positive_pval_file.exists():
-        positive_pval_file = replace_ext(positive_pval_file, ".nii")
+        positive_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c1.nii.gz")
+        if not positive_pval_file.exists():
+            positive_pval_file = replace_ext(positive_pval_file, ".nii")
 
-    positive_tstat_img = nib.load(positive_tstat_file)
-    positive_sig_mask = (
-        nib.load(positive_pval_file).get_fdata() > logp_threshold
-    ).astype(float)
-    positive_masked_tstat = positive_tstat_img.get_fdata() * positive_sig_mask
+        positive_tstat_img = nib.load(positive_tstat_file)
+        positive_sig_mask = (
+            nib.load(positive_pval_file).get_fdata() > logp_threshold
+        ).astype(float)
+        positive_masked_tstat = positive_tstat_img.get_fdata() * positive_sig_mask
 
-    # Reverse direction (e.g., 0_vs_5)
-    negative_tstat_file = Path(f"{output_prefix}_vox_tstat_c2.nii.gz")
-    if not negative_tstat_file.exists():
-        negative_tstat_file = replace_ext(negative_tstat_file, ".nii")
+        # Reverse direction (e.g., 0_vs_5)
+        negative_tstat_file = Path(f"{output_prefix}_vox_tstat_c2.nii.gz")
+        if not negative_tstat_file.exists():
+            negative_tstat_file = replace_ext(negative_tstat_file, ".nii")
 
-    negative_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c2.nii.gz")
-    if not negative_pval_file.exists():
-        negative_pval_file = replace_ext(negative_pval_file, ".nii")
+        negative_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c2.nii.gz")
+        if not negative_pval_file.exists():
+            negative_pval_file = replace_ext(negative_pval_file, ".nii")
 
-    negative_tstat_img = nib.load(negative_tstat_file)
-    negative_sig_mask = (
-        nib.load(negative_pval_file).get_fdata() > logp_threshold
-    ).astype(float)
-    negative_masked_tstat = (negative_tstat_img.get_fdata() * negative_sig_mask) * -1
+        negative_tstat_img = nib.load(negative_tstat_file)
+        negative_sig_mask = (
+            nib.load(negative_pval_file).get_fdata() > logp_threshold
+        ).astype(float)
+        negative_masked_tstat = (
+            negative_tstat_img.get_fdata() * negative_sig_mask
+        ) * -1
 
-    # Combine, significant clusters should not overlap/ mutually exclusive
-    combined_masked_tstat = positive_masked_tstat + negative_masked_tstat
-    combined_thresholded_img = new_img_like(
-        positive_tstat_img,
-        combined_masked_tstat,
-        affine=positive_tstat_img.affine,
-        copy_header=True,
-    )
+        # Combine, significant clusters should not overlap/ mutually exclusive
+        combined_masked_tstat = positive_masked_tstat + negative_masked_tstat
+        combined_thresholded_img = new_img_like(
+            positive_tstat_img,
+            combined_masked_tstat,
+            affine=positive_tstat_img.affine,
+            copy_header=True,
+        )
 
-    # Use glt_code in filename (e.g., 5_vs_0)
-    combined_thresholded_file = f"{output_prefix}_thresholded_bisided.nii.gz"
-    nib.save(combined_thresholded_img, combined_thresholded_file)
-    LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
+        # Use glt_code in filename (e.g., 5_vs_0)
+        combined_thresholded_file = f"{output_prefix}_thresholded_bisided.nii.gz"
+        nib.save(combined_thresholded_img, combined_thresholded_file)
+        LGR.info(f"Saved thresholded t-map: {combined_thresholded_file}")
+    except FileNotFoundError:
+        LGR.critical(
+            f"For the {second_level_glt_code} code, a file was not found for the following prefix: {output_prefix}",
+            exc_info=True,
+        )
 
 
 def get_nontarget_dose(second_level_glt_code):

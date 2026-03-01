@@ -1063,7 +1063,7 @@ def main(
                     first_level_glt_label,
                     second_level_glt_code,
                 )
-                n_permutations = (
+                max_permutations = (
                     compute_n_permutation(glt_data_table)
                     if n_permutations == "auto"
                     else n_permutations
@@ -1089,7 +1089,7 @@ def main(
                     entity_key,
                     first_level_glt_label,
                     second_level_glt_code,
-                    n_permutations,
+                    max_permutations,
                     tfce_H,
                     tfce_E,
                     tfce_C,
