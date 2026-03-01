@@ -25,11 +25,14 @@ to extracting the seed, the timeseries is already averaged which helps with spat
 reduction. More importantly, smoothing blur signal outside of the voxels of interest into
 the will result in your seed timeseries containing signal from voxels outside of your mask
 
-For each condition in task (6-9):
-6) Upsample seed timeseries and task regressor to 0.1
+For each condition in task (6-10):
+6) Upsample seed timeseries (https://www.nature.com/articles/s42003-024-07088-3) and task regressor to 0.1
    (TR_orig/ TR_sub is equal to number of points added between each TR or
    the duration / TR_sub is equal to the number of points added after each onset
-   time)
+   time).
+   Resources:
+        1) https://discuss.afni.nimh.nih.gov/t/gppi-analysis-and-upsampling/172
+        2) https://www.nature.com/articles/s42003-024-07088-3
 7) The task regressor should then be mean centered so that the subsequent interaction term
    is not highly correlated with the main effect of the seed timeseries and result in
    spurious results that attribute correlation with the seed timeseries to the interaction
