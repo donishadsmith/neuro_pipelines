@@ -105,7 +105,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--mask_threshold",
         dest="mask_threshold",
-        default=0.5,
+        default=1.0,
         required=False,
         type=float,
         help="Value between 0 to 1 denoting the level of intersection for the masks.",
