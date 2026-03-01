@@ -17,7 +17,10 @@ AFNI:
 2) PSC scaling of NIfTI image, compute mean for censored files
 3) Resample mask to NIfTI (if needed) then extract timeseries
 4) Tranpose the seed timeseries to a column vector
-5) Denoise seed timeseries not too aggressively. Note that smoothing is not done prior
+5) Denoise seed timeseries not too aggressively, we want to keep the temporal autocorrelation
+in the seed timeseries to not bias the deconvolution later. Ensure regular OLS is used just to
+orthogonalize to the minimal nuisance regressors, no prewhitening should be done to prevent
+temporal autocorrelation in the residuals. Note that smoothing is not done prior
 to extracting the seed, the timeseries is already averaged which helps with spatial noise
 reduction. More importantly, smoothing blur signal outside of the voxels of interest into
 the will result in your seed timeseries containing signal from voxels outside of your mask
@@ -27,21 +30,26 @@ For each condition in task (6-9):
    (TR_orig/ TR_sub is equal to number of points added between each TR or
    the duration / TR_sub is equal to the number of points added after each onset
    time)
-7) Deconvolve seed timeseries to get the neural signal that will later
+7) The task regressor should then be mean centered so that the subsequent interaction term
+   is not highly correlated with the main effect of the seed timeseries and result in
+   spurious results that attribute correlation with the seed timeseries to the interaction
+   term. Great paper about this:
+   https://direct.mit.edu/imag/article/doi/10.1162/IMAG.a.989/133601/Common-pitfalls-during-model-specification-in
+8) Deconvolve seed timeseries to get the neural signal that will later
    interact with the task regressor and this interaction will be convolved.
-8) Create PPI term PPI = ([neural signal * binary_condition_vector] * hrf)(t).
+9) Create PPI term PPI = ([neural signal * binary_condition_vector] * hrf)(t).
    Use GAM.
-9) Downsample the PPI term back down to the true TR grid
+10) Downsample the PPI term back down to the true TR grid
 
 After:
-10) For NIfTI image, smooth, then use 3ddeconvolve. Ensure to model everything
+11) For NIfTI image, smooth, then use 3ddeconvolve. Ensure to model everything
    from nuisance regressors, all main effect conditions (convolved), the
    denoised seed signal, and the PPI interaction terms (already convolved
    in previous step). Create contrasts of the interaction terms (+ means
    greater connectivity for A than B and - means reduced connectivity for
    A relative to B)
-11) Use 3dremlfit to account for temporal autocorrelation
-12) Extract PPI interaction contrasts betas for downstream analyses
+12) Use 3dremlfit to account for temporal autocorrelation
+13) Extract PPI interaction contrasts betas for downstream analyses
 """
 
 import argparse, subprocess, json, subprocess, sys
@@ -602,6 +610,11 @@ def upsample_condition_regressor(
 
     LGR.info(f"Upsampling condition {condition_name} to {upsample_dt} s: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
+
+    # Now mean center the task regressor
+    condition_vector = np.loadtxt(upsampled_condition_regressor_file)
+    condition_vector -= condition_vector.mean()
+    np.savetxt(upsampled_condition_regressor_file, condition_vector, fmt="%f")
 
     return upsampled_condition_regressor_file
 
