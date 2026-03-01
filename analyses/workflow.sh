@@ -40,10 +40,10 @@ TASKS=("nback" "flanker" "mtle" "mtlr" "princess")      # Set all or specific on
 # --------------------------------
 # FIRST LEVEL DENOISING PARAMETERS
 # --------------------------------
-export N_MOTION_PARAMETERS=24                           # Choose 6, 12, 18, 24
+export N_MOTION_PARAMETERS=12                           # Choose 6, 12, 18, 24
 export N_ACOMPCORS=5                                    # Recommend choosing 5 or 6
 export ACOMPCOR_STRATEGY="separate"                     # Choose "combined" or "separate"
-export N_GLOBAL_PARAMETERS=0                            # Choose 0, 1, 2, 3, or 4
+export N_GLOBAL_PARAMETERS=1                            # Choose 0, 1, 2, 3, or 4
 export FD_THRESHOLD=0.5                                 # Choose a float between 0-1.0
 export EXCLUSION_CRITERIA=0.3                           # Choose a float between 0.20-0.40
 export FWHM=6                                           # Choose integer
@@ -141,7 +141,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
             if [[ $LABEL != "placeholder" ]]; then
                 export FIRST_LEVEL_GLT_LABEL=$LABEL
             else
-                export FIRST_LEVEL_GLTLABEL=""
+                export FIRST_LEVEL_GLT_LABEL=""
             fi
 
             if [[ -n $JOB_ID_1 ]]; then
@@ -159,7 +159,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
             if [[ -z $SECOND_LEVEL_JOB_IDS ]]; then
                 SECOND_LEVEL_JOB_IDS=$JOB_ID_2
             else
-                # APPEND the job IDs together
+                # Append the job IDs together
                 SECOND_LEVEL_JOB_IDS=${SECOND_LEVEL_JOB_IDS}:${JOB_ID_2}
             fi
         done

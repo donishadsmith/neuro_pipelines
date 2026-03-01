@@ -161,7 +161,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_motion_parameters",
         dest="n_motion_parameters",
-        default=24,
+        default=12,
         type=int,
         choices=[6, 12, 18, 24],
         required=False,
@@ -222,7 +222,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_global_parameters",
         dest="n_global_parameters",
-        default=0,
+        default=1,
         choices=[0, 1, 2, 3, 4],
         type=int,
         required=False,
