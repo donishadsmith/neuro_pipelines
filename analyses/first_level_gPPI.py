@@ -214,10 +214,10 @@ def _get_cmd_args():
         "--acompcor_strategy",
         dest="acompcor_strategy",
         default="combined",
-        choices=["combined", "separate"],
+        choices=["combined", "separate", "none"],
         type=str,
         required=False,
-        help="Whether to use 'combined' aCompCor components or 'separate' components.",
+        help="Whether to use 'combined' aCompCor, 'separate' components, or 'none'.",
     )
     parser.add_argument(
         "--n_global_parameters",
@@ -711,19 +711,20 @@ def main(
         else:
             confounds_tsv_file = confounds_tsv_files[0]
 
-        confounds_json_file = layout.get(
-            scope="derivatives",
-            subject=subject,
-            session=session,
-            task=task,
-            desc="confounds",
-            extension="json",
-            return_type="file",
-        )
-        if not confounds_json_file:
-            continue
-        else:
-            confounds_json_file = confounds_json_file[0]
+        if acompcor_strategy != "none":
+            confounds_json_file = layout.get(
+                scope="derivatives",
+                subject=subject,
+                session=session,
+                task=task,
+                desc="confounds",
+                extension="json",
+                return_type="file",
+            )
+            if not confounds_json_file:
+                continue
+            else:
+                confounds_json_file = confounds_json_file[0]
 
         event_file = layout.get(
             scope="raw",
@@ -813,19 +814,24 @@ def main(
             subject_analysis_dir, subject, session, task, space, censor_mask
         )
 
-        with open(confounds_json_file, "r") as f:
-            confounds_meta = json.load(f)
-
         cosine_regressors, cosine_regressor_names = get_cosine_regressors(confounds_df)
 
         motion_regressors, motion_regressor_names = get_motion_regressors(
             confounds_df, n_motion_parameters
         )
 
-        acompcor_regressor_names = get_acompcor_component_names(
-            confounds_meta, n_acompcor, acompcor_strategy
-        )
-        acompcor_regressors = confounds_df[acompcor_regressor_names].to_numpy(copy=True)
+        if acompcor_strategy == "none":
+            acompcor_regressors, acompcor_regressor_names = None, None
+        else:
+            with open(confounds_json_file, "r") as f:
+                confounds_meta = json.load(f)
+
+            acompcor_regressor_names = get_acompcor_component_names(
+                confounds_meta, n_acompcor, acompcor_strategy
+            )
+            acompcor_regressors = confounds_df[acompcor_regressor_names].to_numpy(
+                copy=True
+            )
 
         global_regressors, global_regressor_names = (
             get_global_signal_regressors(confounds_df, n_global_parameters)
