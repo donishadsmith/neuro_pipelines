@@ -17,6 +17,9 @@ RUN_CLUSTER_RESULTS=true                                # Determines the signifi
 RUN_CLUSTER_MNI_LOCATIONS=true                          # Determines the MNI region name of each cluster and adds to table created from RUN_CLUSTER_RESULTS
 RUN_EXTRACT_INDIVIDUAL_BETAS=true                       # Extracts the individual cluster betas and outputs to table; also adds interpretations
 
+SEND_EMAILS=false                                       # Whether or not to send emails
+EMAIL_ADDRESS=""                                        # Email address to report job completion
+
 # ========================
 # GLOBAL PIPELINE SETTINGS
 # ========================
@@ -61,6 +64,12 @@ export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0" # Options - https://afni
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
 # ======================================
+if [[ $SEND_EMAILS = true ]]; then
+    MAIL_ARGS=("--mail-type=END" "--mail-user=$EMAIL_ADDRESS")
+else
+    MAIL_ARGS=()
+fi
+
 if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
 
     if [[ -z $SEED_MASK_PATH ]]; then
@@ -136,9 +145,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
             fi
 
             if [[ -n $JOB_ID_1 ]]; then
-                JOB_ID_2=$(sbatch --parsable --dependency=afterok:$JOB_ID_1 --array=0 second_level.sb $CURRENT_TASK)
+                JOB_ID_2=$(sbatch --parsable --dependency=afterok:$JOB_ID_1 --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)
             else
-                JOB_ID_2=$(sbatch --parsable --array=0 second_level.sb $CURRENT_TASK)
+                JOB_ID_2=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)
             fi
 
             if [[ $LABEL != "placeholder" ]]; then
@@ -163,9 +172,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ===================
     if [ $RUN_CLUSTER_RESULTS = true ]; then
         if [[ -n $SECOND_LEVEL_JOB_IDS ]]; then
-            JOB_ID_3=$(sbatch --parsable --dependency=afterok:$SECOND_LEVEL_JOB_IDS --array=0 get_cluster_results.sb $CURRENT_TASK)
+            JOB_ID_3=$(sbatch --parsable --dependency=afterok:$SECOND_LEVEL_JOB_IDS --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
         else
-            JOB_ID_3=$(sbatch --parsable --array=0 get_cluster_results.sb $CURRENT_TASK)
+            JOB_ID_3=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
         fi
 
         echo -e "- GET CLUSTER RESULTS SUBMITTED (JOB ID: $JOB_ID_3)\n"
@@ -178,9 +187,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =========================
     if [ $RUN_CLUSTER_MNI_LOCATIONS = true ]; then
         if [[ -n $JOB_ID_3 ]]; then
-            JOB_ID_4=$(sbatch --parsable --dependency=afterok:$JOB_ID_3 --array=0 identify_cluster_locations.sb $CURRENT_TASK)
+            JOB_ID_4=$(sbatch --parsable --dependency=afterok:$JOB_ID_3 --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
         else
-            JOB_ID_4=$(sbatch --parsable --array=0 identify_cluster_locations.sb $CURRENT_TASK)
+            JOB_ID_4=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
         fi
 
         echo -e "- IDENTIFY MNI LOCATIONS SUBMITTED (JOB ID: $JOB_ID_4)\n"
@@ -193,9 +202,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ============================
     if [ $RUN_EXTRACT_INDIVIDUAL_BETAS = true ]; then
         if [[ -n $JOB_ID_4 ]]; then
-            JOB_ID_5=$(sbatch --parsable --dependency=afterok:$JOB_ID_4 --array=0 extract_individual_betas.sb $CURRENT_TASK)
+            JOB_ID_5=$(sbatch --parsable --dependency=afterok:$JOB_ID_4 --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
         else
-            JOB_ID_5=$(sbatch --parsable --array=0 extract_individual_betas.sb $CURRENT_TASK)
+            JOB_ID_5=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
         fi
 
         echo -e "- EXTRACT INDIVIDUAL BETAS SUBMITTED (JOB ID: $JOB_ID_5)\n"
