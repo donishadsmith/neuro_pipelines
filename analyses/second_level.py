@@ -482,10 +482,11 @@ def get_model_str(data_table):
 def get_centering_str(data_table):
     exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
     continuous_vars = set(data_table.columns).difference(exclude)
+    if not continuous_vars:
+        return ""
 
     qvars_str = "'" + ",".join(continuous_vars) + "'"
     centers_str = "'" + ",".join(["0"] * len(continuous_vars)) + "'"
-
     centering_str = f"-qVars {qvars_str} -qVarCenters {centers_str}"
 
     LGR.info(f"The following centering string will be used: {centering_str}")
