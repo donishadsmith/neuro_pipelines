@@ -253,7 +253,7 @@ def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
     )
     event_df.to_csv(tsv_filename, sep="\t", index=False)
 
-
+# See: https://www.neurobs.com/pres_docs/html/03_presentation/03_stimulus_presentation/01_trials/03_fmri_mode/index.html
 def _create_flanker_events_files(
     temp_dir,
     dst_dir,
