@@ -353,8 +353,6 @@ def create_data_table(bids_dir, subject_list, beta_files):
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
     data_table["dose"] = data_table["dose"].astype(int).astype(str)
-    # Make life easier conceptually by organizing data by dose: smallest -> largest
-    data_table = data_table.sort_values(by="dose", ascending=True)
 
     exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
     continuous_vars = set(data_table.columns).difference(exclude)
