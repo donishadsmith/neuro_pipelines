@@ -41,7 +41,7 @@ def _get_task_name(nifti_file: Path, cohort: Literal["kids", "adults"]) -> str:
 def _rename_file(
     nifti_file: Path,
     bids_dir: Path,
-    subject_id: str,
+    participant_id: str,
     session_id: str,
     task_id: Optional[str] = None,
     remove_src_file: bool = True,
@@ -49,7 +49,7 @@ def _rename_file(
     kwargs = {
         "src_file": nifti_file,
         "dst_dir": bids_dir,
-        "sub_id": subject_id,
+        "sub_id": participant_id,
         "ses_id": session_id,
         "run_id": "01",
         "remove_src_file": remove_src_file,
@@ -97,20 +97,20 @@ def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
 
 
 def _get_subject_visits(
-    subject_id: str,
+    participant_id: str,
     subjects_visits_df: pd.DataFrame,
     subjects_visits_date_fmt: str,
     src_data_date_fmt: str,
 ) -> dict[str, str]:
     # Don't sort to keep the order of the NaNs
     visit_dates = _extract_subjects_visits_data(
-        subject_id,
+        participant_id,
         subjects_visits_df,
         column_name="date",
         subjects_visits_date_fmt=subjects_visits_date_fmt,
     )
     if not visit_dates or all(not pd.notna(date) for date in visit_dates):
-        LGR.critical(f"Subject {subject_id} has no visit dates.")
+        LGR.critical(f"Subject {participant_id} has no visit dates.")
 
         return None
 
@@ -120,7 +120,7 @@ def _get_subject_visits(
         for visit_date in check_dates
     ):
         LGR.critical(
-            f"Visit dates will be ignored for subject {subject_id} because "
+            f"Visit dates will be ignored for subject {participant_id} because "
             f"not all dates have a consistent format: {check_dates}."
         )
 
@@ -145,12 +145,12 @@ def _get_subject_visits(
 
 
 def _get_subject_dosages(
-    subject_id: str,
+    participant_id: str,
     subjects_visits_df: pd.DataFrame,
 ) -> dict[str, str] | None:
     dosages = (
         _extract_subjects_visits_data(
-            subject_id, subjects_visits_df, column_name="dose"
+            participant_id, subjects_visits_df, column_name="dose"
         )
         if "dose" in subjects_visits_df.columns
         else None
@@ -165,7 +165,7 @@ def _get_subject_dosages(
 
 
 def _combine_session_data(
-    subject_id,
+    participant_id: str | int,
     visit_session_map: dict[str, str] | None,
     scan_dates: list[str],
     visit_dosage_map: dict[str, str] | None,
@@ -186,7 +186,7 @@ def _combine_session_data(
         if missing_dates:
             LGR.critical(
                 "The following dates are missing from the subject_visits_file "
-                f"for subject {subject_id} and will be used as the session id if a source "
+                f"for subject {participant_id} and will be used as the session id if a source "
                 f"folder has these dates: {missing_dates.keys()}"
             )
 
@@ -215,14 +215,14 @@ def _combine_session_data(
 
 
 def _create_sessions_tsv(
-    bids_dir: Path, subject_id: str, sessions_dict: dict[str, str]
+    bids_dir: Path, participant_id: str, sessions_dict: dict[str, str]
 ) -> None:
     new_sessions_df = pd.DataFrame(sessions_dict)
     new_sessions_df["session_id"] = [
         f"ses-{session_id}" if not session_id.startswith("ses-") else session_id
         for session_id in new_sessions_df["session_id"].tolist()
     ]
-    filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
+    filename = bids_dir / f"sub-{participant_id}" / f"sub-{participant_id}_sessions.tsv"
     new_sessions_df.to_csv(filename, index=False, sep="\t")
 
 
@@ -244,11 +244,11 @@ def _generate_bids_dir_pipeline(
 
     subjects_visits_df = _get_dataframe(subjects_visits_file)
 
-    subject_ids = sorted(
+    participant_ids = sorted(
         list(set([nifti_file.parent.name.split("_")[0] for nifti_file in nifti_files]))
     )
-    for subject_id in subject_ids:
-        subject_nifti_files = _filter_nifti_files(nifti_files, subject_id)
+    for participant_id in participant_ids:
+        subject_nifti_files = _filter_nifti_files(nifti_files, participant_id)
         scan_dates = _get_folder_scan_dates(subject_nifti_files)
         if scan_dates:
             scan_dates = _standardize_dates(scan_dates, src_data_date_fmt)
@@ -256,22 +256,22 @@ def _generate_bids_dir_pipeline(
         if not all(is_valid_date(date, src_data_date_fmt) for date in scan_dates):
             LGR.warning(
                 f"Not all dates have the following format ({src_data_date_fmt}) "
-                f"for subject {subject_id}: {scan_dates}."
+                f"for subject {participant_id}: {scan_dates}."
             )
 
         if subjects_visits_df is not None:
             visit_session_map = _get_subject_visits(
-                subject_id,
+                participant_id,
                 subjects_visits_df,
                 subjects_visits_date_fmt,
                 src_data_date_fmt,
             )
-            visit_dosage_map = _get_subject_dosages(subject_id, subjects_visits_df)
+            visit_dosage_map = _get_subject_dosages(participant_id, subjects_visits_df)
         else:
             visit_session_map, visit_dosage_map = None, None
 
         session_data_tuple = _combine_session_data(
-            subject_id, visit_session_map, scan_dates, visit_dosage_map
+            participant_id, visit_session_map, scan_dates, visit_dosage_map
         )
 
         sessions_dict = {"session_id": [], "acq_time": [], "dose": []}
@@ -284,7 +284,7 @@ def _generate_bids_dir_pipeline(
 
                 dst_path = (
                     bids_dir
-                    / f"sub-{subject_id}"
+                    / f"sub-{participant_id}"
                     / f"ses-{session_id}"
                     / (
                         "anat"
@@ -301,7 +301,7 @@ def _generate_bids_dir_pipeline(
                 _rename_file(
                     session_nifti_file,
                     dst_path,
-                    subject_id,
+                    participant_id,
                     session_id,
                     task_id,
                     delete_temp_dir,
@@ -310,7 +310,7 @@ def _generate_bids_dir_pipeline(
         if add_sessions_tsv or subjects_visits_file:
             _create_sessions_tsv(
                 bids_dir,
-                subject_id,
+                participant_id,
                 sessions_dict,
             )
 

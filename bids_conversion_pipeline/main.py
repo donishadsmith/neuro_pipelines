@@ -23,7 +23,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         required=True,
         help=(
             "Source directory containing original data where NIfTI files "
-            "are stored in folders with the following format {subject_ID}_{date}."
+            "are stored in folders with the following format {participant_id}_{date}."
         ),
     )
     parser.add_argument(
@@ -99,7 +99,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         required=False,
         default=None,
         help=(
-            "A text file, where the 'subject_id' contaims the subject ID and the "
+            "A text file, where the 'participant_id' contaims the subject ID and the "
             "'date' column is the date of visit. Using this parameter is recommended "
             "when data is missing. Ensure all dates have a consistent format. "
             "**All subject visit dates should be listed AND dates should be in order of earliest to lates.** "
@@ -176,12 +176,12 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
         dst_file.unlink()
         return
 
-    subject_id = nifti_file.parent.name.split("_")[0]
-    if nifti_file.name.split("_")[0] != subject_id:
+    participant_id = nifti_file.parent.name.split("_")[0]
+    if nifti_file.name.split("_")[0] != participant_id:
         LGR.critical(
             "Deleting the following nifti file from the temporary directory "
             "since it is nested in a source directory with a different subject "
-            f"id ({subject_id}): {nifti_file}"
+            f"id ({participant_id}): {nifti_file}"
         )
         dst_file.unlink()
         return

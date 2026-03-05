@@ -352,7 +352,7 @@ def create_data_table(bids_dir, subject_list, beta_files):
     )
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
-    if pd.to_numeric(dose["dose"], errors="coerce").notna().all():
+    if pd.to_numeric(data_table["dose"].dropna(), errors="coerce").notna().all():
         data_table["dose"] = data_table["dose"].astype(int).astype(str)
     else:
         data_table["dose"] = data_table["dose"].astype(str)
