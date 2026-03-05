@@ -42,6 +42,14 @@ def _get_cmd_args():
         help="Path to a temporary directory to use.",
     )
     parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=False,
+        default="kids",
+        choices=["kids", "adults"],
+        help="Name of cohort.",
+    )
+    parser.add_argument(
         "--task",
         dest="task",
         required=True,
@@ -80,7 +88,11 @@ def _get_cmd_args():
         dest="subjects_visits_date_fmt",
         required=False,
         default=r"%m/%d/%Y",
-        help=("The format of the date in the ``subjects_visits`` file."),
+        help=(
+            "The format of the date in the ``subjects_visits_file`` file."
+            "**If using an Excel file, the date format may change to '%Y-%m-%d' "
+            "even if using the '%m/%d/%Y' format."
+        ),
     )
     parser.add_argument(
         "--src_data_date_fmt",
@@ -557,11 +569,28 @@ def _get_dataframe(subjects_visits_file):
     if not subjects_visits_file:
         return None
 
-    return pd.read_csv(subjects_visits_file, sep=None, engine="python")
+    if str(subjects_visits_file).endswith(".xlsx") or str(
+        subjects_visits_file
+    ).endswith(".xls"):
+        return pd.read_excel(subjects_visits_file)
+    else:
+        pd.read_csv(subjects_visits_file, sep=None, engine="python")
 
 
 def _strip_entity(subjects):
     return [str(subject).removeprefix("sub-") for subject in subjects]
+
+
+EVENTS_FUNC = {
+    "kids": {
+        "flanker": _create_flanker_events_files,
+        "nback": _create_nback_events_files,
+        "mtle": _create_mtl_events_files,
+        "mtlr": _create_mtl_events_files,
+        "princess": _create_princess_events_files,
+    },
+    "adults": {"flanker": _create_flanker_events_files},
+}
 
 
 def main(
@@ -569,22 +598,17 @@ def main(
     dst_dir,
     temp_dir,
     task,
+    cohort,
     subjects,
     minimum_file_size,
     subjects_visits_file,
     subjects_visits_date_fmt,
     src_data_date_fmt,
 ):
-    func = {
-        "flanker": _create_flanker_events_files,
-        "nback": _create_nback_events_files,
-        "mtle": _create_mtl_events_files,
-        "mtlr": _create_mtl_events_files,
-        "princess": _create_princess_events_files,
-    }
-
-    if task not in func:
-        raise ValueError(f"`task` must be one of the following: {func.keys()}")
+    if task not in EVENTS_FUNC[cohort]:
+        raise ValueError(
+            f"`task` must be one of the following: {EVENTS_FUNC[cohort].keys()}"
+        )
 
     if subjects_visits_file:
         _check_subjects_visits_file(subjects_visits_file)
@@ -617,7 +641,7 @@ def main(
 
     try:
         _copy_event_files(src_dir, temp_dir, task, minimum_file_size)
-        func[task](**kwargs)
+        EVENTS_FUNC[cohort][task](**kwargs)
     finally:
         shutil.rmtree(temp_dir)
 
