@@ -1,7 +1,8 @@
-import argparse, tempfile, shutil
+import argparse, tempfile, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
+from nifti2bids._decorators import check_nifti
 from nifti2bids.io import _copy_file, compress_image, regex_glob
 from nifti2bids.logging import setup_logger
 from nifti2bids.metadata import is_valid_date
@@ -44,11 +45,12 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         help="The subject IDs in the 'src_dir' to convert to BIDS.",
     )
     parser.add_argument(
-        "--dataset",
-        dest="dataset",
+        "--exclude_src_folder_names",
+        dest="exclude_src_folder_names",
         required=False,
-        default="mph",
-        help="Name of the dataset (i.e., mph and naag).",
+        nargs="+",
+        default=None,
+        help="Names of the source folders to exclude.",
     )
     parser.add_argument(
         "--delete_temp_dir",
@@ -63,6 +65,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="cohort",
         required=False,
         default="kids",
+        choices=["kids", "adults"],
         help="The cohort if dataset is 'mph' (i.e., kids and adult).",
     )
     parser.add_argument(
@@ -108,7 +111,11 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="subjects_visits_date_fmt",
         required=False,
         default=r"%m/%d/%Y",
-        help=("The format of the date in the ``subjects_visits_file`` file."),
+        help=(
+            "The format of the date in the ``subjects_visits_file`` file."
+            "**If using an Excel file, the date format may change to '%Y-%m-%d' "
+            "even if using the '%m/%d/%Y' format."
+        ),
     )
     parser.add_argument(
         "--src_data_date_fmt",
@@ -141,6 +148,15 @@ def _filter_subjects(
         return folders
 
 
+def _filter_source_folders(
+    folders: list[Path], exclude_src_folder_names: Optional[list[str]]
+):
+    if not exclude_src_folder_names:
+        return folders
+
+    return [folder for folder in folders if folder.name not in exclude_src_folder_names]
+
+
 def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
     dst_file = temp_dir / nifti_file.parent.name / nifti_file.name
     _copy_file(
@@ -148,6 +164,27 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
         dst_file=dst_file,
         remove_src_file=False,
     )
+
+    try:
+        _is_raw_nifti(dst_file)
+    except ValueError:
+        LGR.critical(
+            "Deleting the following nifti file from the temporary directory "
+            f"since it is likely not a raw image: {nifti_file}",
+            exc_info=True,
+        )
+        dst_file.unlink()
+        return
+
+    subject_id = nifti_file.parent.name.split("_")[0]
+    if nifti_file.name.split("_")[0] != subject_id:
+        LGR.critical(
+            "Deleting the following nifti file from the temporary directory "
+            "since it is nested in a source directory with a different subject "
+            f"id ({subject_id}): {nifti_file}"
+        )
+        dst_file.unlink()
+        return
 
     if nifti_file.name.endswith(".nii"):
         try:
@@ -160,12 +197,25 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
             dst_file.unlink()
 
 
+@check_nifti(nifti_param_name="nifti_file")
+def _is_raw_nifti(nifti_file):
+    pass
+
+
 def _copy_data_to_temp_dir(
-    src_dir: Path, temp_dir: Path, subjects: Optional[list[str | int]]
+    src_dir: Path,
+    temp_dir: Path,
+    subjects: Optional[list[str | int]],
+    exclude_src_folder_names: Optional[list[str]],
 ) -> None:
-    subject_folders = _filter_subjects(
-        folders=regex_glob(src_dir, pattern=r"^\d+_\d+$"), subjects=subjects
-    )
+    subject_folders = regex_glob(src_dir, pattern=r"^\d+.*_\d+$")
+    subject_folders = _filter_subjects(subject_folders, subjects)
+    subject_folders = _filter_source_folders(subject_folders, exclude_src_folder_names)
+    if not subject_folders:
+        LGR.critical(
+            f"After filtering, no folders can be converted from the following directory: {src_dir}"
+        )
+        sys.exit(1)
 
     for subject_folder in subject_folders:
         date_str = subject_folder.name.split("_")[-1]
@@ -177,7 +227,9 @@ def _copy_data_to_temp_dir(
 
         # Handle edge case where analyses related files placed in same folder as
         # original nifti which has the naming {subjectID}_{scan_date}_{acqusition_number}
-        nifti_files = regex_glob(subject_folder, pattern=r"^\d+_\d+.*\.(nii|nii.gz)$")
+        nifti_files = regex_glob(
+            subject_folder, pattern=r"^\d+_(\d+)?.*\.(nii|nii.gz)$"
+        )
         for nifti_file in nifti_files:
             _copy_nifti_files(nifti_file, temp_dir)
 
@@ -187,7 +239,7 @@ def main(
     temp_dir: str,
     bids_dir: str,
     subjects: Optional[list[str | int]],
-    dataset: Literal["mph", "naag"],
+    exclude_src_folder_names: Optional[list[str]],
     cohort: Literal["kids", "adults"],
     delete_temp_dir: bool,
     create_dataset_metadata: bool,
@@ -197,9 +249,6 @@ def main(
     src_data_date_fmt: str,
 ) -> None:
     try:
-        if (dataset := dataset.lower()) not in ["naag", "mph"]:
-            raise ValueError("'--dataset' must be 'naag' or 'mph'.")
-
         if (cohort := cohort.lower()) not in ["kids", "adults"]:
             raise ValueError("'--cohort' must be 'kids' or 'adults'.")
 
@@ -219,16 +268,17 @@ def main(
         if subjects:
             subjects = _strip_entity(subjects)
 
-        _copy_data_to_temp_dir(Path(src_dir), temp_dir, subjects)
+        _copy_data_to_temp_dir(
+            Path(src_dir), temp_dir, subjects, exclude_src_folder_names
+        )
 
         # Pipeline to identify un-named NIfTI images and standardize task names
-        _standardize_task_pipeline(temp_dir, dataset, cohort)
+        _standardize_task_pipeline(temp_dir, cohort)
 
         # Pipeline to move files to BIDS directory
         _generate_bids_dir_pipeline(
             temp_dir,
             bids_dir,
-            dataset,
             cohort,
             create_dataset_metadata,
             add_sessions_tsv,
@@ -239,7 +289,7 @@ def main(
         )
 
         # Pipeline to create JSON sidecars for NIfTI images
-        _create_json_sidecar_pipeline(bids_dir)
+        _create_json_sidecar_pipeline(bids_dir, cohort)
     finally:
         if delete_temp_dir and (isinstance(temp_dir, Path) and temp_dir.exists()):
             shutil.rmtree(temp_dir)

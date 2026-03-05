@@ -6,30 +6,25 @@ from nifti2bids.io import regex_glob, get_nifti_header
 from nifti2bids.metadata import is_3d_img, infer_task_from_image
 from nifti2bids.logging import setup_logger
 
-from _utils import _get_constant
-
-_TASK_NAMES = {
-    "mph": {
-        "kids": ["mtl_neu", "n-back", "nback", "n_back", "princess", "flanker"],
-        "adults": None,
-    },
-    "naag": None,
-}
-_ANAT_NAME = "mprage32"
-_TASK_VOLUME_MAP = {
-    "mph": {
-        "kids": {"flanker": 305, "nback": 246, "princess": 262, "mtl": 96},
-        "adults": None,
-    },
-    "naag": None,
-}
-
 LGR = setup_logger(__name__)
 
+_TASK_NAMES_PATTERNS = {
+    "kids": "(mtl(_neu)?|n([_-])?back|princess|flanker|mprage(32)?)",
+    "adults": "(mtl|n([_-])?back|(simple(repeat)?)?gng|flanker|mprage(32)?)",
+}
+_TASK_VOLUME_MAP = {
+    "kids": {"flanker": 305, "nback": 246, "princess": 262, "mtl": 96},
+    "adults": {"flanker": 305, "nback": 124, "mtl": 174, "gng": 98},
+}
 
-def _infer_file_identity(
-    temp_dir: Path, all_desc: list[str], task_volume_map: dict[str, int]
-) -> None:
+
+def _pattern_found(pattern: str, filename: str):
+    match = re.search(pattern, filename.lower())
+
+    return True if match else False
+
+
+def _infer_file_identity(temp_dir: Path, cohort: Literal["kids", "adults"]) -> None:
     """
     For files with no task names, identify the file by whether its
     3D (anatomical) or not. If it is a 4D image, then infer the
@@ -37,7 +32,7 @@ def _infer_file_identity(
     """
     nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
     for nifti_file in nifti_files:
-        if not any(name in nifti_file.name.lower() for name in all_desc):
+        if not _pattern_found(_TASK_NAMES_PATTERNS[cohort], nifti_file.name):
             if is_3d_img(nifti_file):
                 # Safety identity check based on voxel sizes for near isotropic mprage32
                 # Note: Protocol doesn't collect fmaps
@@ -56,15 +51,16 @@ def _infer_file_identity(
                         "to allow the conversion to continue for the remaining files."
                     )
                     nifti_file.unlink()
-
                     continue
             else:
-                desc = infer_task_from_image(nifti_file, task_volume_map)
+                desc = infer_task_from_image(nifti_file, _TASK_VOLUME_MAP[cohort])
 
-            # Special case since there are two mtl_neu with 96 volumes
+            # Special case since there are two mtl files for the kids dataset and the adult dataset
+            # with the same number of volumes
             # Each mtl file has the acquisition number in the filename that preceeds "_1"
             # MTLE comes before the MTLR hence the acquisition number is important
-            if desc.startswith("mtl"):
+            # Same for go-nogo, there are two versions with the same number of volumes for the adult data
+            if desc.startswith("mtl") or desc.endswith("gng"):
                 # There are cases where there is only a single number followed by
                 # extension hence the _\d+ is optional
                 pattern = r"_(\d+)(?:_\d+)?\.nii\.gz$"
@@ -82,25 +78,27 @@ def _infer_file_identity(
 
 
 def _standardize_task_pipeline(
-    temp_dir: Path, dataset: Literal["mph", "naag"], cohort: Literal["kids", "adults"]
+    temp_dir: Path, cohort: Literal["kids", "adults"]
 ) -> None:
-    all_desc = _get_constant(_TASK_NAMES, dataset, cohort) + [_ANAT_NAME]
-    task_volume_map = _get_constant(_TASK_VOLUME_MAP, dataset, cohort)
+    _infer_file_identity(temp_dir, cohort)
+    _differentiate_mtl_filenames(temp_dir)
+    _standardize_nback_filenames(temp_dir)
 
-    _infer_file_identity(temp_dir, all_desc, task_volume_map)
-
-    if dataset == "mph":
-        _rename_mtl_filenames(temp_dir)
-        _standardize_nback_filenames(temp_dir, all_desc)
+    if cohort == "adults":
+        _differentiate_gng_filenames(temp_dir)
 
 
-def _rename_mtl_filenames(temp_dir: Path) -> None:
+def _differentiate_filenames(
+    temp_dir: Path, task: str, task_order_dict: dict[int, str]
+):
     for subject_folder in temp_dir.glob("*"):
         nifti_files = list(
             regex_glob(subject_folder, pattern=r"^.*\.nii\.gz$", recursive=True)
         )
         nifti_files = [
-            nifti_file for nifti_file in nifti_files if "mtl" in nifti_file.name.lower()
+            nifti_file
+            for nifti_file in nifti_files
+            if _pattern_found(_get_pattern(task), nifti_file.name)
         ]
 
         # Cant sort due to lexicographical sorting which makes 10 preceed 9.
@@ -121,35 +119,48 @@ def _rename_mtl_filenames(temp_dir: Path) -> None:
             ]
         )
 
-        for indx, nii_tuple in enumerate(nii_tuple_list):
+        for index, nii_tuple in enumerate(nii_tuple_list):
             _, nifti_file = nii_tuple
-            task_name = "mtle" if indx == 0 else "mtlr"
-            replace_name = "mtl_neu" if "mtl_neu" in nifti_file.name else "mtl"
+            task_name = task_order_dict[index]
             new_nifti_filename = nifti_file.parent / nifti_file.name.lower().replace(
-                replace_name, task_name
+                _get_replace_name(nifti_file, task), task_name
             )
             nifti_file.rename(new_nifti_filename)
 
 
-def _standardize_nback_filenames(temp_dir: Path, all_desc: list[str]) -> None:
-    nback_variants = [desc for desc in all_desc if desc.endswith("back")]
-    nifti_files = list(regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True))
+def _get_pattern(task: Literal["mtl", "gng", "nback"]):
+    return {
+        "mtl": "(mtl(_neu)?)",
+        "gng": "((simple(repeat)?)?gng)",
+        "nback": "(n([_-])?back)",
+    }[task]
 
+
+def _get_replace_name(nifti_file: Path, task: Literal["mtl", "gng", "nback"]):
+    return re.search(_get_pattern(task), nifti_file.name.lower()).group(1)
+
+
+def _differentiate_mtl_filenames(temp_dir: Path) -> None:
+    _differentiate_filenames(
+        temp_dir, task="mtl", task_order_dict={0: "mtle", 1: "mtlr"}
+    )
+
+
+def _differentiate_gng_filenames(temp_dir: Path) -> None:
+    _differentiate_filenames(
+        temp_dir, task="gng", task_order_dict={0: "simplegng", 1: "repeatgng"}
+    )
+
+
+def _standardize_nback_filenames(temp_dir: Path) -> None:
+    nifti_files = list(regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True))
     nifti_files = [
         nifti_file
         for nifti_file in nifti_files
-        if any(variant in nifti_file.name.lower() for variant in nback_variants)
+        if _pattern_found(_get_pattern("nback"), nifti_file.name)
     ]
     for nifti_file in nifti_files:
-        indx = [variant in nifti_file.name.lower() for variant in nback_variants].index(
-            True
-        )
-        variant = nback_variants[indx]
-        if variant == "nback":
-            continue
-
         new_filename = nifti_file.parent / nifti_file.name.lower().replace(
-            variant, "nback"
+            _get_replace_name(nifti_file, "nback"), "nback"
         )
-
         nifti_file.rename(new_filename)

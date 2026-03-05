@@ -11,9 +11,8 @@
 # ---------------------------------------------------------------------------
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 
-DATASET="mph-study"
 COHORT="kids"
-BIDS_DIR="/projects/bigos_lab/${DATASET}/${COHORT}/dset"
+BIDS_DIR="/projects/bigos_lab/"mph-study"/$COHORT/dset"
 SUBJECTS_VISITS_FILE=""
 
 CMD="$PYTHON add_dosages.py --bids_dir $BIDS_DIR --subjects_visits_file $SUBJECTS_VISITS_FILE"

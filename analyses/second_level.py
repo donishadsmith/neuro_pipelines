@@ -337,7 +337,7 @@ def create_data_table(bids_dir, subject_list, beta_files):
     all_sessions = pd.concat(sessions_dfs, ignore_index=True)
     data_table = all_sessions.merge(participants_df, on="participant_id")
 
-    for col in ["acq_time", "acq_date"]:
+    for col in ["acq_time", "mg"]:
         if col in data_table.columns:
             data_table = data_table.drop(col, axis=1)
 
@@ -352,7 +352,10 @@ def create_data_table(bids_dir, subject_list, beta_files):
     )
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
-    data_table["dose"] = data_table["dose"].astype(int).astype(str)
+    if pd.to_numeric(dose["dose"], errors="coerce").notna().all():
+        data_table["dose"] = data_table["dose"].astype(int).astype(str)
+    else:
+        data_table["dose"] = data_table["dose"].astype(str)
 
     exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
     continuous_vars = set(data_table.columns).difference(exclude)
@@ -430,7 +433,7 @@ def create_gm_only_group_mask(gm_probseg_img_path, gm_mask_threshold, group_mask
         return group_mask
 
     LGR.info(
-        "Thresholding GM probability mask, any voxel with a proability greater than "
+        "Thresholding GM probability mask, any voxel with a probability greater than "
         f"{gm_mask_threshold} will be retained in the group mask."
     )
 
@@ -844,7 +847,6 @@ def create_concatenated_image(
 
         for img in subject_mean_images:
             Path(img).unlink()
-
     else:
         files_to_merge = glt_data_table["InputFile"].tolist()
         cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(files_to_merge)}"

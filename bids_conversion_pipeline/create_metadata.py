@@ -1,5 +1,6 @@
 import copy, json
 from pathlib import Path
+from typing import Literal
 
 import nifti2bids.metadata as bids_meta
 from nifti2bids.io import regex_glob
@@ -31,7 +32,7 @@ _FUNC_JSON.update(
         "InternalPulseSequenceName": "EPI",
         "MRAcquisitionType": "2D",
         "SliceThickness": 3,
-        "SpacingBetweenSlices": 1.12,
+        "SpacingBetweenSlices": None,
         "EchoTime": 0.03,
         "EffectiveEchoSpacing": None,
         "TotalReadoutTime": None,
@@ -47,11 +48,13 @@ _FUNC_JSON.update(
 
 SLICE_ENCODING_END = "S"
 FAT_SHIFT_DIRECTION = "P"
-WATER_FAT_SHIFT_PIXELS = 7.174
+WATER_FAT_SHIFT_PIXELS = {"kids": 7.174, "adults": 7.179}
 EPI_FACTOR = 27
 
 
-def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
+def _create_json_sidecar_pipeline(
+    bids_dir: Path, cohort: Literal["kids", "adults"]
+) -> None:
     nifti_files = regex_glob(bids_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
     for nifti_file in nifti_files:
         modality = nifti_file.parent.name
@@ -61,7 +64,7 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
             json_schema = copy.deepcopy(_FUNC_JSON)
             json_schema["EffectiveEchoSpacing"] = (
                 bids_meta.compute_effective_echo_spacing(
-                    WATER_FAT_SHIFT_PIXELS, EPI_FACTOR
+                    WATER_FAT_SHIFT_PIXELS[cohort], EPI_FACTOR
                 )
             )
 
@@ -108,7 +111,15 @@ def _create_json_sidecar_pipeline(bids_dir: Path) -> None:
                 if orientation[slice_index] == SLICE_ENCODING_END
                 else f"{slice_axis}-"
             )
-            json_schema["TaskName"] = get_entity_value(nifti_file, entity="task")
+            task_name = get_entity_value(nifti_file, entity="task")
+            # The simple and repeat gng are the only tasks with 0 slice spacing but
+            # but still uses ascending/sequential as opposed to another method that collects
+            # every other slice, unsure how cross-slice excitation is accounted for here
+            # https://mriquestions.com/cross-talk.html#:~:text=Slice%20cross%2Dtalk%20%2D%20Questions%20and,it%20the%20%22distance%20factor%22.
+            json_schema["SpacingBetweenSlices"] = (
+                0 if task_name.endswith("gng") else 1.12
+            )
+            json_schema["TaskName"] = task_name
 
             # https://neurostars.org/t/determining-phase-encoding-direction-and-total-read-out-time-from-philips-scans/25402/4
             # https://neurostars.org/t/bids-fmap-phase-encoding-direction-and-image-orientation-beginner/33274/7

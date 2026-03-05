@@ -1,4 +1,4 @@
-import shutil
+import re, shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
@@ -15,7 +15,6 @@ from nifti2bids.metadata import is_valid_date
 from nifti2bids.logging import setup_logger
 
 from _utils import (
-    _get_constant,
     _create_or_append_participants_tsv,
     _extract_subjects_visits_data,
     _standardize_dates,
@@ -24,8 +23,8 @@ from _utils import (
 LGR = setup_logger(__name__)
 
 _TASK_NAMES = {
-    "mph": {"kids": ["mtlr", "mtle", "nback", "princess", "flanker"], "adults": None},
-    "naag": None,
+    "kids": "(mtlr|mtle|nback|princess|flanker)",
+    "adults": "(mtlr|mtle|nback|flanker|simplegng|repeatgng)",
 }
 
 
@@ -35,13 +34,8 @@ def _filter_nifti_files(nifti_files: list[Path], target: str) -> list[Path]:
     )
 
 
-def _get_task_name(
-    nifti_file: Path, dataset: Literal["mph", "naag"], cohort: Literal["kids", "adults"]
-) -> str:
-    task_names = _get_constant(_TASK_NAMES, dataset, cohort)
-    indx = [task in nifti_file.name.lower() for task in task_names].index(True)
-
-    return task_names[indx]
+def _get_task_name(nifti_file: Path, cohort: Literal["kids", "adults"]) -> str:
+    return re.search(_TASK_NAMES[cohort], nifti_file.name.lower()).group(1)
 
 
 def _rename_file(
@@ -67,10 +61,10 @@ def _rename_file(
         create_bids_file(**kwargs, task_id=task_id, desc="bold")
 
 
-def _generate_dataset_metadata(bids_dir: Path, dataset: Literal["mph", "naag"]) -> None:
+def _generate_dataset_metadata(bids_dir: Path) -> None:
     if not list(bids_dir.glob("dataset_description.json")):
         dataset_description = create_dataset_description(
-            dataset.upper(), bids_version="1.4.0"
+            dataset_name="MPH", bids_version="1.4.0"
         )
         save_dataset_description(dataset_description, bids_dir)
 
@@ -81,7 +75,12 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
     if not subjects_visits_file:
         return None
 
-    return pd.read_csv(subjects_visits_file, sep=None, engine="python")
+    if str(subjects_visits_file).endswith(".xlsx") or str(
+        subjects_visits_file
+    ).endswith(".xls"):
+        return pd.read_excel(subjects_visits_file)
+    else:
+        pd.read_csv(subjects_visits_file, sep=None, engine="python")
 
 
 def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
@@ -110,7 +109,6 @@ def _get_subject_visits(
         column_name="date",
         subjects_visits_date_fmt=subjects_visits_date_fmt,
     )
-
     if not visit_dates or all(not pd.notna(date) for date in visit_dates):
         LGR.critical(f"Subject {subject_id} has no visit dates.")
 
@@ -203,7 +201,7 @@ def _combine_session_data(
     filtered_dosages = []
     if visit_dosage_map:
         filtered_dosages = [
-            float(dosage)
+            dosage
             for session_id, dosage in visit_dosage_map.items()
             if session_id in session_scan_date_map
         ]
@@ -222,7 +220,7 @@ def _create_sessions_tsv(
     new_sessions_df = pd.DataFrame(sessions_dict)
     new_sessions_df["session_id"] = [
         f"ses-{session_id}" if not session_id.startswith("ses-") else session_id
-        for session_id in new_sessions_df["session_id"].to_numpy(copy=True)
+        for session_id in new_sessions_df["session_id"].tolist()
     ]
     filename = bids_dir / f"sub-{subject_id}" / f"sub-{subject_id}_sessions.tsv"
     new_sessions_df.to_csv(filename, index=False, sep="\t")
@@ -231,7 +229,6 @@ def _create_sessions_tsv(
 def _generate_bids_dir_pipeline(
     temp_dir: Path,
     bids_dir: Path,
-    dataset: Literal["mph", "naag"],
     cohort: Literal["kids", "adults"],
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
@@ -269,11 +266,7 @@ def _generate_bids_dir_pipeline(
                 subjects_visits_date_fmt,
                 src_data_date_fmt,
             )
-            visit_dosage_map = (
-                _get_subject_dosages(subject_id, subjects_visits_df)
-                if dataset == "mph"
-                else None
-            )
+            visit_dosage_map = _get_subject_dosages(subject_id, subjects_visits_df)
         else:
             visit_session_map, visit_dosage_map = None, None
 
@@ -301,7 +294,7 @@ def _generate_bids_dir_pipeline(
                 )
 
                 task_id = (
-                    _get_task_name(session_nifti_file, dataset, cohort)
+                    _get_task_name(session_nifti_file, cohort)
                     if dst_path.name == "func"
                     else None
                 )
@@ -314,9 +307,6 @@ def _generate_bids_dir_pipeline(
                     delete_temp_dir,
                 )
 
-        if dataset != "mph":
-            del sessions_dict["doses"]
-
         if add_sessions_tsv or subjects_visits_file:
             _create_sessions_tsv(
                 bids_dir,
@@ -325,7 +315,7 @@ def _generate_bids_dir_pipeline(
             )
 
     if create_dataset_metadata:
-        _generate_dataset_metadata(bids_dir, dataset)
+        _generate_dataset_metadata(bids_dir)
 
     if delete_temp_dir:
         shutil.rmtree(temp_dir)

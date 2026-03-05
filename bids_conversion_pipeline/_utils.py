@@ -13,18 +13,6 @@ from _exceptions import SubjectsVisitsFileError
 LGR = setup_logger(__name__)
 
 
-def _get_constant(
-    object: dict[str, list[str]] | dict[str, int | float],
-    dataset: Literal["mph", "naag"],
-    cohort: Literal["kids", "adults"],
-) -> list[str] | dict[str, int]:
-    constant = object[dataset]
-    if dataset == "mph":
-        constant = constant[cohort]
-
-    return constant
-
-
 def _create_or_append_participants_tsv(bids_dir: Path) -> None:
     if not (tsv_file := list(bids_dir.glob("participants.tsv"))):
         create_participant_tsv(bids_dir, save_df=True, return_df=False)
@@ -106,7 +94,15 @@ def _check_subjects_visits_file(
 ) -> None | pd.DataFrame:
     required_colnames = ["subject_id", "date"]
 
-    subjects_visits_df = pd.read_csv(subjects_visits_file, sep=None, engine="python")
+    if str(subjects_visits_file).endswith(".xlsx") or str(
+        subjects_visits_file
+    ).endswith(".xls"):
+        subjects_visits_df = pd.read_excel(subjects_visits_file)
+    else:
+        subjects_visits_df = pd.read_csv(
+            subjects_visits_file, sep=None, engine="python"
+        )
+
     subjects_visits_df.columns = [col.strip() for col in subjects_visits_df.columns]
 
     if not all(
