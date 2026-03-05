@@ -13,8 +13,14 @@ PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 
 COHORT="kids"
 BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
+DEMOGRAPHICS_FILE=""
+COVARIATES_TO_ADD=""
 
 CMD="$PYTHON participants_tsv.py --bids_dir $BIDS_DIR"
+
+if [[ -n $DEMOGRAPHICS_FILE ]]; then
+    CMD+=" --demographics_file $DEMOGRAPHICS_FILE --covariates_to_add $COVARIATES_TO_ADD"
+fi
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD

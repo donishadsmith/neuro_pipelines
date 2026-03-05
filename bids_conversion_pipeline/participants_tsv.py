@@ -1,5 +1,4 @@
 import argparse
-
 from pathlib import Path
 
 import pandas as pd
@@ -36,6 +35,59 @@ def _get_cmd_args():
     return parser
 
 
+def _get_demographic_df(demographics_file):
+    if str(demographics_file).endswith(".xlsx") or str(demographics_file).endswith(
+        ".xls"
+    ):
+        return pd.read_excel(demographics_file)
+
+    try:
+        demographic_df = pd.read_csv(
+            demographics_file, sep=None, engine="python", encoding="utf-8"
+        )
+    except UnicodeDecodeError:
+        demographic_df = pd.read_csv(
+            demographics_file, sep=None, engine="python", encoding="windows-1252"
+        )
+
+    return demographic_df
+
+
+def _get_mask_and_change_dtype(participant_df, covariate):
+    if covariate in participant_df.columns:
+        mask = participant_df[covariate].isna()
+        if (
+            pd.to_numeric(participant_df[covariate].dropna(), errors="coerce")
+            .notna()
+            .all()
+        ):
+            participant_df[covariate] = participant_df[covariate].astype(float)
+    else:
+        mask = ~participant_df["participant_id"].isna()
+
+    return mask, participant_df
+
+
+def _check_new_categories(participant_df, covariate, covariate_values):
+    if covariate not in participant_df.columns:
+        return None
+
+    if not is_string_dtype(participant_df[covariate]):
+        return None
+
+    unique_categories = participant_df[covariate].dropna().unique().tolist()
+    if unique_categories:
+        new_categories = [
+            category
+            for category in covariate_values
+            if category not in unique_categories
+        ]
+        if new_categories:
+            LGR.info(
+                f"The following new categories will be added to {covariate}: {new_categories}"
+            )
+
+
 def main(bids_dir, demographics_file, covariates_to_add) -> None:
     if demographics_file and not covariates_to_add:
         raise ValueError(
@@ -52,13 +104,7 @@ def main(bids_dir, demographics_file, covariates_to_add) -> None:
     if participant_df is None:
         return None
 
-    try:
-        demographic_df = pd.read_csv(demographics_file, sep=None, engine="python")
-    except UnicodeDecodeError:
-        demographic_df = pd.read_csv(
-            demographics_file, sep=None, engine="python", encoding="windows-1252"
-        )
-
+    demographic_df = _get_demographic_df(demographics_file)
     if "participant_id" not in demographic_df.columns:
         raise ValueError("`participant_id` must be a column in `demographics_file`.")
 
@@ -67,16 +113,13 @@ def main(bids_dir, demographics_file, covariates_to_add) -> None:
         subset="participant_id", keep="first"
     )
     for covariate in covariates_to_add:
-        if covariate in participant_df.columns:
-            mask = participant_df[covariate].isna()
-            if (
-                pd.to_numeric(participant_df[covariate].dropna(), errors="coerce")
-                .notna()
-                .all()
-            ):
-                participant_df[covariate] = participant_df[covariate].astype(float)
-        else:
-            mask = ~participant_df["participant_id"].isna()
+        if covariate not in demographic_df.columns:
+            LGR.info(
+                f"The following column name is not in `demographics_file`: {covariate}"
+            )
+            continue
+
+        mask, participant_df = _get_mask_and_change_dtype(participant_df, covariate)
 
         participant_ids = participant_df.loc[mask, "participant_id"].tolist()
         if not all(demographic_df["participant_id"].isin(participant_ids).tolist()):
@@ -85,20 +128,7 @@ def main(bids_dir, demographics_file, covariates_to_add) -> None:
         covariate_values = demographic_df.loc[
             demographic_df["participant_id"].isin(participant_ids), covariate
         ].tolist()
-        if covariate in participant_df.columns and is_string_dtype(
-            participant_df[covariate]
-        ):
-            unique_categories = participant_df[covariate].dropna().unique().tolist()
-            if unique_categories:
-                new_categories = [
-                    category
-                    for category in covariate_values
-                    if category not in unique_categories
-                ]
-                if new_categories:
-                    LGR.info(
-                        f"The following new categories will be added to {covariate}: {new_categories}"
-                    )
+        _check_new_categories(participant_df, covariate, covariate_values)
 
         participant_df.loc[mask, covariate] = covariate_values
 
