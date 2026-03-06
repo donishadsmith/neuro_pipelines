@@ -73,6 +73,9 @@ else
 	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsy:res-2"
 fi
 
+# All data uses Sense acceleration of 3, so every third line in k-space is
+# collected; distortion is minimizes. Also no field maps collected
+# https://pubmed.ncbi.nlm.nih.gov/37517572/
 CMD="$APPTAINER_CMD \
 	/data \
 	/out \
@@ -87,7 +90,6 @@ CMD="$APPTAINER_CMD \
 	--notrack \
 	--skip-bids-validation \
 	--ignore fieldmaps \
-	--use-syn-sdc \
 	$SKULL_STRIP_TEMPLATE \
 	--subject-anatomical-reference first-lex \
 	--slice-time-ref 0 \

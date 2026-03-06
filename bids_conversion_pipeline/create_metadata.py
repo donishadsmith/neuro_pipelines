@@ -133,6 +133,7 @@ def _create_json_sidecar_pipeline(
             # and fat shift direction of P (phase encoding from P to A) is j for RAS and j- for LPS
             # SENSE=3 collects 1/3 of the data in k-space in the encoding direction which reduces sdc
             # Distortion in these images are minimal https://cds.ismrm.org/protected/07MProceedings/PDFfiles/01500.pdf
+            # https://pubmed.ncbi.nlm.nih.gov/37517572/
             json_schema["PhaseEncodingDirection"] = (
                 phase_axis
                 if orientation[phase_index] != FAT_SHIFT_DIRECTION
