@@ -22,12 +22,14 @@ def _get_cmd_args():
         "--demographics_file",
         dest="demographics_file",
         required=False,
+        default=None,
         help="A demographics file, subject IDs should be in a column names `participant_id`.",
     )
     parser.add_argument(
         "--covariates_to_add",
         dest="covariates_to_add",
         required=False,
+        default=None,
         nargs="+",
         help="Names of the covariates from the demographics file.",
     )

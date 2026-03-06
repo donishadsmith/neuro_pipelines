@@ -337,7 +337,7 @@ def create_data_table(bids_dir, subject_list, beta_files):
     all_sessions = pd.concat(sessions_dfs, ignore_index=True)
     data_table = all_sessions.merge(participants_df, on="participant_id")
 
-    for col in ["acq_time", "mg"]:
+    for col in ["acq_time", "dose_mg"]:
         if col in data_table.columns:
             data_table = data_table.drop(col, axis=1)
 
