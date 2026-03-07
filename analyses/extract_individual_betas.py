@@ -291,7 +291,12 @@ def main(
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
     glm_dir = Path(glm_dir) if glm_dir else None
+    if not glm_dir.exists():
+        glm_dir = None
+
     seed_mask_path = Path(seed_mask_path) if seed_mask_path else None
+    if not seed_mask_path.exists():
+        seed_mask_path = None
 
     first_level_glt_labels = get_first_level_gltsym_codes(
         task, analysis_type, caller="extract_individual_betas"
