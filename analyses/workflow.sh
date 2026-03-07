@@ -11,6 +11,8 @@
 # NOTE: If a specific image template is needed but the file is not found in templateflow but the filename is there
 # it is a pointer to the file and needs to be downloaded. If you have download firewall issues
 # use `git annex whereis filename.nii.gz` get the download link, download it, and transfer via Globus
+# If multiple, you can do something like `git annex whereis *.nii.gz | grep "https:" | cut -c 7-"` or
+# `git annex whereis *.nii.gz | grep "https:" | cut -c 7- > links.txt`
 
 # =============================================
 # CONTROL FLOW VARIABLES (Set to true or false)
