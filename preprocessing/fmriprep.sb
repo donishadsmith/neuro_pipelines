@@ -70,7 +70,7 @@ if [[ $COHORT == "kids" ]]; then
 	OUTPUT_SPACES="--output-spaces MNIPediatricAsym:cohort-1:res-2"
 else
 	SKULL_STRIP_TEMPLATE="--skull-strip-template OASIS30ANTs"
-	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsy:res-2"
+	OUTPUT_SPACES="--output-spaces MNI152NLin2009cAsym:res-2"
 fi
 
 # All data uses Sense acceleration of 3, so every third line in k-space is
