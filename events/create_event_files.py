@@ -1,4 +1,4 @@
-import argparse, os, shutil, tempfile
+import argparse, os, re, shutil, tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -7,6 +7,7 @@ import numpy as np, pandas as pd
 from nifti2bids.parsers import (
     load_presentation_log,
     convert_edat3_to_text,
+    get_presentation_log_date,
 )
 from nifti2bids.bids import (
     PresentationBlockExtractor,
@@ -99,12 +100,23 @@ def _get_cmd_args():
         dest="src_data_date_fmt",
         required=False,
         default=r"%Y%m%d",
-        help=(
-            "The format of the dates in the filenames that are in the source directory."
-        ),
+        help="The format of the dates in the source filenames.",
     )
 
     return parser
+
+
+FILE_SIZE_MINIMUM_KB = {
+    "kids": {"flanker": 40, "mtle": 5, "mtlr": 5, "princess": 50, "nback": 40},
+    "adults": {
+        "flanker": 40,
+        "simplegng": 20,
+        "repeatgng": 20,
+        "nback": 12,
+        "mtle": 8,
+        "mtlr": 8,
+    },
+}
 
 
 class SubjectsVisitsFileError(Exception):
@@ -124,39 +136,29 @@ def _filter_log_files(log_files, subjects):
         return log_files
 
 
-def _get_minimum_file_size(task, minimum_file_size):
-    file_size_minimum_kb = {
-        "flanker": 40,
-        "mtle": 5,
-        "mtlr": 5,
-        "princess": 50,
-        "nback": 40,
-    }
-
+def _get_minimum_file_size(cohort, task, minimum_file_size):
     if not minimum_file_size:
-        minimum_file_size = file_size_minimum_kb[task] * 1024
+        minimum_file_size = FILE_SIZE_MINIMUM_KB[cohort][task] * 1024
 
     return minimum_file_size
 
 
-def _copy_event_files(src_dir, temp_dir, task, minimum_file_size):
+def _copy_event_files(src_dir, temp_dir, cohort, task, minimum_file_size):
     for event_file in src_dir.glob("*"):
-        minimum_file_size = _get_minimum_file_size(task, minimum_file_size)
-
+        minimum_file_size = _get_minimum_file_size(cohort, task, minimum_file_size)
         if os.path.getsize(event_file) < minimum_file_size:
             LGR.critical(
                 f"The following file is smaller than {minimum_file_size} bytes "
                 f"and will not be copied to the temporary directory: {event_file}."
             )
-
             continue
 
         _copy_file(event_file, temp_dir / event_file.name, remove_src_file=False)
 
 
 def _check_subjects_visits_file(subjects_visits_file: str | Path) -> None:
-    required_colnames = ["subject_id", "date"]
-    colnames = pd.read_csv(subjects_visits_file, sep=None, engine="python").columns
+    required_colnames = ["participant_id", "date"]
+    colnames = _get_dataframe(subjects_visits_file).columns
     if not all(required_colname in colnames for required_colname in required_colnames):
         raise SubjectsVisitsFileError(
             f"The following columns are required in {subjects_visits_file}: "
@@ -168,12 +170,10 @@ def _get_subjects_visits(
     subject_id, subjects_visits_df, subjects_visits_date_fmt, src_data_date_fmt
 ):
     # Don't sort to keep the order of the NaNs
-    visit_dates = (
-        subjects_visits_df[subjects_visits_df["subject_id"].astype(str) == subject_id]
-        .loc[:, "date"]
-        .tolist()
-        .tolist()
-    )
+    subjects_visits_df["date"] = subjects_visits_df["date"].astype(str)
+    visit_dates = subjects_visits_df.loc[
+        subjects_visits_df["participant_id"].astype(str) == subject_id, "date"
+    ].tolist()
 
     if not visit_dates or all(
         isinstance(date, float) and np.isnan(date) for date in visit_dates
@@ -185,6 +185,12 @@ def _get_subjects_visits(
     check_dates = [
         date for date in visit_dates if not (isinstance(date, float) and np.isnan(date))
     ]
+
+    if not check_dates:
+        LGR.critical(f"No visit dates will be ignored for subject {subject_id}.")
+
+        return None
+
     if not all(
         is_valid_date(visit_date, subjects_visits_date_fmt)
         for visit_date in check_dates
@@ -210,7 +216,7 @@ def _get_subjects_visits(
 def _get_presentation_session(
     temp_dir,
     subject_id,
-    excel_file,
+    log_file,
     task=None,
     subjects_visits_df=None,
     subjects_visits_date_fmt=None,
@@ -224,18 +230,21 @@ def _get_presentation_session(
                 for path in list(temp_dir.glob(f"*{subject_id}*{identifier}*"))
             ]
         )
+    elif task == "nback":
+        file_dates = sorted(
+            [path.name.split("_")[1] for path in list(temp_dir.glob(f"*{subject_id}*"))]
+        )
+    elif task in ["simplegng", "repeatgng"]:
+        log_date = get_presentation_log_date(log_file)
+        log_date = datetime.strptime(log_date, r"%m/%d/%Y").strftime(src_data_date_fmt)
+        file_dates = [log_date]
+
     else:
         file_dates = sorted(
             [
                 path.name.split("_")[-2]
                 for path in list(temp_dir.glob(f"*{subject_id}*"))
             ]
-        )
-
-    if not all(is_valid_date(date, src_data_date_fmt) for date in file_dates):
-        LGR.warning(
-            f"Not all dates have the following format ({src_data_date_fmt}) "
-            f"for subject {subject_id}: {file_dates}."
         )
 
     visit_session_map = (
@@ -245,8 +254,19 @@ def _get_presentation_session(
         if subjects_visits_df is not None
         else None
     )
+
     if visit_session_map:
-        curr_date = [date for date in file_dates if date in excel_file.name][0]
+        if not all(is_valid_date(date, src_data_date_fmt) for date in file_dates):
+            LGR.warning(
+                f"Not all dates have the following format ({src_data_date_fmt}) "
+                f"for subject {subject_id}: {file_dates}."
+            )
+
+        if task in ["simplegng", "repeatgng"]:
+            curr_date = file_dates[0]
+        else:
+            curr_date = [date for date in file_dates if date in log_file.name][0]
+
         date_in_map = curr_date in visit_session_map
         if not date_in_map:
             LGR.critical(
@@ -256,7 +276,10 @@ def _get_presentation_session(
 
         return visit_session_map[curr_date] if date_in_map else curr_date
     else:
-        return [date in excel_file.name for date in file_dates].index(True) + 1
+        if task in ["simplegng", "repeatgng"]:
+            return file_dates[0]
+        else:
+            return [date in log_file.name for date in file_dates].index(True) + 1
 
 
 def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
@@ -337,7 +360,52 @@ def _create_flanker_events_files(
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="flanker")
 
 
-def _create_nback_events_files(temp_dir, dst_dir, subjects):
+def _create_gonogo_events_files(
+    temp_dir,
+    dst_dir,
+    task,
+    subjects,
+    subjects_visits_df,
+    subjects_visits_date_fmt,
+    src_data_date_fmt,
+):
+    task_name = "SimpleRepeatGNG" if task == "simplegng" else "RepeatSimpleGNG"
+    log_files = _filter_log_files(temp_dir.glob(f"*{task_name}*.log"), subjects)
+    for log_file in log_files:
+        extractor = PresentationEventExtractor(
+            log_file,
+            convert_to_seconds=["Time", "Duration"],
+            trial_types=("Go", "Nogo"),
+            initial_column_headers=["Subject", "Trial"],
+            scanner_event_type="Picture",
+            trial_column_name="Trial_Type(str)",
+            scanner_trigger_code="scanner trigger",
+        )
+
+        events = {}
+        events["onset"] = extractor.extract_onsets()
+        events["duration"] = extractor.extract_durations()
+        events["trial_type"] = extractor.extract_trial_types()
+        events["response"] = extractor.extract_responses()
+
+        event_df = pd.DataFrame(events)
+
+        # Getting subject ID and organising files to get subject ID
+        subject_id = log_file.name.split("-")[0]
+        session_id = _get_presentation_session(
+            temp_dir,
+            subject_id,
+            log_file,
+            task,
+            subjects_visits_df,
+            subjects_visits_date_fmt,
+            src_data_date_fmt,
+        )
+
+        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
+
+
+def _create_nback_eprime_events_files(temp_dir, dst_dir, subjects):
     edat_files = _filter_log_files(temp_dir.glob("*.edat3"), subjects)
     for edat_file in edat_files:
         with tempfile.NamedTemporaryFile(
@@ -415,10 +483,101 @@ def _create_nback_events_files(temp_dir, dst_dir, subjects):
             csv_path.unlink()
 
 
+def _create_nback_presentation_events_files(
+    temp_dir,
+    dst_dir,
+    subjects,
+    subjects_visits_df,
+    subjects_visits_date_fmt,
+    src_data_date_fmt,
+):
+    text_files = _filter_log_files(temp_dir.glob("*.txt"), subjects)
+    for text_file in text_files:
+        extractor = PresentationBlockExtractor(
+            text_file,
+            convert_to_seconds=["Time", "Duration"],
+            block_cue_names=["0back", "2back"],
+            scanner_event_type="Pulse",
+            scanner_trigger_code="30",
+        )
+        events = {}
+        events["onset"] = extractor.extract_onsets()
+        events["duration"] = extractor.extract_durations()
+        events["trial_types"] = extractor.extract_trial_types()
+
+        event_df = pd.DataFrame(events)
+
+        subject_id = text_file.name.split("_")[0]
+        session_id = _get_presentation_session(
+            temp_dir,
+            subject_id,
+            text_file,
+            task="nback",
+            subjects_visits_df=subjects_visits_df,
+            subjects_visits_date_fmt=subjects_visits_date_fmt,
+            src_data_date_fmt=src_data_date_fmt,
+        )
+
+        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
+
+
+def _parse_mtl_files(
+    temp_dir,
+    excel_file,
+    task_name,
+    task,
+    subjects_visits_df,
+    subjects_visits_date_fmt,
+    src_data_date_fmt,
+):
+    input_df = load_presentation_log(excel_file)
+    # Add quit code, some log files did not record the quit event type
+    if not input_df[input_df["Event Type"] == "Quit"].empty:
+        input_df.loc[input_df["Event Type"] == "Quit", "Code"] = "quit"
+
+    extractor = PresentationBlockExtractor(
+        input_df,
+        convert_to_seconds=["Time", "Duration"],
+        block_cue_names=(task_name),
+        scanner_event_type="Pulse",
+        scanner_trigger_code="30",
+        rest_block_codes="rest",
+        quit_code="quit",
+        split_cue_as_instruction=True,
+    )
+
+    events = {}
+    events["onset"] = extractor.extract_onsets()
+    durations = extractor.extract_durations()
+    # Fix for those that do not have the quit event type
+    durations[-1] = durations[-1] if durations[-1] != 0 else 20.0
+    events["duration"] = durations
+    events["trial_type"] = extractor.extract_trial_types()
+
+    event_df = pd.DataFrame(events)
+    event_df["trial_type"] = event_df["trial_type"].replace(
+        {f"{task_name}_instruction": "instruction"}
+    )
+
+    subject_id = excel_file.name.split("_")[0]
+    session_id = _get_presentation_session(
+        temp_dir,
+        subject_id,
+        excel_file,
+        task,
+        subjects_visits_df,
+        subjects_visits_date_fmt,
+        src_data_date_fmt,
+    )
+
+    return event_df, subject_id, session_id
+
+
 def _create_mtl_events_files(
     temp_dir,
     dst_dir,
     subjects,
+    cohort,
     task,
     subjects_visits_df,
     subjects_visits_date_fmt,
@@ -459,7 +618,6 @@ def _create_mtl_events_files(
             {f"{task_name}_instruction": "instruction"}
         )
 
-        # Special case for subject 10308 to get subject and session
         subject_id = excel_file.name.split("_")[0]
         session_id = _get_presentation_session(
             temp_dir,
@@ -470,6 +628,12 @@ def _create_mtl_events_files(
             subjects_visits_date_fmt,
             src_data_date_fmt,
         )
+
+        if cohort == "adults":
+            # Pattern seems to be the first for blocks have the aversive images and last four are neutral
+            event_df.loc[event_df["trial_type"] == task_name, "trial_type"] = [
+                "aversive"
+            ] * 4 + ["neutral"] * 4
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
@@ -584,12 +748,19 @@ def _strip_entity(subjects):
 EVENTS_FUNC = {
     "kids": {
         "flanker": _create_flanker_events_files,
-        "nback": _create_nback_events_files,
+        "nback": _create_nback_eprime_events_files,
         "mtle": _create_mtl_events_files,
         "mtlr": _create_mtl_events_files,
         "princess": _create_princess_events_files,
     },
-    "adults": {"flanker": _create_flanker_events_files},
+    "adults": {
+        "flanker": _create_flanker_events_files,
+        "nback": _create_nback_presentation_events_files,
+        "simplegng": _create_gonogo_events_files,
+        "repeatgng": _create_gonogo_events_files,
+        "mtle": _create_mtl_events_files,
+        "mtlr": _create_mtl_events_files,
+    },
 }
 
 
@@ -626,11 +797,13 @@ def main(
         subjects = _strip_entity(subjects)
 
     kwargs = {"temp_dir": temp_dir, "dst_dir": dst_dir, "subjects": subjects}
-    if task in ["mtle", "mtlr"]:
+    if task in ["mtle", "mtlr", "simplegng", "repeatgng"]:
         kwargs.update({"task": task})
 
     # Only Presentation files contain date in filename
-    if task in ["mtle", "mtlr", "flanker"]:
+    if task in ["mtle", "mtlr", "flanker", "simplegng", "repeatgng"] or (
+        task == "nback" and cohort == "adults"
+    ):
         kwargs.update(
             {
                 "subjects_visits_df": _get_dataframe(subjects_visits_file),
@@ -638,9 +811,11 @@ def main(
                 "src_data_date_fmt": src_data_date_fmt,
             }
         )
+        if task in ["mtle", "mtlr"]:
+            kwargs.update({"cohort": cohort})
 
     try:
-        _copy_event_files(src_dir, temp_dir, task, minimum_file_size)
+        _copy_event_files(src_dir, temp_dir, cohort, task, minimum_file_size)
         EVENTS_FUNC[cohort][task](**kwargs)
     finally:
         shutil.rmtree(temp_dir)
