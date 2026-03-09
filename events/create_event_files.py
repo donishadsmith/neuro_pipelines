@@ -1,4 +1,4 @@
-import argparse, os, re, shutil, tempfile
+import argparse, os, shutil, tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -102,6 +102,13 @@ def _get_cmd_args():
         default=r"%Y%m%d",
         help="The format of the dates in the source filenames.",
     )
+    parser.add_argument(
+        "--exclude_filenames",
+        dest="exclude_filenames",
+        required=False,
+        default=None,
+        help="Exclude specific filenames.",
+    )
 
     return parser
 
@@ -125,15 +132,20 @@ class SubjectsVisitsFileError(Exception):
     pass
 
 
-def _filter_log_files(log_files, subjects):
+def _filter_log_files(log_files, subjects, exclude_filenames):
     if subjects:
-        return [
+        log_files = [
             log_file
             for log_file in log_files
             if any(subject in log_file.name for subject in subjects)
         ]
-    else:
-        return log_files
+
+    if exclude_filenames:
+        log_files = [
+            log_file for log_file in log_files if str(log_file) not in exclude_filenames
+        ]
+
+    return log_files
 
 
 def _get_minimum_file_size(cohort, task, minimum_file_size):
@@ -297,8 +309,9 @@ def _create_flanker_events_files(
     subjects_visits_df,
     subjects_visits_date_fmt,
     src_data_date_fmt,
+    exclude_filenames,
 ):
-    excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects)
+    excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects, exclude_filenames)
     for excel_file in excel_files:
         extractor = PresentationEventExtractor(
             excel_file,
@@ -368,9 +381,12 @@ def _create_gonogo_events_files(
     subjects_visits_df,
     subjects_visits_date_fmt,
     src_data_date_fmt,
+    exclude_filenames,
 ):
     task_name = "SimpleRepeatGNG" if task == "simplegng" else "RepeatSimpleGNG"
-    log_files = _filter_log_files(temp_dir.glob(f"*{task_name}*.log"), subjects)
+    log_files = _filter_log_files(
+        temp_dir.glob(f"*{task_name}*.log"), subjects, exclude_filenames
+    )
     for log_file in log_files:
         extractor = PresentationEventExtractor(
             log_file,
@@ -405,8 +421,10 @@ def _create_gonogo_events_files(
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
 
-def _create_nback_eprime_events_files(temp_dir, dst_dir, subjects):
-    edat_files = _filter_log_files(temp_dir.glob("*.edat3"), subjects)
+def _create_nback_eprime_events_files(temp_dir, dst_dir, subjects, exclude_filenames):
+    edat_files = _filter_log_files(
+        temp_dir.glob("*.edat3"), subjects, exclude_filenames
+    )
     for edat_file in edat_files:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False
@@ -490,8 +508,9 @@ def _create_nback_presentation_events_files(
     subjects_visits_df,
     subjects_visits_date_fmt,
     src_data_date_fmt,
+    exclude_filenames,
 ):
-    text_files = _filter_log_files(temp_dir.glob("*.txt"), subjects)
+    text_files = _filter_log_files(temp_dir.glob("*.txt"), subjects, exclude_filenames)
     for text_file in text_files:
         extractor = PresentationBlockExtractor(
             text_file,
@@ -582,12 +601,15 @@ def _create_mtl_events_files(
     subjects_visits_df,
     subjects_visits_date_fmt,
     src_data_date_fmt,
+    exclude_filenames,
 ):
     # MTLE and MTLR are separate tasks but can be processed in one function
     filename = "_PEARencN" if task == "mtle" else "_PEARretN"
     task_name = "indoor" if task == "mtle" else "seen"
 
-    excel_files = _filter_log_files(temp_dir.glob(f"*{filename}*.xls"), subjects)
+    excel_files = _filter_log_files(
+        temp_dir.glob(f"*{filename}*.xls"), subjects, exclude_filenames
+    )
     for excel_file in excel_files:
         input_df = load_presentation_log(excel_file)
         # Add quit code, some log files did not record the quit event type
@@ -638,8 +660,10 @@ def _create_mtl_events_files(
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
 
-def _create_princess_events_files(temp_dir, dst_dir, subjects):
-    edat_files = _filter_log_files(temp_dir.glob("*.edat3"), subjects)
+def _create_princess_events_files(temp_dir, dst_dir, subjects, exclude_filenames):
+    edat_files = _filter_log_files(
+        temp_dir.glob("*.edat3"), subjects, exclude_filenames
+    )
     for edat_file in edat_files:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False
@@ -775,6 +799,7 @@ def main(
     subjects_visits_file,
     subjects_visits_date_fmt,
     src_data_date_fmt,
+    exclude_filenames,
 ):
     if task not in EVENTS_FUNC[cohort]:
         raise ValueError(
@@ -796,7 +821,12 @@ def main(
     if subjects:
         subjects = _strip_entity(subjects)
 
-    kwargs = {"temp_dir": temp_dir, "dst_dir": dst_dir, "subjects": subjects}
+    kwargs = {
+        "temp_dir": temp_dir,
+        "dst_dir": dst_dir,
+        "subjects": subjects,
+        "exclude_filenames": exclude_filenames,
+    }
     if task in ["mtle", "mtlr", "simplegng", "repeatgng"]:
         kwargs.update({"task": task})
 
