@@ -58,7 +58,7 @@ After:
 import argparse, subprocess, json, subprocess, sys
 from pathlib import Path
 
-import nibabel as nib, numpy as np
+import nibabel as nib, numpy as np, matplotlib.pyplot as plt
 
 import bids, numpy as np, pandas as pd
 
@@ -303,6 +303,24 @@ def extract_seed_timeseries(
     resampled_seed_file.unlink()
 
     return seed_timeseries_file
+
+
+def plot_signal(signal_regressor_file, nifti_file, plot_title, upsample_dt = None):
+    dt = upsample_dt or get_tr(nifti_file)
+
+    Y = np.loadtxt(signal_regressor_file).flatten()
+    max_time = len(Y) * dt
+    X = np.linspace(0, max_time, len(Y))
+
+    plt.plot(X, Y)
+    plt.xlabel(f"Time (seconds) | dt = {dt}", fontsize=15)
+    plt.ylabel("Signal Amplitude", fontsize=15)
+    plt.title(plot_title)
+
+    filename = plot_title.replace(" ", "_").lower() + ".png"
+    save_filename = signal_regressor_file.parent / filename
+    plt.savefig(save_filename)
+    plt.clf()
 
 
 def denoise_seed_timeseries(
@@ -889,6 +907,9 @@ def main(
             seed_mask_path,
             afni_img_path,
         )
+        plot_title = "Seed Timeseries"
+        plot_signal(seed_timeseries_file, nifti_file, plot_title)
+
         denoised_seed_timeseries_file = denoise_seed_timeseries(
             subject_analysis_dir,
             subject,
@@ -900,6 +921,9 @@ def main(
             afni_img_path,
             confounds_df,
         )
+        plot_title = "Denoised Seed Timeseries"
+        plot_signal(denoised_seed_timeseries_file, nifti_file, plot_title)
+
         upsampled_seed_timeseries_file = resample_data(
             denoised_seed_timeseries_file,
             tr,
@@ -907,12 +931,17 @@ def main(
             upsample_dt,
             method="upsample",
         )
+        plot_title = "Upsampled Seed Timeseries"
+        plot_signal(upsampled_seed_timeseries_file, nifti_file, plot_title, upsample_dt)
+
         deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
             upsampled_seed_timeseries_file,
             upsample_dt,
             faltung_penalty_syntax,
             afni_img_path,
         )
+        plot_title = "Deconvolved Seed Timeseries"
+        plot_signal(deconvolved_seed_timeseries_file, nifti_file, plot_title, upsample_dt)
 
         first_level_gltsym_codes = get_first_level_gltsym_codes(
             task, analysis_type="glm", caller="gPPI"
@@ -939,9 +968,14 @@ def main(
                 afni_img_path,
                 upsample_dt,
             )
-            resample_data(
+            plot_title = "Upsampled PPI Timeseries"
+            plot_signal(ppi_regressor_file, nifti_file, plot_title, upsample_dt)
+
+            downsampled_ppi_regressor_file = resample_data(
                 ppi_regressor_file, tr, afni_img_path, upsample_dt, method="downsample"
             )
+            plot_title = "Downsampled PPI Timeseries"
+            plot_signal(downsampled_ppi_regressor_file, nifti_file, plot_title)
 
         smoothed_nifti_file = perform_spatial_smoothing(
             subject_analysis_dir.parent,

@@ -43,6 +43,7 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
 # If using, then pass the specific task to the shell script
 # e.g. sbatch second_level.sb nback
+TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 FIRST_LEVEL_GLT_LABEL=${FIRST_LEVEL_GLT_LABEL:-}
 EXCLUDE_COVARIATES=${EXCLUDE_COVARIATES:-""}
 GM_PROBSEG_IMG_PATH=${GM_PROBSEG_IMG_PATH:-""}
@@ -73,6 +74,7 @@ CMD="$PYTHON second_level.py \
 	--dst_dir $DST_DIR \
 	--method $METHOD \
 	--task $TASK \
+	--space $TEMPLATE_SPACE \
 	--exclude_covariates $EXCLUDE_COVARIATES \
 	--analysis_type $ANALYSIS_TYPE \
     --n_cores $SLURM_CPUS_PER_TASK"

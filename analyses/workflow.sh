@@ -42,6 +42,7 @@ NUM_SUBJECTS=20                                         # Set to "" if using SUB
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
 # TASKS=("nback")
 TASKS=("nback" "flanker" "mtle" "mtlr" "princess")      # Set all or specific ones out of "nback", "flanker", "mtle", "mtlr", "princess"
+export TEMPLATE_SPACE="MNIPediatricAsym_cohort-1_res-2" # Choose the name of template space data is in
 
 # --------------------------------
 # FIRST LEVEL DENOISING PARAMETERS
@@ -57,7 +58,6 @@ export FWHM=6                                           # Choose integer
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-
 TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1"
 export EXCLUDE_COVARIATES="age sex ethnicity race n_censored_volumes" # Covariates to save dof; separated by space
 export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-2_label-GM_probseg.nii.gz" # Used to isolate gray matter voxels in group mask
@@ -66,7 +66,6 @@ export GM_MASK_THRESHOLD=0.20                           # Choose a float between
 # ------------------------------------------------
 # PARAMETERS USED WHEN GETTING THE CLUSTER RESULTS
 # ------------------------------------------------
-
 export SPHERE_RADIUS=5                                  # Used to create masks, choose integer
 export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz" # Used to create sphere masks
 export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz" # Used for plotting

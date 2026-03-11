@@ -29,6 +29,7 @@ mkdir -p $DST_DIR
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 
+TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 N_MOTION_PARAMETERS=${N_MOTION_PARAMETERS:-12}      # Choose 6, 12, 18, 24
 N_ACOMPCORS=${N_ACOMPCORS:-5}                       # Recommend choosing 5 or 6
 ACOMPCOR_STRATEGY=${ACOMPCOR_STRATEGY:-"combined"}  # Choose "combined" or "separate"
@@ -58,6 +59,7 @@ CMD="$PYTHON first_level_gPPI.py \
 	--dst_dir $DST_DIR \
 	--subject ${SUBJECT#sub-} \
 	--task $TASK \
+	--space $TEMPLATE_SPACE \
 	--n_motion_parameters $N_MOTION_PARAMETERS \
 	--n_acompcor $N_ACOMPCORS \
 	--acompcor_strategy $ACOMPCOR_STRATEGY \
