@@ -28,6 +28,9 @@ def main(src_dir, bids_dir):
     src_dir = Path(src_dir)
     bids_dir = Path(bids_dir)
 
+    if not src_dir.exists():
+        raise FileExistsError(f"The following directory does not exist: {src_dir}")
+
     for src_file in src_dir.rglob("*"):
         if not src_file.name.startswith("sub-"):
             continue
