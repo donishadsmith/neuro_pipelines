@@ -1,4 +1,4 @@
-import argparse, os, shutil, tempfile
+import argparse, os, re, shutil, tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -360,7 +360,7 @@ def _create_flanker_events_files(
         )
 
         # Getting subject ID and organising files to get subject ID
-        subject_id = excel_file.name.split("_")[0]
+        subject_id = re.search("\d+", excel_file.name.split("_")[0])
         session_id = _get_presentation_session(
             temp_dir,
             subject_id,
@@ -407,7 +407,7 @@ def _create_gonogo_events_files(
         event_df = pd.DataFrame(events)
 
         # Getting subject ID and organising files to get subject ID
-        subject_id = log_file.name.split("-")[0]
+        subject_id = re.search("\d+", log_file.name.split("-")[0])
         session_id = _get_presentation_session(
             temp_dir,
             subject_id,
@@ -526,7 +526,7 @@ def _create_nback_presentation_events_files(
 
         event_df = pd.DataFrame(events)
 
-        subject_id = text_file.name.split("_")[0]
+        subject_id = re.search("\d+", text_file.name.split("_")[0])
         session_id = _get_presentation_session(
             temp_dir,
             subject_id,
@@ -578,7 +578,7 @@ def _parse_mtl_files(
         {f"{task_name}_instruction": "instruction"}
     )
 
-    subject_id = excel_file.name.split("_")[0]
+    subject_id = re.search("\d+", excel_file.name.split("_")[0])
     session_id = _get_presentation_session(
         temp_dir,
         subject_id,
@@ -640,7 +640,7 @@ def _create_mtl_events_files(
             {f"{task_name}_instruction": "instruction"}
         )
 
-        subject_id = excel_file.name.split("_")[0]
+        subject_id = re.search("\d+", excel_file.name.split("_")[0])
         session_id = _get_presentation_session(
             temp_dir,
             subject_id,
