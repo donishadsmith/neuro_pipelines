@@ -76,6 +76,7 @@ fi
 # All data uses Sense acceleration of 3, so every third line in k-space is
 # collected; distortion is minimizes. Also no field maps collected
 # https://pubmed.ncbi.nlm.nih.gov/37517572/
+# Usage Notes: https://fmriprep.org/en/stable/usage.html
 CMD="$APPTAINER_CMD \
 	/data \
 	/out \
