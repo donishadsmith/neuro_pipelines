@@ -124,6 +124,7 @@ def _create_json_sidecar_pipeline(
             # https://neurostars.org/t/determining-phase-encoding-direction-and-total-read-out-time-from-philips-scans/25402/4
             # https://neurostars.org/t/bids-fmap-phase-encoding-direction-and-image-orientation-beginner/33274/7
             # https://pmc.ncbi.nlm.nih.gov/articles/PMC4845159/
+            # https://neurostars.org/t/image-orientation-and-pe-direction-for-fmriprep/25735
             # When the fat shift direction is A, susceptibility artifacts are shifted posteriorly
             # When fat shift direction is P, susceptibility artifacts are shifted anteriorly
             # Artifacts shift in opposite direction of the fat
