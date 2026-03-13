@@ -10,12 +10,16 @@ Set variables inside "workflow.sh", then run:
 ```bash
 bash workflow.sh
 ```
-
-All jobs will be executed in order automatically
+All jobs will be executed in order automatically.
 
 ## Run each script independently
-Modify the shell script as needed and execute in the following order:
+Modify the shell script as needed:
 
+```bash
+vim first_level_glm.sb
+# Can use nano first_level_glm.sb
+```
+Then execute in the following order:
 1. first_level_glm.sb or first_level_gPPI.sb
 2. second_level.sb
 3. get_cluster_results.sb
