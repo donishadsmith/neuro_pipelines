@@ -305,13 +305,16 @@ def extract_seed_timeseries(
     return seed_timeseries_file
 
 
-def plot_signal(signal_regressor_file, nifti_file, plot_title, upsample_dt=None):
+def plot_signal(
+    signal_regressor_file, nifti_file, plot_title, upsample_dt=None, figsize=(12, 8)
+):
     dt = upsample_dt or get_tr(nifti_file)
 
     Y = np.loadtxt(signal_regressor_file).flatten()
     max_time = len(Y) * dt
     X = np.linspace(0, max_time, len(Y))
 
+    plt.figure(figsize=figsize)
     plt.plot(X, Y)
     plt.xlabel(f"Time (seconds) | dt = {dt}", fontsize=15)
     plt.ylabel("Signal Amplitude", fontsize=15)
@@ -965,6 +968,11 @@ def main(
             upsampled_condition_regressor_file = upsample_condition_regressor(
                 condition_filename, task, tr, n_volumes, upsample_dt, afni_img_path
             )
+            plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Upsampled Condition Regressor"
+            plot_signal(
+                upsampled_condition_regressor_file, nifti_file, plot_title, upsample_dt
+            )
+
             ppi_regressor_file = create_convolved_ppi_term(
                 ppi_dir,
                 deconvolved_seed_timeseries_file,
@@ -972,13 +980,13 @@ def main(
                 afni_img_path,
                 upsample_dt,
             )
-            plot_title = "Upsampled PPI Timeseries"
+            plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Upsampled PPI Timeseries"
             plot_signal(ppi_regressor_file, nifti_file, plot_title, upsample_dt)
 
             downsampled_ppi_regressor_file = resample_data(
                 ppi_regressor_file, tr, afni_img_path, upsample_dt, method="downsample"
             )
-            plot_title = "Downsampled PPI Timeseries"
+            plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Downsampled PPI Timeseries"
             plot_signal(downsampled_ppi_regressor_file, nifti_file, plot_title)
 
         smoothed_nifti_file = perform_spatial_smoothing(
