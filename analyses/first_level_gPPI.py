@@ -230,7 +230,7 @@ def _get_cmd_args():
             "Global signal regression. If 0, no global signal parameters used. "
             "If 1, 'global_signal' is used, if 2 'global_signal' and 'global_signal_derivative1' used "
             "If 3, 'global_signal', global_signal_derivative1', and global_signal_power2' used. "
-            "If 4, 'global_signal', global_signal_derivative1', global_signal_power2', an global_signal_derivative1_power2' used. "
+            "If 4, 'global_signal', global_signal_derivative1', global_signal_power2', an global_signal_derivative1_power2' used."
         ),
     )
     parser.add_argument(
@@ -247,7 +247,18 @@ def _get_cmd_args():
         default=0.1,
         type=float,
         required=False,
-        help="Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution ",
+        help="Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.",
+    )
+    parser.add_argument(
+        "--pad_seconds",
+        dest="pad_seconds",
+        default=10,
+        required=False,
+        help=(
+            "Time in seconds to determine the padding to add to both ends (pad_seconds/upsample_dt) "
+            "to minimize boundary spikes prior to deconvolution. The padding is dropped immediatelly afterwards "
+            "so the final deconvolved timeseries includes no padding."
+        ),
     )
     parser.add_argument(
         "--faltung_penalty_syntax",
@@ -562,6 +573,7 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
 
         LGR.info(f"Upsampling seed timeseries from {tr} to {upsample_dt}: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
+
     else:
         # original TR divided by sub_TR, starts at the first tr (0) and takes every
         # (tr / upsample_dt) point
@@ -583,7 +595,11 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
 
 
 def deconvolve_seed_timeseries(
-    upsampled_seed_timeseries_file, upsample_dt, faltung_penalty_syntax, afni_img_path
+    upsampled_seed_timeseries_file,
+    upsample_dt,
+    pad_seconds,
+    faltung_penalty_syntax,
+    afni_img_path,
 ):
     gamma_file_name = upsampled_seed_timeseries_file.parent / "GammaHR.1D"
     deconvolved_seed_timeseries_file = (
@@ -593,18 +609,46 @@ def deconvolve_seed_timeseries(
         )
     )
 
+    padded_deconvolved_seed_timeseries_file = (
+        deconvolved_seed_timeseries_file.parent
+        / deconvolved_seed_timeseries_file.name.replace(
+            "_desc-deconvolved", "_desc-deconvolved_padded"
+        )
+    )
+
+    # Use some padding for smooth ramp up at ends
+    pad_length = int(pad_seconds / upsample_dt)
+    padded_upsampled_seed_timeseries_file = (
+        upsampled_seed_timeseries_file.parent
+        / upsampled_seed_timeseries_file.name.replace(
+            "_desc-upsampled", "_desc-upsampled_padded"
+        )
+    )
+    padded_arr = np.pad(
+        np.loadtxt(upsampled_seed_timeseries_file), pad_width=pad_length, mode="reflect"
+    )
+    np.savetxt(padded_upsampled_seed_timeseries_file, padded_arr, fmt="%f")
+
     # Create impulse response function (GAM) and perform deconvolution to estimate the neural response given the
     # upsampled seed timeseries and an impulse response function, while also adding a penalty for better/smoother
     # estimation
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "waver '
         f"-dt {upsample_dt} -GAM -inline 1@1 > {gamma_file_name} && "
-        f"3dTfitter -RHS {upsampled_seed_timeseries_file} "
-        f'-FALTUNG {gamma_file_name} {deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
+        f"3dTfitter -RHS {padded_upsampled_seed_timeseries_file} "
+        f'-FALTUNG {gamma_file_name} {padded_deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
     )
 
     LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
+
+    deconvolved_arr = np.loadtxt(padded_deconvolved_seed_timeseries_file)[
+        pad_length:-pad_length
+    ]
+    np.savetxt(deconvolved_seed_timeseries_file, deconvolved_arr, fmt="%f")
+
+    padded_upsampled_seed_timeseries_file.unlink()
+    padded_deconvolved_seed_timeseries_file.unlink()
 
     return deconvolved_seed_timeseries_file
 
@@ -701,6 +745,7 @@ def main(
     acompcor_strategy,
     fwhm,
     upsample_dt,
+    pad_seconds,
     faltung_penalty_syntax,
 ):
     tasknames = ["princess", "flanker", "nback", "mtle", "mtlr"]
@@ -942,6 +987,7 @@ def main(
         deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
             upsampled_seed_timeseries_file,
             upsample_dt,
+            pad_seconds,
             faltung_penalty_syntax,
             afni_img_path,
         )
