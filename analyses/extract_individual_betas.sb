@@ -11,7 +11,9 @@
 # ------------------------------------------------------------------------------------------
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
 METHOD=${METHOD:-nonparametric}
-BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+
+COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
+BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 
 # Specific mask used as the seed for the gPPI

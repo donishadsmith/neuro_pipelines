@@ -53,19 +53,21 @@ TMP_DIR="$SCRATCH_DIR/tmp"
 mkdir -p $TMP_DIR
 
 # Directory within the container templateflow will be in
-APPTAINERENV_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/templateflow"
+APPTAINERENV_TEMPLATEFLOW_HOME="/home/fmriprep/.cache/${COHORT}_templateflow"
 export APPTAINERENV_TEMPLATEFLOW_HOME
 
+# https://apptainer.org/docs/user/main/bind_paths_and_mounts.html
 APPTAINER_CMD="apptainer run --containall --writable-tmpfs --cleanenv \
 	-B $BIDS_DIR:/data \
 	-B $DERIVS_DIR:/out \
-	-B $TEMPLATEFLOW_HOST_HOME:$APPTAINERENV_TEMPLATEFLOW_HOME \
+	-B $TEMPLATEFLOW_HOST_HOME:$APPTAINERENV_TEMPLATEFLOW_HOME:ro \
 	-B $SCRATCH_DIR:/work \
 	-B $TMP_DIR:/tmp \
 	-B $FS_LICENSE:/freesurfer \
 	$IMG_DIR"
 
 if [[ $COHORT == "kids" ]]; then
+	# https://neurostars.org/t/problems-using-pediatric-template-from-templateflow/4566/3
 	SKULL_STRIP_TEMPLATE="--skull-strip-template MNIPediatricAsym:cohort-1"
 	OUTPUT_SPACES="--output-spaces MNIPediatricAsym:cohort-1:res-2"
 else

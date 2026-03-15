@@ -17,7 +17,8 @@
 FMRIPREP_VERSION="25.2.3"
 
 USERNAME=${HOME#/home/}
-BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
+BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 DST_DIR="$BIDS_DIR/derivatives/glm"
 mkdir -p $DST_DIR

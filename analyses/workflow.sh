@@ -32,6 +32,8 @@ EMAIL_ADDRESS=""                                        # Email address to repor
 export ANALYSIS_TYPE="glm"                              # Choose "glm" or "gPPI"
 export METHOD="nonparametric"                           # Choose "parametric" or "nonparametric"
 export SEED_MASK_PATH=""                                # Add path if using gPPI
+# TODO: Add global cohort variable
+export COHORT="kids"                                    # Choose "kids" or "adults"
 
 # For first level
 SUBJECTS_IDS=()                                         # Set to () if running all subjects and set NUM_SUBJECTS else set specific IDS (e.g. 101 102 103)
@@ -42,7 +44,6 @@ NUM_SUBJECTS=20                                         # Set to "" if using SUB
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
 # TASKS=("nback")
 TASKS=("nback" "flanker" "mtle" "mtlr" "princess")      # Set all or specific ones out of "nback", "flanker", "mtle", "mtlr", "princess"
-export TEMPLATE_SPACE="MNIPediatricAsym_cohort-1_res-2" # Choose the name of template space data is in
 
 # --------------------------------
 # FIRST LEVEL DENOISING PARAMETERS
@@ -58,23 +59,18 @@ export FWHM=6                                           # Choose integer
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1"
 export EXCLUDE_COVARIATES="age sex ethnicity race n_censored_volumes" # Covariates to save dof; separated by space
-export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-2_label-GM_probseg.nii.gz" # Used to isolate gray matter voxels in group mask
-export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30
+export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 
 # ------------------------------------------------
 # PARAMETERS USED WHEN GETTING THE CLUSTER RESULTS
 # ------------------------------------------------
 export SPHERE_RADIUS=5                                  # Used to create masks, choose integer
-export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz" # Used to create sphere masks
-export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz" # Used for plotting
 
 # -------------------------------------------------------
 # PARAMETER USED FOR IDENTIFYING MNI LOCATION OF CLUSTERS
 # -------------------------------------------------------
 export AFNI_ORIENT="lpi"                                # Orientation of images -lpi/-spm -rai/-dicom
-export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0" # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
 
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
@@ -83,6 +79,26 @@ if [[ $SEND_EMAILS = true ]]; then
     MAIL_ARGS=("--mail-type=END" "--mail-user=$EMAIL_ADDRESS")
 else
     MAIL_ARGS=()
+fi
+
+if [[ $COHORT == "kids" ]]; then
+    export TEMPLATE_SPACE="MNIPediatricAsym_cohort-1_res-2"
+
+    TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1"
+    export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_label-GM_probseg.nii.gz"
+    export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_desc-brain_mask.nii.gz"
+    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
+    # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
+    export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0"
+else
+    # TODO: Implement adult first level, second level, etc
+    export TEMPLATE_SPACE="MNI152NLin2009cAsym_res-02"
+
+    TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNI152NLin2009cAsym"
+    export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_label-GM_probseg.nii.gz"
+    export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_desc-brain_mask.nii.gz"
+    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
+    export WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
 fi
 
 if [[ $ANALYSIS_TYPE == "gPPI" ]]; then

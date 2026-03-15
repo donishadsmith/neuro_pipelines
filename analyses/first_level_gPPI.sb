@@ -21,7 +21,8 @@ USERNAME=${HOME#/home/}
 SEED_MASK_PATH=${SEED_MASK_PATH:-}
 TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
 
-BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
+BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 DST_DIR="$BIDS_DIR/derivatives/gPPI"
 mkdir -p $DST_DIR
