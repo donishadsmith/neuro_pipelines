@@ -305,7 +305,7 @@ def extract_seed_timeseries(
     return seed_timeseries_file
 
 
-def plot_signal(signal_regressor_file, nifti_file, plot_title, upsample_dt = None):
+def plot_signal(signal_regressor_file, nifti_file, plot_title, upsample_dt=None):
     dt = upsample_dt or get_tr(nifti_file)
 
     Y = np.loadtxt(signal_regressor_file).flatten()
@@ -319,6 +319,8 @@ def plot_signal(signal_regressor_file, nifti_file, plot_title, upsample_dt = Non
 
     filename = plot_title.replace(" ", "_").lower() + ".png"
     save_filename = signal_regressor_file.parent / filename
+
+    LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
     plt.savefig(save_filename)
     plt.clf()
 
@@ -941,7 +943,9 @@ def main(
             afni_img_path,
         )
         plot_title = "Deconvolved Seed Timeseries"
-        plot_signal(deconvolved_seed_timeseries_file, nifti_file, plot_title, upsample_dt)
+        plot_signal(
+            deconvolved_seed_timeseries_file, nifti_file, plot_title, upsample_dt
+        )
 
         first_level_gltsym_codes = get_first_level_gltsym_codes(
             task, analysis_type="glm", caller="gPPI"
