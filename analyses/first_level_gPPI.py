@@ -101,7 +101,7 @@ LGR = setup_logger(__name__)
 # Instruction has the same duration for all three tasks but in the
 # code for clarity
 CONDITION_DURATIONS = {
-    "flanker": 0.5,
+    "flanker": 0.8,
     "nback": 32,
     "princess": 52,
     "mtle": 18,
