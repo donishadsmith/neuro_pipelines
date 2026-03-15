@@ -29,10 +29,10 @@ EMAIL_ADDRESS=""                                        # Email address to repor
 # ========================
 # GLOBAL PIPELINE SETTINGS
 # ========================
+export FMRIPREP_VERSION="25.2.3"                        # Version of fMRIPrep being used
 export ANALYSIS_TYPE="glm"                              # Choose "glm" or "gPPI"
 export METHOD="nonparametric"                           # Choose "parametric" or "nonparametric"
 export SEED_MASK_PATH=""                                # Add path if using gPPI
-# TODO: Add global cohort variable
 export COHORT="kids"                                    # Choose "kids" or "adults"
 
 # For first level

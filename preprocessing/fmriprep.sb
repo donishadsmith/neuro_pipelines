@@ -16,7 +16,6 @@ FMRIPREP_VERSION="25.2.3"
 DATASET="mph"
 COHORT="kids" # kids, adults
 
-USERNAME=${HOME#/home/}
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 FS_LICENSE="/projects/bigos_lab/freesurfer/license.txt"
 DSET_DIR="/projects/bigos_lab/$DATASET-study/$COHORT"
@@ -46,7 +45,7 @@ fi
 DERIVS_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 mkdir -p $DERIVS_DIR
 
-SCRATCH_DIR="/scratch/$USERNAME/$DATASET/$COHORT/fmriprep-$FMRIPREP_VERSION/$SUBJECT"
+SCRATCH_DIR="/scratch/$USER/$DATASET/$COHORT/fmriprep-$FMRIPREP_VERSION/$SUBJECT"
 mkdir -p $SCRATCH_DIR
 
 TMP_DIR="$SCRATCH_DIR/tmp"

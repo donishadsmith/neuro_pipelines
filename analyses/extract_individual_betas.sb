@@ -21,7 +21,6 @@ GLM_DIR="$BIDS_DIR/derivatives/glm"
 # $BIDS_DIR/derivatives/glm/$TASK/sphere_mask/{path}
 SEED_MASK_PATH=${SEED_MASK_PATH:-}
 
-
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
 # sbatch --array=0 extract_individual_betas.sb # values map to SLURM_ARRAY_TASK_ID for indexing TASK array

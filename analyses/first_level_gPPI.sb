@@ -10,13 +10,12 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_gPPI_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_gPPI_%A_%a.err
 # ----------------------------------------------------------------------------------
-FMRIPREP_VERSION="25.2.3"
+FMRIPREP_VERSION=${FMRIPREP_VERSION:-"25.2.3"}
 
 # sbatch --array=0 first_level_gPPI.sb # values map to SLURM_ARRAY_TASK_ID for indexing subject array
 # sbatch --array=1-13%3 first_level_gPPI.sb
 # sbatch --array=0-13 first_level_gPPI.sb
 
-USERNAME=${HOME#/home/}
 # Can be the sphere mask or another binary mask
 SEED_MASK_PATH=${SEED_MASK_PATH:-}
 TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
@@ -28,7 +27,7 @@ DST_DIR="$BIDS_DIR/derivatives/gPPI"
 mkdir -p $DST_DIR
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
 
 TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 N_MOTION_PARAMETERS=${N_MOTION_PARAMETERS:-12}      # Choose 6, 12, 18, 24

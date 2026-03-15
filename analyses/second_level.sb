@@ -14,7 +14,7 @@
 module load FSL
 module load matlab
 
-FMRIPREP_VERSION="25.2.3"
+FMRIPREP_VERSION=${FMRIPREP_VERSION:-"25.2.3"}
 
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
 METHOD=${METHOD:-nonparametric}
@@ -27,7 +27,7 @@ PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTI_FILE=""
 
 FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
 
 # NBACK (glm or gPPI)
 # "1-back_vs_0-back" or "PPI_1-back_vs_PPI_0-back"

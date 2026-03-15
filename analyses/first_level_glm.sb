@@ -14,9 +14,8 @@
 # sbatch --array=1-13%3 first_level_glm.sb
 # sbatch --array=0-13 first_level_glm.sb
 
-FMRIPREP_VERSION="25.2.3"
+FMRIPREP_VERSION=${FMRIPREP_VERSION:-"25.2.3"}
 
-USERNAME=${HOME#/home/}
 COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
 BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
 DERIV_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
@@ -26,7 +25,7 @@ mkdir -p $DST_DIR
 TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
 
 TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 N_MOTION_PARAMETERS=${N_MOTION_PARAMETERS:-12}      # Choose 6, 12, 18, 24
