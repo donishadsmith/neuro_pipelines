@@ -642,6 +642,9 @@ def deconvolve_seed_timeseries(
     LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
+    # Note: deconvolved file ends up being saved as a column vector as opposed to a row vector here
+    # AFNI saves the deconvolved file as a row; hence for create interaction term the deconvolved
+    # file does not need \\'
     deconvolved_arr = np.loadtxt(padded_deconvolved_seed_timeseries_file)[
         pad_length:-pad_length
     ]
