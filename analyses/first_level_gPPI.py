@@ -628,7 +628,9 @@ def deconvolve_seed_timeseries(
     padded_arr = np.pad(
         np.loadtxt(upsampled_seed_timeseries_file), pad_width=pad_length, mode="reflect"
     )
-    np.savetxt(padded_upsampled_seed_timeseries_file, padded_arr, fmt="%f")
+    np.savetxt(
+        padded_upsampled_seed_timeseries_file, padded_arr.reshape(-1, 1), fmt="%f"
+    )
 
     # Create impulse response function (GAM) and perform deconvolution to estimate the neural response given the
     # upsampled seed timeseries and an impulse response function, while also adding a penalty for better/smoother
@@ -649,7 +651,9 @@ def deconvolve_seed_timeseries(
     deconvolved_arr = np.loadtxt(padded_deconvolved_seed_timeseries_file)[
         pad_length:-pad_length
     ]
-    np.savetxt(deconvolved_seed_timeseries_file, deconvolved_arr, fmt="%f")
+    np.savetxt(
+        deconvolved_seed_timeseries_file, deconvolved_arr.reshape(-1, 1), fmt="%f"
+    )
 
     padded_upsampled_seed_timeseries_file.unlink()
     padded_deconvolved_seed_timeseries_file.unlink()
@@ -688,7 +692,9 @@ def upsample_condition_regressor(
     # Now mean center the task regressor
     condition_vector = np.loadtxt(upsampled_condition_regressor_file)
     condition_vector -= condition_vector.mean()
-    np.savetxt(upsampled_condition_regressor_file, condition_vector, fmt="%f")
+    np.savetxt(
+        upsampled_condition_regressor_file, condition_vector.reshape(-1, 1), fmt="%f"
+    )
 
     return upsampled_condition_regressor_file
 
