@@ -423,7 +423,7 @@ def get_task_deconvolve_cmd(
             f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
             f"-stim_times 3 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
             f"-stim_file 4 {ppi_dir / 'PPI_instruction.1D'} -stim_label 4 PPI_instruction "
-            f"-stim_file 5 {ppi_dir / 'PPI_indoor.1D'} -stim_label 5 PPI_instruction "
+            f"-stim_file 5 {ppi_dir / 'PPI_indoor.1D'} -stim_label 5 PPI_indoor "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
@@ -715,7 +715,7 @@ def create_convolved_ppi_term(
     # So regressor can be properly downsampled
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "1deval '
-        f"-a {deconvolved_seed_timeseries_file}\\' -b {upsampled_condition_regressor_file} "
+        f"-a {deconvolved_seed_timeseries_file} -b {upsampled_condition_regressor_file} "
         f"-expr 'a*b' > {neural_interaction_file} && "
         f"waver -GAM -peak 1 -TR {upsample_dt} "
         f'-input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"'

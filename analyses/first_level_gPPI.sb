@@ -37,6 +37,7 @@ N_GLOBAL_PARAMETERS=${N_GLOBAL_PARAMETERS:-1}       # Choose 0, 1, 2, 3, or 4
 FD_THRESHOLD=${FD_THRESHOLD:-0.9}                   # Choose a float between 0-1.0
 EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.4}       # Choose a float between 0.20-0.40
 FWHM=${FWHM:-6}                                     # Choose integer
+GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-10}
 
 # Extract one subject from the like corresponding to the current
 # slurm job value; essentially extracting sub-{id}
@@ -66,7 +67,8 @@ CMD="$PYTHON first_level_gPPI.py \
 	--n_global_parameters $N_GLOBAL_PARAMETERS \
 	--fd_threshold $FD_THRESHOLD \
 	--exclusion_criteria $EXCLUSION_CRITERIA \
-	--fwhm $FWHM"
+	--fwhm $FWHM \
+	--pad_seconds $GPPI_PAD_SECONDS"
 
 # hostname
 # id

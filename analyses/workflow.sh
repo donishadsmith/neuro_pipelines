@@ -55,6 +55,7 @@ export N_GLOBAL_PARAMETERS=0                            # Choose 0, 1, 2, 3, or 
 export FD_THRESHOLD=0.9                                 # Choose a float between 0-1.0
 export EXCLUSION_CRITERIA=0.3                           # Choose a float between 0.20-0.40
 export FWHM=6                                           # Choose integer
+export GPPI_PAD_SECONDS=10                              # Choose integer, pads timeseries for deconvolution for gPPI
 
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
