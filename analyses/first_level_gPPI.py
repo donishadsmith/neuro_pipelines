@@ -252,7 +252,8 @@ def _get_cmd_args():
     parser.add_argument(
         "--pad_seconds",
         dest="pad_seconds",
-        default=10,
+        default=10.0,
+        type=float,
         required=False,
         help=(
             "Time in seconds to determine the padding to add to both ends (pad_seconds/upsample_dt) "

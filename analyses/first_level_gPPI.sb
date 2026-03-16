@@ -37,7 +37,7 @@ N_GLOBAL_PARAMETERS=${N_GLOBAL_PARAMETERS:-1}       # Choose 0, 1, 2, 3, or 4
 FD_THRESHOLD=${FD_THRESHOLD:-0.9}                   # Choose a float between 0-1.0
 EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.4}       # Choose a float between 0.20-0.40
 FWHM=${FWHM:-6}                                     # Choose integer
-GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-10}
+GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-10.0}          # Choose float, pads timeseries for deconvolution for gPPI
 
 # Extract one subject from the like corresponding to the current
 # slurm job value; essentially extracting sub-{id}
