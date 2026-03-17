@@ -7,10 +7,10 @@ ENV LANG="en_GB.UTF-8"
 
 RUN apt update -y && \
     apt upgrade -y && \
-    apt install software-properties-common -y 
+    apt install software-properties-common -y
 
 RUN add-apt-repository universe && \
-    apt upgrade -y && \  
+    apt upgrade -y && \
     apt install -y \
     tcsh \
     xfonts-base \
@@ -63,7 +63,7 @@ RUN curl -O https://afni.nimh.nih.gov/pub/dist/bin/misc/@update.afni.binaries &&
     tcsh @update.afni.binaries -package linux_ubuntu_24_64 -do_extras -bindir $AFNI_DIR
 
 ENV PATH="$AFNI_DIR:$PATH"
-ENV R_LIBS=$AFNI_DIR/R 
+ENV R_LIBS=$AFNI_DIR/R
 
 RUN mkdir $R_LIBS
 

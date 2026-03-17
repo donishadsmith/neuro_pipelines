@@ -24,7 +24,7 @@ LGR = setup_logger(__name__)
 
 _TASK_NAMES = {
     "kids": "(mtlr|mtle|nback|princess|flanker)",
-    "adults": "(mtlr|mtle|nback|flanker|simplegng|repeatgng)",
+    "adults": "(mtlr|mtle|nback|flanker|simplegng|complexgng)",
 }
 
 
@@ -80,7 +80,7 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
     ).endswith(".xls"):
         return pd.read_excel(subjects_visits_file)
     else:
-        pd.read_csv(subjects_visits_file, sep=None, engine="python")
+        return pd.read_csv(subjects_visits_file, sep=None, engine="python")
 
 
 def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
@@ -259,16 +259,13 @@ def _generate_bids_dir_pipeline(
                 f"for subject {participant_id}: {scan_dates}."
             )
 
-        if subjects_visits_df is not None:
-            visit_session_map = _get_subject_visits(
-                participant_id,
-                subjects_visits_df,
-                subjects_visits_date_fmt,
-                src_data_date_fmt,
-            )
-            visit_dosage_map = _get_subject_dosages(participant_id, subjects_visits_df)
-        else:
-            visit_session_map, visit_dosage_map = None, None
+        visit_session_map = _get_subject_visits(
+            participant_id,
+            subjects_visits_df,
+            subjects_visits_date_fmt,
+            src_data_date_fmt,
+        )
+        visit_dosage_map = _get_subject_dosages(participant_id, subjects_visits_df)
 
         session_data_tuple = _combine_session_data(
             participant_id, visit_session_map, scan_dates, visit_dosage_map

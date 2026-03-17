@@ -2,8 +2,10 @@ import argparse, tempfile, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
+from nibabel.filebasedimages import ImageFileError
+
 from nifti2bids._decorators import check_nifti
-from nifti2bids.io import _copy_file, compress_image, regex_glob
+from nifti2bids.io import _copy_file, load_nifti, compress_image, regex_glob
 from nifti2bids.logging import setup_logger
 from nifti2bids.metadata import is_valid_date
 
@@ -96,13 +98,13 @@ def _get_cmd_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--subjects_visits_file",
         dest="subjects_visits_file",
-        required=False,
-        default=None,
+        required=True,
+        type=str,
         help=(
             "A text file, where the 'participant_id' contaims the subject ID and the "
-            "'date' column is the date of visit. Using this parameter is recommended "
-            "when data is missing. Ensure all dates have a consistent format. "
-            "**All subject visit dates should be listed AND dates should be in order of earliest to lates.** "
+            "'date' column is the date of visit. Ensure all dates have a consistent format. "
+            "**All subject visit dates should be listed AND dates should be in order from earliest to latest.** "
+            "**Can exclude dates listed in ``exclude_src_folder_names`` but its not mandatory**."
             "If a 'dose' column is included, then dosages will be included in the sessions TSV file."
         ),
     )
@@ -164,6 +166,17 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
         dst_file=dst_file,
         remove_src_file=False,
     )
+
+    try:
+        load_nifti(dst_file)
+    except ImageFileError:
+        LGR.critical(
+            "Deleting the following nifti file from the temporary directory since "
+            f"Nibabel cannot work out file type: {nifti_file}",
+            exc_info=True,
+        )
+        dst_file.unlink()
+        return
 
     try:
         _is_raw_nifti(dst_file)
@@ -252,16 +265,18 @@ def main(
         if (cohort := cohort.lower()) not in ["kids", "adults"]:
             raise ValueError("'--cohort' must be 'kids' or 'adults'.")
 
-        if subjects_visits_file:
-            _check_subjects_visits_file(
-                subjects_visits_file, dose_column_required=False
-            )
+        _check_subjects_visits_file(subjects_visits_file, dose_column_required=False)
 
         # Create temporary directory with compressed files
         temp_dir = temp_dir or tempfile.TemporaryDirectory().name
         temp_dir: Path = Path(temp_dir)
         if not temp_dir.exists():
             temp_dir.mkdir()
+        else:
+            raise FileExistsError(
+                "The temporary directory exists; either choose another name or "
+                f"delete the following directory: {temp_dir}"
+            )
 
         bids_dir = Path(bids_dir)
 

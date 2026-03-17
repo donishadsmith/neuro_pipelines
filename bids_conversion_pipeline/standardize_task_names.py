@@ -10,7 +10,7 @@ LGR = setup_logger(__name__)
 
 _TASK_NAMES_PATTERNS = {
     "kids": "(mtl(_neu)?|n([_-])?back|princess|flanker|mprage(32)?)",
-    "adults": "(mtl|n([_-])?back|(simple(repeat)?)?gng|flanker|mprage(32)?)",
+    "adults": "(mtl|n([_-])?back|(simple.*(repeat.*)?)?gng|flanker|mprage(32)?)",
 }
 _TASK_VOLUME_MAP = {
     "kids": {"flanker": 305, "nback": 246, "princess": 262, "mtl": 96},
@@ -131,7 +131,7 @@ def _differentiate_filenames(
 def _get_pattern(task: Literal["mtl", "gng", "nback"]):
     return {
         "mtl": "(mtl(_neu)?)",
-        "gng": "((simple(repeat)?)?gng)",
+        "gng": "((simple.*(repeat.*)?)?gng)",
         "nback": "(n([_-])?back)",
     }[task]
 
@@ -148,7 +148,7 @@ def _differentiate_mtl_filenames(temp_dir: Path) -> None:
 
 def _differentiate_gng_filenames(temp_dir: Path) -> None:
     _differentiate_filenames(
-        temp_dir, task="gng", task_order_dict={0: "simplegng", 1: "repeatgng"}
+        temp_dir, task="gng", task_order_dict={0: "simplegng", 1: "complexgng"}
     )
 
 

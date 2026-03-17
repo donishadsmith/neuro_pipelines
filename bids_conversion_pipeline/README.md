@@ -16,6 +16,11 @@ Pipeline:
 - Optionally create the participants TSV, dataset description JSON, and a sessions TSV.
     - If participants TSV is detected, will instead append new subjects to the dataframe.
 
+Execution Order:
+- main.py
+- participants_tsv.py
+- add_dosages.py
+
 ## Usage
 To run pipeline, in your preferred terminal, run:
 
