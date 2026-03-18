@@ -60,7 +60,7 @@ export GPPI_PAD_SECONDS=10.0                            # Choose float, pads tim
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export EXCLUDE_COVARIATES="age sex ethnicity race n_censored_volumes" # Covariates to save dof; separated by space
+export EXCLUDE_COVARIATES="all"                         # Covariates to save dof; separated by space; Use "" to include are covariates or "all" to exclude all
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 
 # ------------------------------------------------
@@ -92,7 +92,6 @@ if [[ $COHORT == "kids" ]]; then
     # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
     export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0"
 else
-    # TODO: Implement adult first level, second level, etc
     export TEMPLATE_SPACE="MNI152NLin2009cAsym_res-02"
 
     TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNI152NLin2009cAsym"
@@ -103,7 +102,6 @@ else
 fi
 
 if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
-
     if [[ -z $SEED_MASK_PATH ]]; then
         echo "SEED_MASK_PATH must be set when ANALYSIS_TYPE='gPPI'"
         exit 1
@@ -130,9 +128,17 @@ for CURRENT_TASK in "${TASKS[@]}"; do
 
     if [[ $CURRENT_TASK == "nback" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
-            FIRST_LEVEL_GLT_LABELS=("1-back_vs_0-back" "2-back_vs_0-back" "2-back_vs_1-back")
+            if [[ $COHORT == "kids" ]]; then
+                FIRST_LEVEL_GLT_LABELS=("1-back_vs_0-back" "2-back_vs_0-back" "2-back_vs_1-back")
+            else
+                FIRST_LEVEL_GLT_LABELS=("placeholder")
+            fi
         else
-            FIRST_LEVEL_GLT_LABELS=("PPI_1-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_1-back")
+            if [[ $COHORT == "kids" ]]; then
+                FIRST_LEVEL_GLT_LABELS=("PPI_1-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_1-back")
+            else
+                FIRST_LEVEL_GLT_LABELS=("placeholder")
+            fi
         fi
     elif [[ $CURRENT_TASK == "flanker" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
@@ -140,7 +146,6 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         else
             FIRST_LEVEL_GLT_LABELS=("PPI_congruent_vs_PPI_neutral" "PPI_incongruent_vs_PPI_neutral" "PPI_nogo_vs_PPI_neutral" "PPI_incongruent_vs_PPI_congruent" "PPI_congruent_vs_PPI_nogo" "PPI_incongruent_vs_PPI_nogo")
         fi
-
     else
         FIRST_LEVEL_GLT_LABELS=("placeholder")
     fi

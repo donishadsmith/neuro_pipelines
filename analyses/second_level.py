@@ -1,4 +1,5 @@
 import argparse, shutil, subprocess, sys
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,23 +25,6 @@ from _utils import (
 )
 
 LGR = setup_logger(__name__)
-
-EXCLUDE_COLS = ["participant_id", "session_id", "InputFile", "dose"]
-CATEGORICAL_VARS = set(["sex", "race", "ethnicity"])
-SUBJECT_CONSTANT_VARS = ["age"] + list(CATEGORICAL_VARS)
-# From most to least
-DEPRIORITIZED_REGRESSORS = ["ethnicity", "race", "sex", "age", "n_censored_volumes"]
-
-GLT_CODES = (
-    "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
-    "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
-    "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
-    "-gltCode 0 'dose : 1*'0'' ",
-    "-gltCode 5 'dose : 1*'5'' ",
-    "-gltCode 10 'dose : 1*'10'' ",
-    "-gltCode mean 'dose : {mean_code}' ",
-)
-
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
@@ -73,11 +57,17 @@ def _get_cmd_args():
         help="The destination directory for analysis.",
     )
     parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
+    parser.add_argument(
         "--space",
         dest="space",
-        default="MNIPediatricAsym_cohort-1_res-2",
-        required=False,
-        help="Template space.",
+        required=True,
+        help="Template space (i.e. 'MNIPediatricAsym_cohort-1_res-2')",
     )
     parser.add_argument(
         "--gm_probseg_img_path",
@@ -247,15 +237,70 @@ def _get_cmd_args():
     return parser
 
 
-def append_global_exclude_covariates(exclude_covariates):
-    if exclude_covariates:
-        global EXCLUDE_COLS
-        EXCLUDE_COLS.extend(exclude_covariates)
+@dataclass
+class DataContainer:
+    exclude_cols: list[str] = field(
+        default_factory=lambda: ["participant_id", "session_id", "InputFile", "dose"],
+    )
+    categorical_vars: set = field(
+        default_factory=lambda: set(["sex", "race", "ethnicity"])
+    )
+    subject_constant_vars: list[str] = field(
+        default_factory=lambda: ["age", "sex", "race", "ethnicity"]
+    )
+    # From most to least
+    deprioritized_regressors: list[str] = field(
+        default_factory=lambda: [
+            "ethnicity",
+            "race",
+            "sex",
+            "age",
+            "n_censored_volumes",
+        ],
+    )
 
-        LGR.info(
-            f"Added the following to the EXCLUDE_COLS global variable: {exclude_covariates}"
-        )
+    @property
+    def get_glt_codes(self, cohort: str) -> str:
+        glt_codes = {
+            "kids": {
+                "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
+                "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
+                "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
+                "-gltCode 0 'dose : 1*'0'' ",
+                "-gltCode 5 'dose : 1*'5'' ",
+                "-gltCode 10 'dose : 1*'10'' ",
+                "-gltCode mean 'dose : {mean_code}' ",
+            },
+            "adults": {
+                "-gltCode mph_vs_placebo 'dose : 1*'mph' -1*'placebo' ",
+                "-gltCode mph 'dose : 1*mph'' ",
+                "-gltCode placebo 'dose : 1*'placebo'' ",
+                "-gltCode mean 'dose : {mean_code}' ",
+            },
+        }
 
+        return glt_codes[cohort]
+
+    def update_exclude_cols(self, exclude_covariates: str) -> None:
+        if not exclude_covariates:
+            return
+
+        if exclude_covariates == "all":
+            self.exclude_cols.extend(self.deprioritized_regressors)
+            LGR.info(
+                "Added the following variables to be excluded, if available: "
+                f"{self.deprioritized_regressors}"
+            )
+        else:
+            self.exclude_cols.extend(exclude_covariates)
+            LGR.info(
+                "Added the following variables to be excluded, if available: "
+                f"{exclude_covariates}"
+            )
+
+    @property
+    def exclude_vars(self) -> list[str]:
+        return list(set(self.exclude_cols + list(self.categorical_vars)))
 
 def get_beta_files(analysis_dir, task, first_level_glt_label):
     return sorted(
@@ -298,7 +343,7 @@ def drop_constant_columns(data_table):
     return data_table.drop(columns=constant_columns)
 
 
-def create_data_table(bids_dir, subject_list, beta_files):
+def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     bids_dir = Path(bids_dir)
     participants_df = pd.read_csv(bids_dir / "participants.tsv", sep="\t")
 
@@ -357,8 +402,7 @@ def create_data_table(bids_dir, subject_list, beta_files):
     else:
         data_table["dose"] = data_table["dose"].astype(str)
 
-    exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
-    continuous_vars = set(data_table.columns).difference(exclude)
+    continuous_vars = set(data_table.columns).difference(datacontainer.exclude_vars)
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
@@ -448,10 +492,10 @@ def create_gm_only_group_mask(gm_probseg_img_path, gm_mask_threshold, group_mask
     return nib.nifti1.Nifti1Image(group_mask_data, group_mask.affine, group_mask.header)
 
 
-def get_glt_codes_str(data_table):
+def get_glt_codes_str(data_table, datacontainer, cohort):
     glt_str = ""
     available_doses = sorted(data_table["dose"].astype(str).unique())
-    for glt_code in GLT_CODES:
+    for glt_code in datacontainer.get_glt_codes(cohort):
         level_str = glt_code.removeprefix("-gltCode").lstrip().split(" ")[0]
         if level_str == "mean":
             value = round(1 / len(available_doses), 4)
@@ -468,9 +512,10 @@ def get_glt_codes_str(data_table):
     return glt_str
 
 
-def get_model_str(data_table):
-    exclude = set(EXCLUDE_COLS).difference(["dose"])
-    columns = [col for col in data_table.columns if col not in exclude]
+def get_model_str(data_table, datacontainer):
+    columns = [
+        col for col in data_table.columns if col not in datacontainer.exclude_vars
+    ]
 
     model_str = "+".join(columns)
     model_str += "+(1|participant_id)"
@@ -480,9 +525,8 @@ def get_model_str(data_table):
     return model_str
 
 
-def get_centering_str(data_table):
-    exclude = list(CATEGORICAL_VARS) + EXCLUDE_COLS
-    continuous_vars = set(data_table.columns).difference(exclude)
+def get_centering_str(data_table, datacontainer):
+    continuous_vars = set(data_table.columns).difference(datacontainer.exclude_vars)
     if not continuous_vars:
         return ""
 
@@ -526,40 +570,46 @@ def generate_matrices_filenames(
     return matrices_filenames_dict
 
 
-def prioritize_regressors(design_matrix):
-    if design_matrix.shape[0] <= design_matrix.shape[1]:
-        for regressor in DEPRIORITIZED_REGRESSORS:
-            if drop_columns := [
-                col for col in design_matrix.columns if col.startswith(regressor)
-            ]:
-                LGR.info(
-                    f"Dropping the following regressor(s) to save dof: {drop_columns}"
-                )
-                design_matrix = design_matrix.drop(columns=drop_columns)
+def prioritize_regressors(design_matrix, datacontainer):
+    has_dof = lambda design_matrix: design_matrix.shape[0] > design_matrix.shape[1]
 
-            LGR.info(
-                f"N OBSERVATIONS: {design_matrix.shape[0]}; N COLUMNS: {design_matrix.shape[0]}"
-            )
-            if design_matrix.shape[0] >= design_matrix.shape[1]:
-                break
+    if has_dof(design_matrix):
+        return design_matrix
+
+    for regressor in datacontainer.deprioritized_regressors:
+        if drop_columns := [
+            col for col in design_matrix.columns if col.startswith(regressor)
+        ]:
+            LGR.info(f"Dropping the following regressor(s) to save dof: {drop_columns}")
+            design_matrix = design_matrix.drop(columns=drop_columns)
+
+        LGR.info(
+            f"N OBSERVATIONS: {design_matrix.shape[0]}; N COLUMNS: {design_matrix.shape[0]}"
+        )
+        if has_dof(design_matrix):
+            break
 
     return design_matrix
 
 
 def create_design_matrix(
     glt_data_table,
+    datacontainer,
     include_intercept,
     average_within_subjects=False,
     second_level_glt_code=None,
 ):
     categorical_cols = [
-        col for col in glt_data_table.columns if col in CATEGORICAL_VARS
+        col
+        for col in glt_data_table.columns
+        if col in datacontainer.categorical_vars
+        and col not in datacontainer.exclude_vars
     ]
 
     continuous_cols = [
         col
         for col in glt_data_table.columns
-        if col not in EXCLUDE_COLS and col not in categorical_cols
+        if col not in datacontainer.exclude_vars and col not in categorical_cols
     ]
 
     for col in categorical_cols:
@@ -615,7 +665,7 @@ def create_design_matrix(
         design_matrix = pd.DataFrame(
             design_arr, columns=list(regressor_positions.values())
         )
-        design_matrix = prioritize_regressors(design_matrix)
+        design_matrix = prioritize_regressors(design_matrix, datacontainer)
 
     if include_intercept:
         intercept = [1] * design_matrix.shape[0]
@@ -680,6 +730,7 @@ def write_contrast_direction_file(
 
 def create_mean_matrices(
     glt_data_table,
+    datacontainer,
     output_dir,
     task,
     entity_key,
@@ -702,6 +753,7 @@ def create_mean_matrices(
 
     design_matrix = create_design_matrix(
         glt_data_table,
+        datacontainer,
         include_intercept=True,
         average_within_subjects=(second_level_glt_code == "mean"),
     )
@@ -725,6 +777,7 @@ def create_mean_matrices(
 
 def create_comparison_matrices(
     glt_data_table,
+    datacontainer,
     output_dir,
     task,
     entity_key,
@@ -745,7 +798,7 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    for col in SUBJECT_CONSTANT_VARS:
+    for col in datacontainer.subject_constant_vars:
         if col in glt_data_table.columns:
             glt_data_table = glt_data_table.drop(col, axis=1)
 
@@ -754,6 +807,7 @@ def create_comparison_matrices(
 
     design_matrix = create_design_matrix(
         glt_data_table,
+        datacontainer,
         include_intercept=False,
         second_level_glt_code=second_level_glt_code,
     )
@@ -878,6 +932,37 @@ def perform_palm(
         / f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-nonparametric"
     )
 
+    # The corrcon flag is used to control false positive rates since the positive and negative
+    # maps are combined programatically later, which doubles the fpr (i.e., 2 × 0.05 = 0.10)
+    # Note that Palm also has a two-tailed; however based on source code:
+    # 
+    # https://github.com/andersonwinkler/PALM/blob/d937704489cc8ae8a7dafb273e421536f8b1e1a5/palm_core.m#L1603-L1605
+    # if opts.twotail && ~ opts.missingdata && ( ~ opts.accel.lowrank || p > plm.nJ{m}(c))
+    #      G{y}{m}{c} = abs(G{y}{m}{c});
+    #   end
+    # 
+    # The abs() is applied before tfce is computed:
+    # https://github.com/andersonwinkler/PALM/blob/d937704489cc8ae8a7dafb273e421536f8b1e1a5/palm_core.m#L1674-L1675
+    # if opts.tfce.uni.do
+    #   tfce{y}{m}{c} = tfcefunc(G{y}{m}{c},y,opts,plm);
+    #
+    # tfce only integrates over positive thresholds:
+    # https://github.com/andersonwinkler/PALM/blob/d937704489cc8ae8a7dafb273e421536f8b1e1a5/palm_tfce.m#L68-L75
+    # for h = dh:dh:max(D(:));
+    #    CC = bwconncomp(D>=h,opts.tfce.conn);
+    #    integ = cellfun(@numel,CC.PixelIdxList).^opts.tfce.E * h^opts.tfce.H;
+    #    for c = 1:CC.NumObjects,
+    #        tfcestat(CC.PixelIdxList{c}) = ...
+    #        tfcestat(CC.PixelIdxList{c}) + integ(c);
+    #    end
+    # end
+    #
+    # It appears that with -twotail, abs() makes all voxels positive before tfce, and
+    # this would cause opposite effect directions (e.g., A > B and B > A) to be merged
+    # into a single cluster which artificially inflates tfce. The intended behavior
+    # for a true bidirectional map where each cluster only represents one direction is to do two separate
+    # one-tailed contrasts with -corrcon, which corrects fwer across both contrasts, and merge the results
+    # into a single bidirectional t-stat map. 
     palm_flags = (
         "-noniiclass "
         f"-i {concatenated_filename} "
@@ -889,6 +974,7 @@ def perform_palm(
         f"-tfce_H {tfce_H} "
         f"-tfce_E {tfce_E} "
         f"-tfce_C {tfce_C} "
+        "-corrcon "
         "-logp "
         "-savedof "
         f"-o {output_prefix}"
@@ -964,6 +1050,7 @@ def main(
     deriv_dir,
     analysis_dir,
     dst_dir,
+    cohort,
     task,
     first_level_glt_label,
     analysis_type,
@@ -991,13 +1078,14 @@ def main(
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
     if first_level_glt_label:
-        first_level_glt_labels = [first_level_glt_label]
+        first_level_glt_labels = (first_level_glt_label,)
     else:
         first_level_glt_labels = get_first_level_gltsym_codes(
-            task, analysis_type, caller="second_level"
+            cohort, task, analysis_type, caller="second_level"
         )
 
-    append_global_exclude_covariates(exclude_covariates)
+    datacontainer = DataContainer()
+    datacontainer.update_exclude_cols(exclude_covariates)
 
     for first_level_glt_label in first_level_glt_labels:
         entity_key = get_contrast_entity_key(first_level_glt_label)
@@ -1016,7 +1104,9 @@ def main(
             f"Found {len(beta_files)} files from {len(set(subject_list))} subjects"
         )
 
-        data_table = create_data_table(bids_dir, subject_list, beta_files)
+        data_table = create_data_table(
+            bids_dir, datacontainer, subject_list, beta_files
+        )
         data_table_filename = (
             dst_dir
             / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-data_table.txt"
@@ -1047,9 +1137,9 @@ def main(
                 first_level_glt_label,
             )
 
-            glt_str = get_glt_codes_str(data_table)
-            model_str = get_model_str(data_table)
-            center_str = get_centering_str(data_table)
+            glt_str = get_glt_codes_str(data_table, datacontainer, cohort)
+            model_str = get_model_str(data_table, datacontainer)
+            center_str = get_centering_str(data_table, datacontainer)
 
             residual_filename = perform_3dlmer(
                 task,
@@ -1091,7 +1181,7 @@ def main(
 
             output_dir = dst_dir / "second_level_outputs" / "nonparametric"
             output_dir.mkdir(parents=True, exist_ok=True)
-            for second_level_glt_code in get_second_level_glt_codes():
+            for second_level_glt_code in get_second_level_glt_codes(cohort):
                 LGR.info(f"Processing the following glt code: {second_level_glt_code}")
 
                 vs_in_code = "_vs_" in second_level_glt_code
@@ -1132,6 +1222,7 @@ def main(
                 )
                 matrices_output_dict = matrix_creation_func(
                     glt_data_table,
+                    datacontainer,
                     output_dir,
                     task,
                     entity_key,

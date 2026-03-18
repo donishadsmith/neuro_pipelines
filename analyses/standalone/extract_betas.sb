@@ -12,7 +12,8 @@
 # Use --array to process multiple subjects at the same time
 ANALYSIS_TYPE="glm" # glm or gPPI
 
-BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+COHORT="kids" # kids or adults
+BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni_23.0.07_20230302.simg"
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
@@ -36,6 +37,7 @@ CMD="$PYTHON extract_betas.py \
 	--analysis_dir $ANALYSIS_DIR \
 	--afni_img_path $AFNI_IMG_PATH \
 	--subject $SUBJECT \
+	--cohort $COHORT \
 	--task $TASK \
 	--analysis_type $ANALYSIS_TYPE"
 

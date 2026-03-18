@@ -35,6 +35,13 @@ def _get_cmd_args():
         required=True,
         help="Path to Apptainer image of Afni with R.",
     )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--analysis_type",
@@ -47,14 +54,14 @@ def _get_cmd_args():
     return parser
 
 
-def main(analysis_dir, dst_dir, afni_img_path, task, analysis_type):
+def main(analysis_dir, dst_dir, afni_img_path, cohort, task, analysis_type):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
 
     LGR.info(f"TASK: {task}")
 
     first_level_gltlabels = get_first_level_gltsym_codes(
-        task, analysis_type, caller="compute_cluster_correction"
+        cohort, task, analysis_type, caller="compute_cluster_correction"
     )
     for first_level_gltlabel in first_level_gltlabels:
         entity_key = get_contrast_entity_key(first_level_gltlabel)

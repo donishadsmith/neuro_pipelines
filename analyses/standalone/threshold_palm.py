@@ -42,6 +42,13 @@ def _get_cmd_args():
             "eliminates the need to select an arbritrary threshold for the voxels (cluster-forming threshold)"
         ),
     )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--analysis_type",
@@ -64,17 +71,17 @@ def get_output_prefixes(
     return files[0].parent / prefix
 
 
-def main(analysis_dir, dst_dir, task, analysis_type, cluster_correction_p):
+def main(analysis_dir, dst_dir, cohort, task, analysis_type, cluster_correction_p):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
 
     LGR.info(f"TASK: {task}")
 
     first_level_gltlabels = get_first_level_gltsym_codes(
-        task, analysis_type, caller="threshold_palm_images"
+        cohort, task, analysis_type, caller="threshold_palm_images"
     )
     for first_level_gltlabel in first_level_gltlabels:
-        for second_level_glt_code in get_second_level_glt_codes():
+        for second_level_glt_code in get_second_level_glt_codes(cohort):
             output_prefix = get_output_prefixes(
                 analysis_dir, task, first_level_gltlabel
             )

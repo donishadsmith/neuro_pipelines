@@ -53,6 +53,12 @@ After:
    A relative to B)
 12) Use 3dremlfit to account for temporal autocorrelation
 13) Extract PPI interaction contrasts betas for downstream analyses
+
+# Interpretation:
+- Positive beta coefficients for the PPI regressor means greater connectivity between
+  the seed region and the brain region during a specific condition
+- Negative beta coefficients for the PPI regressor means reduced connectivity between
+  the seed region and the brain region during a specific condition
 """
 
 import argparse, subprocess, json, subprocess, sys
@@ -96,19 +102,35 @@ from _utils import (
 
 LGR = setup_logger(__name__)
 
+VALID_TASK_NAMES = {
+    "kids": ["nback", "mtlr", "mtle", "flanker", "princess"],
+    "adults": ["nback", "mtlr", "mtle", "flanker", "simplegng", "repeatgng"],
+}
 # Using constant durations instead of BIDS one, which have small
 # stimulus presentation delays
 # Instruction has the same duration for all three tasks but in the
 # code for clarity
 CONDITION_DURATIONS = {
-    "flanker": 0.8,
-    "nback": 32,
-    "princess": 52,
-    "mtle": 18,
-    "mtlr": 18,
-    "instruction_nback": 2,
-    "instruction_mtle": 2,
-    "instruction_mtlr": 2,
+    "kids": {
+        "flanker": 0.8,
+        "nback": 32,
+        "princess": 52,
+        "mtle": 18,
+        "mtlr": 18,
+        "instruction_nback": 2,
+        "instruction_mtle": 2,
+        "instruction_mtlr": 2,
+    },
+    "adults": {
+        "flanker": 0.8,
+        "nback": 30,
+        "mtle": 18,
+        "mtlr": 18,
+        "simplegng": 0.3,
+        "complexgng": 0.3,
+        "instruction_mtle": 2,
+        "instruction_mtlr": 2,
+    },
 }
 
 
@@ -145,11 +167,17 @@ def _get_cmd_args():
         help="The mask of the seed region.",
     )
     parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
+    parser.add_argument(
         "--space",
         dest="space",
-        default="MNIPediatricAsym_cohort-1_res-2",
-        required=False,
-        help="Template space.",
+        required=True,
+        help="Template space (i.e. 'MNIPediatricAsym_cohort-1_res-2')",
     )
     parser.add_argument(
         "--subject",
@@ -395,7 +423,7 @@ def denoise_seed_timeseries(
     return denoised_seed_timeseries_file
 
 
-def get_task_deconvolve_cmd(
+def get_task_deconvolve_kids_cmd(
     task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
 ):
     seed_name = str(seed_timeseries_file).split("_desc")[0]
@@ -422,9 +450,9 @@ def get_task_deconvolve_cmd(
             "num_stimts": "-num_stimts 5 ",
             "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 3 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 3 indoor "
+            f"-stim_times 3 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_encoding "
             f"-stim_file 4 {ppi_dir / 'PPI_instruction.1D'} -stim_label 4 PPI_instruction "
-            f"-stim_file 5 {ppi_dir / 'PPI_indoor.1D'} -stim_label 5 PPI_indoor "
+            f"-stim_file 5 {ppi_dir / 'PPI_neutral_encoding.1D'} -stim_label 5 PPI_neutral_encoding "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
@@ -432,9 +460,9 @@ def get_task_deconvolve_cmd(
             "num_stimts": "-num_stimts 5 ",
             "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 3 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 3 seen "
+            f"-stim_times 3 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_retrieval "
             f"-stim_file 4 {ppi_dir / 'PPI_instruction.1D'} -stim_label 4 PPI_instruction "
-            f"-stim_file 5 {ppi_dir / 'PPI_seen.1D'} -stim_label 5 PPI_seen "
+            f"-stim_file 5 {ppi_dir / 'PPI_neutral_retrieval.1D'} -stim_label 5 PPI_neutral_retrieval "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "princess":
@@ -447,6 +475,80 @@ def get_task_deconvolve_cmd(
             f"-stim_file 5 {ppi_dir / 'PPI_nonswitch.1D'} -stim_label 5 PPI_nonswitch "
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_switch -1*PPI_nonswitch' -glt_label 1 PPI_switch_vs_PPI_nonswitch ",
+        }
+    else:
+        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
+        deconvolve_cmd = create_flanker_deconvolve_cmd(
+            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+        )
+
+    return deconvolve_cmd
+
+
+def get_task_deconvolve_adults_cmd(
+    task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+):
+    seed_name = str(seed_timeseries_file).split("_desc")[0]
+
+    if task == "nback":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 5 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 3 0-back "
+            f"-stim_times 3 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 4 2-back "
+            f"-stim_file 4 {ppi_dir / 'PPI_0-back.1D'} -stim_label 6 PPI_0-back "
+            f"-stim_file 5 {ppi_dir / 'PPI_2-back.1D'} -stim_label 7 PPI_2-back "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back ",
+        }
+    elif task == "mtle":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 7 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_encoding "
+            f"-stim_times 4 {timing_dir / 'aversive_encoding.1D'} 'BLOCK(18, 1)' -stim_label 4 aversive_encoding "
+            f"-stim_file 5 {ppi_dir / 'PPI_instruction.1D'} -stim_label 5 PPI_instruction "
+            f"-stim_file 6 {ppi_dir / 'PPI_neutral_encoding.1D'} -stim_label 6 PPI_neutral_encoding"
+            f"-stim_file 7 {ppi_dir / 'PPI_aversive_encoding.1D'} -stim_label 7 PPI_aversive_encoding "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*PPI_aversive_encoding -1*PPI_neutral_encoding' -glt_label 1 PPI_aversive_encoding_vs_PPI_neutral_encoding ",
+        }
+    elif task == "mtlr":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 7 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_retrieval "
+            f"-stim_times 4 {timing_dir / 'aversive_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 4 aversive_retrieval "
+            f"-stim_file 5 {ppi_dir / 'PPI_instruction.1D'} -stim_label 5 PPI_instruction "
+            f"-stim_file 6 {ppi_dir / 'PPI_neutral_retrieval.1D'} -stim_label 6 PPI_neutral_retrieval"
+            f"-stim_file 7 {ppi_dir / 'PPI_aversive_retrieval.1D'} -stim_label 7 PPI_aversive_retrieval "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*PPI_aversive_retrieval -1*PPI_neutral_retrieval' -glt_label 1 PPI_aversive_retrieval_vs_PPI_neutral_retrieval ",
+        }
+    # Determine if only want successful instances considering there are not many trials
+    elif task == "simplegng":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 5 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'simple_go.1D'} 'GAM' -stim_label 2 simple_go "
+            f"-stim_times 3 {timing_dir / 'simple_nogo.1D'} 'GAM' -stim_label 3 simple_nogo "
+            f"-stim_file 4 {ppi_dir / 'PPI_simple_go.1D'} -stim_label 4 PPI_simple_go"
+            f"-stim_file 5 {ppi_dir / 'PPI_simple_nogo.1D'} -stim_label 5 PPI_simple_nogo "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*PPI_simple_nogo -1*PPI_simple_go' -glt_label 1 PPI_simple_nogo_vs_PPI_simple_go ",
+        }
+    elif task == "complexgng":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 5 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'complex_go.1D'} 'GAM' -stim_label 2 complex_go "
+            f"-stim_times 3 {timing_dir / 'complex_nogo.1D'} 'GAM' -stim_label 3 complex_nogo "
+            f"-stim_file 4 {ppi_dir / 'PPI_complex_go.1D'} -stim_label 4 PPI_complex_go"
+            f"-stim_file 5 {ppi_dir / 'PPI_complex_nogo.1D'} -stim_label 5 PPI_complex_nogo "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*PPI_complex_nogo -1*PPI_complex_go' -glt_label 1 PPI_complex_nogo_vs_PPI_complex_go ",
         }
     else:
         # Note: simply multiply the coefficient image by -1 to get the opposite contrast
@@ -553,11 +655,13 @@ def create_flanker_deconvolve_cmd(
     return deconvolve_cmd
 
 
-def get_instruction_name(timing_dir, task, condition_filenames):
-    if task in ["nback", "mtle", "mtlr"]:
-        return condition_filenames + [timing_dir / f"instruction.1D"]
-    else:
+def get_instruction_name(timing_dir, cohort, task, condition_filenames):
+    if task not in ["nback", "mtle", "mtlr"] and not (
+        task == "nback" and cohort == "adult"
+    ):
         return condition_filenames
+    else:
+        return condition_filenames + [timing_dir / f"instruction.1D"]
 
 
 def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
@@ -662,7 +766,7 @@ def deconvolve_seed_timeseries(
 
 
 def upsample_condition_regressor(
-    timing_file, task, tr, n_volumes, upsample_dt, afni_img_path
+    timing_file, cohort, task, tr, n_volumes, upsample_dt, afni_img_path
 ):
     condition_name = timing_file.name.removesuffix(".1D")
 
@@ -672,9 +776,9 @@ def upsample_condition_regressor(
     upsampled_condition_regressor_file.parent.mkdir(parents=True, exist_ok=True)
 
     duration = (
-        CONDITION_DURATIONS[task]
+        CONDITION_DURATIONS[cohort][task]
         if not condition_name.startswith("instruction")
-        else CONDITION_DURATIONS[f"{condition_name}_{task}"]
+        else CONDITION_DURATIONS[cohort][f"{condition_name}_{task}"]
     )
 
     cmd = (
@@ -743,8 +847,9 @@ def main(
     dst_dir,
     deriv_dir,
     seed_mask_path,
-    space,
+    cohort,
     subject,
+    space,
     task,
     n_motion_parameters,
     n_global_parameters,
@@ -758,12 +863,11 @@ def main(
     pad_seconds,
     faltung_penalty_syntax,
 ):
-    tasknames = ["princess", "flanker", "nback", "mtle", "mtlr"]
-    if task not in tasknames:
+    if task not in VALID_TASK_NAMES[cohort]:
         LGR.critical(
-            f"The task must be one of the following: {iterable_to_str(tasknames)}"
+            f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
         )
-        sys.exit()
+        sys.exit(status=1)
 
     layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or True)
 
@@ -772,7 +876,7 @@ def main(
     )
     if not sessions:
         LGR.critical(f"No sessions for {subject} for {task}.")
-        sys.exit()
+        sys.exit(status=1)
 
     for session in sessions:
         confounds_tsv_files = layout.get(
@@ -1007,7 +1111,7 @@ def main(
         )
 
         first_level_gltsym_codes = get_first_level_gltsym_codes(
-            task, analysis_type="glm", caller="gPPI"
+            cohort, task, analysis_type="glm", caller="gPPI"
         )
         condition_filenames = [
             timing_dir / f"{condition}.1D"
@@ -1015,14 +1119,20 @@ def main(
             if "_vs_" not in condition
         ]
         condition_filenames = get_instruction_name(
-            timing_dir, task, condition_filenames
+            timing_dir, cohort, task, condition_filenames
         )
         for condition_filename in condition_filenames:
             if is_timing_file_empty(condition_filename):
                 continue
 
             upsampled_condition_regressor_file = upsample_condition_regressor(
-                condition_filename, task, tr, n_volumes, upsample_dt, afni_img_path
+                condition_filename,
+                cohort,
+                task,
+                tr,
+                n_volumes,
+                upsample_dt,
+                afni_img_path,
             )
             plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Upsampled Condition Regressor"
             plot_signal(
@@ -1053,7 +1163,12 @@ def main(
             fwhm,
         )
 
-        deconvolve_cmd = get_task_deconvolve_cmd(
+        get_task_deconvolve_cmd = {
+            "kids": get_task_deconvolve_kids_cmd,
+            "adults": get_task_deconvolve_adults_cmd,
+        }
+
+        deconvolve_cmd = get_task_deconvolve_cmd[cohort](
             task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
         design_matrix_file = create_design_matrix(
@@ -1078,7 +1193,12 @@ def main(
         betas_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
-            stats_file_relm, betas_dir, afni_img_path, task, analysis_type="gPPI"
+            stats_file_relm,
+            betas_dir,
+            afni_img_path,
+            cohort,
+            task,
+            analysis_type="gPPI",
         )
 
 

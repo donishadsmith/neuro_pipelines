@@ -56,6 +56,13 @@ def _get_cmd_args():
         default=None,
         help="Path to Apptainer image of Afni with R.",
     )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--analysis_type",
@@ -461,6 +468,7 @@ def main(
     analysis_dir,
     dst_dir,
     afni_img_path,
+    cohort,
     task,
     analysis_type,
     method,
@@ -477,10 +485,10 @@ def main(
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
     first_level_glt_labels = get_first_level_gltsym_codes(
-        task, analysis_type, caller="get_cluster_results"
+        cohort, task, analysis_type, caller="get_cluster_results"
     )
     first_level_glt_label_list = list(
-        itertools.product(first_level_glt_labels, get_second_level_glt_codes())
+        itertools.product(first_level_glt_labels, get_second_level_glt_codes(cohort))
     )
 
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:

@@ -37,6 +37,7 @@ CMD="$PYTHON get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
     --dst_dir $ANALYSIS_DIR \
     --method $METHOD \
+    --cohort $COHORT \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE \
     --template_mask_path $TEMPLATE_MASK_PATH \

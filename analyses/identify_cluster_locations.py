@@ -47,6 +47,13 @@ def _get_cmd_args():
         choices=["parametric", "nonparametric"],
         help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
     )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--analysis_type",
@@ -68,8 +75,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--atlas",
         dest="atlas",
-        required=False,
-        default="Haskins_Pediatric_Nonlinear_1.0",
+        required=True,
         help="The atlas to use.",
     )
     parser.add_argument(
@@ -180,6 +186,7 @@ def main(
     scratch_dir,
     afni_img_path,
     method,
+    cohort,
     task,
     analysis_type,
     orient,
@@ -192,10 +199,10 @@ def main(
     LGR.info(f"TASK: {task}")
 
     first_level_glt_label = get_first_level_gltsym_codes(
-        task, analysis_type, caller="identify_cluster_regions"
+        cohort, task, analysis_type, caller="identify_cluster_regions"
     )
     first_level_glt_label_list = list(
-        itertools.product(first_level_glt_label, get_second_level_glt_codes())
+        itertools.product(first_level_glt_label, get_second_level_glt_codes(cohort))
     )
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
         entity_key = get_contrast_entity_key(first_level_glt_label)

@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=16G
-#SBATCH --time=03:00:00
+#SBATCH --time=24:00:00
 # Outputs --------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/first_level_gPPI_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/first_level_gPPI_%A_%a.err
@@ -59,6 +59,7 @@ CMD="$PYTHON first_level_gPPI.py \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
 	--subject ${SUBJECT#sub-} \
+	--cohort $COHORT \
 	--task $TASK \
 	--space $TEMPLATE_SPACE \
 	--n_motion_parameters $N_MOTION_PARAMETERS \

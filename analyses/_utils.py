@@ -13,30 +13,50 @@ from nifti2bids.io import replace_ext
 
 LGR = setup_logger(__name__)
 
-
-def get_first_level_gltsym_codes(task, analysis_type, caller):
-    if task == "nback":
-        contrasts = (
+TASK_CONTRASTS = {
+    "kids": {
+        "nback": (
             "1-back_vs_0-back",
             "2-back_vs_0-back",
             "2-back_vs_1-back",
-        )
-    elif task == "mtle":
-        contrasts = ("indoor",)
-    elif task == "mtlr":
-        contrasts = ("seen",)
-    elif task == "princess":
-        contrasts = ("switch_vs_nonswitch",)
-    else:
-        contrasts = (
+        ),
+        "mtle": ("neutral_encoding"),
+        "mtlr": ("neutral_retrieval",),
+        "princess": ("switch_vs_nonswitch",),
+        "flanker": (
             "congruent_vs_neutral",
             "incongruent_vs_neutral",
             "nogo_vs_neutral",
             "incongruent_vs_congruent",
             "congruent_vs_nogo",
             "incongruent_vs_nogo",
-        )
+        ),
+    },
+    "adults": {
+        "nback": "2-back_vs_0-back",
+        "mtle": ("aversive_encoding_vs_neutral_encoding",),
+        "mtlr": ("aversive_retrieval_vs_neutral_retrieval",),
+        "flanker": (
+            "congruent_vs_neutral",
+            "incongruent_vs_neutral",
+            "nogo_vs_neutral",
+            "incongruent_vs_congruent",
+            "congruent_vs_nogo",
+            "incongruent_vs_nogo",
+        ),
+        "simplegng": ("simple_nogo_vs_simple_go",),
+        "complexgng": ("complex_nogo_vs_complex_go",),
+    },
+}
 
+CONTRAST_CODES = {
+    "kids": ("0", "5", "10", "5_vs_0", "10_vs_0", "10_vs_5", "mean"),
+    "adults": ("mph", "placebo", "mph_vs_placebo", "mean"),
+}
+
+
+def get_first_level_gltsym_codes(cohort, task, analysis_type, caller):
+    contrasts = TASK_CONTRASTS[cohort][task]
     if analysis_type == "gPPI":
         contrasts = modify_contrast_names(contrasts)
 
@@ -47,8 +67,8 @@ def get_first_level_gltsym_codes(task, analysis_type, caller):
     )
 
 
-def get_second_level_glt_codes():
-    return ["0", "5", "10", "5_vs_0", "10_vs_0", "10_vs_5", "mean"]
+def get_second_level_glt_codes(cohort):
+    return CONTRAST_CODES[cohort]
 
 
 def modify_contrast_names(contrasts):
@@ -117,13 +137,14 @@ def create_beta_files(
     stats_file,
     beta_dir,
     afni_img_path,
+    cohort,
     task,
     analysis_type,
     out_dir=None,
     overwrite=True,
 ):
     first_level_gltsyms = get_first_level_gltsym_codes(
-        task, analysis_type, caller="extract_betas"
+        cohort, task, analysis_type, caller="extract_betas"
     )
     beta_names = get_beta_names(first_level_gltsyms, add_coef_str=True)
 

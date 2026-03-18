@@ -37,6 +37,7 @@ CMD="$PYTHON identify_cluster_locations.py \
     --analysis_dir $ANALYSIS_DIR \
     --scratch_dir $SCRATCH_DIR \
 	--afni_img_path $AFNI_IMG_PATH \
+    --cohort $COHORT \
 	--task $TASK \
     --method $METHOD \
     --atlas $WHEREAMI_ATLAS \

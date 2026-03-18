@@ -64,6 +64,13 @@ def _get_cmd_args():
             "This will only be used if `glm_dir` is not set to None."
         ),
     )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--analysis_type",
@@ -283,6 +290,7 @@ def main(
     dst_dir,
     glm_dir,
     seed_mask_path,
+    cohort,
     task,
     analysis_type,
     method,
@@ -299,7 +307,7 @@ def main(
         seed_mask_path = None
 
     first_level_glt_labels = get_first_level_gltsym_codes(
-        task, analysis_type, caller="extract_individual_betas"
+        cohort, task, analysis_type, caller="extract_individual_betas"
     )
 
     for first_level_glt_label in first_level_glt_labels:
@@ -317,7 +325,7 @@ def main(
         data_table = pd.read_csv(data_table_file, sep=None, engine="python")
         data_table["participant_id"] = data_table["participant_id"].astype(str)
         data_table["dose"] = data_table["dose"].astype(int)
-        for second_level_glt_code in get_second_level_glt_codes():
+        for second_level_glt_code in get_second_level_glt_codes(cohort):
             LGR.info(
                 f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: "
                 f"{first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"

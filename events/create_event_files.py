@@ -422,6 +422,7 @@ def _create_gng_events_files(
     exclude_filenames,
 ):
     task_name = "SimpleRepeatGNG" if task == "simplegng" else "RepeatSimpleGNG"
+    prefix = "simple" if task == "simplegng" else "complex"
     log_files = _filter_log_files(
         temp_dir.glob(f"*{task_name}*.log"), subjects, exclude_filenames
     )
@@ -486,6 +487,11 @@ def _create_gng_events_files(
             event_df.loc[
                 event_df["trial_type"].str.fullmatch(r".*Nogo.*"), "trial_type"
             ] = "Nogo"
+
+        event_df["trial_type"] = event_df["trial_type"].apply(lambda x: x.lower())
+        event_df["trial_type"] = event_df["trial_type"].replace(
+            {"go": f"{prefix}_go", "nogo": f"{prefix}_nogo"}
+        )
 
         # Getting subject ID and organising files to get subject ID
         subject_id = re.search("(\d+).*-", log_file.name).group(1)
@@ -610,9 +616,15 @@ def _create_nback_presentation_events_files(
         events = {}
         events["onset"] = extractor.extract_onsets()
         events["duration"] = extractor.extract_durations()
-        events["trial_types"] = extractor.extract_trial_types()
+        events["trial_type"] = extractor.extract_trial_types()
 
         event_df = pd.DataFrame(events)
+        event_df["trial_type"] = event_df["trial_type"].replace(
+            {
+                "0back": "0-back",
+                "2back": "2-back",
+            }
+        )
 
         subject_id = re.search("^(\d+).*_", text_file.name).group(1)
         session_id = _get_presentation_session(
@@ -638,6 +650,7 @@ def _create_mtl_events_files(
     # MTLE and MTLR are separate tasks but can be processed in one function
     filename = "_PEARenc" if task == "mtle" else "_PEARret"
     task_name = "indoor" if task == "mtle" else "seen"
+    suffix = "encoding" if task_name == "indoor" else "retrieval"
     excel_files = _filter_log_files(
         temp_dir.glob(f"*{filename}*.xls"), subjects, exclude_filenames
     )
@@ -682,8 +695,12 @@ def _create_mtl_events_files(
         if cohort == "adults":
             # Pattern seems to be the first for blocks have the aversive images and last four are neutral
             event_df.loc[event_df["trial_type"] == task_name, "trial_type"] = [
-                "aversive"
-            ] * 4 + ["neutral"] * 4
+                f"aversive_{suffix}"
+            ] * 4 + [f"neutral_{suffix}"] * 4
+        else:
+            event_df.loc[event_df["trial_type"] == task_name, "trial_type"] = [
+                f"neutral_{suffix}"
+            ] * 4
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
@@ -761,7 +778,7 @@ def _create_princess_events_files(
                 scanner_start_time=scanner_start_time
             )
             events["duration"] = extractor.extract_durations(
-                offset_column_name="feedback.OffsetTime"
+               offset_column_name="feedback.OffsetTime"
             )
             trial_name_dict = {
                 "daynight": "switch",
@@ -775,6 +792,10 @@ def _create_princess_events_files(
             events["block_cue"] = extractor.extract_trial_types()
 
             event_df = pd.DataFrame(events)
+            # For some subjects, the recorded timing at the end may be about 1 second out of bounds
+            # This task doesn't have a rest block or crosshair at the end
+            event_df["duration"] = 52
+            event_df["onset"] = event_df["onset"].apply(lambda x: int(np.floor(x)))
 
             subject_id = re.search(r"(\d+)-\d+\.edat3$", edat_file.name).group(1)
             session_id = _get_eprime_session(

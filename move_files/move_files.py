@@ -1,8 +1,10 @@
-import argparse, shutil
+import argparse, shutil, traceback
 from pathlib import Path
 
 from nifti2bids.bids import get_entity_value
+from nifti2bids.logging import setup_logger
 
+LGR = setup_logger(__name__)
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
@@ -47,12 +49,16 @@ def main(src_dir, bids_dir):
 
         try:
             dst_file = dst_dir / src_file.name
+            if not dst_file.parent.exists():
+                continue
+            
             if dst_file.exists():
                 dst_file.unlink()
 
             shutil.move(str(src_file), dst_dir)
-        except:
-            pass
+        except Exception as e:
+            LGR.fatal(traceback.format_exc())
+            raise e
 
 
 if __name__ == "__main__":

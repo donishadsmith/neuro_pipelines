@@ -38,6 +38,7 @@ CMD="$PYTHON extract_individual_betas.py \
     --analysis_dir $ANALYSIS_DIR \
     --dst_dir $ANALYSIS_DIR \
     --method $METHOD \
+    --cohort $COHORT \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE"
 

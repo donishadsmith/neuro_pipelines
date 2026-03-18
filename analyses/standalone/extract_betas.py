@@ -32,6 +32,13 @@ def _get_cmd_args():
         required=True,
         help="Subject ID without the 'sub-' entity.",
     )
+    parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
         "--analysis_type",
@@ -54,7 +61,7 @@ def _get_cmd_args():
     return parser
 
 
-def main(analysis_dir, subject, afni_img_path, task, analysis_type, out_dir):
+def main(analysis_dir, subject, afni_img_path, cohort, task, analysis_type, out_dir):
     subject_base_dir = Path(analysis_dir) / (
         f"sub-{subject}" if not str(subject).startswith("sub-") else subject
     )
@@ -77,7 +84,7 @@ def main(analysis_dir, subject, afni_img_path, task, analysis_type, out_dir):
         beta_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
-            stats_file, beta_dir, afni_img_path, task, analysis_type, out_dir
+            stats_file, beta_dir, afni_img_path, cohort, task, analysis_type, out_dir
         )
 
 

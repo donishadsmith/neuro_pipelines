@@ -75,6 +75,7 @@ CMD="$PYTHON second_level.py \
 	--dst_dir $DST_DIR \
 	--method $METHOD \
 	--task $TASK \
+	--cohort $COHORT \
 	--space $TEMPLATE_SPACE \
 	--exclude_covariates $EXCLUDE_COVARIATES \
 	--analysis_type $ANALYSIS_TYPE \

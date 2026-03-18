@@ -55,6 +55,7 @@ CMD="$PYTHON first_level_glm.py \
 	--deriv_dir $DERIV_DIR \
 	--dst_dir $DST_DIR \
 	--subject ${SUBJECT#sub-} \
+	--cohort $COHORT \
 	--task $TASK \
 	--space $TEMPLATE_SPACE \
 	--n_motion_parameters $N_MOTION_PARAMETERS \

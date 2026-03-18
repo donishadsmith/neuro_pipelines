@@ -27,6 +27,11 @@ from _utils import create_beta_files
 
 LGR = setup_logger(__name__)
 
+VALID_TASK_NAMES = {
+    "kids": ["nback", "mtlr", "mtle", "flanker", "princess"],
+    "adults": ["nback", "mtlr", "mtle", "flanker", "simplegng", "repeatgng"],
+}
+
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(description="Perform first level GLM for a task.")
@@ -53,10 +58,16 @@ def _get_cmd_args():
         help="Root of the derivatives directory.",
     )
     parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=True,
+        choices=["adults", "kids"],
+        help="The cohort to analyze.",
+    )
+    parser.add_argument(
         "--space",
         dest="space",
-        default="MNIPediatricAsym_cohort-1_res-2",
-        required=False,
+        required=True,
         help="Template space.",
     )
     parser.add_argument(
@@ -151,7 +162,7 @@ def _get_cmd_args():
     return parser
 
 
-def get_task_deconvolve_cmd(task, timing_dir, nuisance_regressors_file):
+def get_task_deconvolve_kids_cmd(task, timing_dir, nuisance_regressors_file):
     if task == "nback":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
@@ -168,14 +179,14 @@ def get_task_deconvolve_cmd(task, timing_dir, nuisance_regressors_file):
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
             "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'indoor.1D'} 'BLOCK(18, 1)' -stim_label 2 indoor "
+            f"-stim_times 2 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_encoding "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "mtlr":
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 2 ",
             "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'seen.1D'} 'BLOCK(18, 1)' -stim_label 2 seen "
+            f"-stim_times 2 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_retrieval "
             f"-ortvec {nuisance_regressors_file} Nuisance ",
         }
     elif task == "princess":
@@ -190,6 +201,69 @@ def get_task_deconvolve_cmd(task, timing_dir, nuisance_regressors_file):
         # Note: simply multiply the coefficient image by -1 to get the opposite contrast
         deconvolve_cmd = create_flanker_deconvolve_cmd(
             timing_dir, nuisance_regressors_file
+        )
+
+    return deconvolve_cmd
+
+
+def get_task_deconvolve_adults_cmd(
+    task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+):
+    seed_name = str(seed_timeseries_file).split("_desc")[0]
+
+    if task == "nback":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 3 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 3 0-back "
+            f"-stim_times 3 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 4 2-back "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 1 2-back_vs_0-back ",
+        }
+    elif task == "mtle":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 4 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_encoding "
+            f"-stim_times 4 {timing_dir / 'aversive_encoding.1D'} 'BLOCK(18, 1)' -stim_label 4 aversive_encoding "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*aversive_encoding -1*neutral_encoding' -glt_label 1 aversive_encoding_vs_neutral_encoding ",
+        }
+    elif task == "mtlr":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 4 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
+            f"-stim_times 3 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_retrieval "
+            f"-stim_times 4 {timing_dir / 'aversive_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 4 aversive_retrieval "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*aversive_retrieval -1*neutral_retrieval' -glt_label 1 aversive_retrieval_vs_neutral_retrieval ",
+        }
+    # Determine if only want successful instances considering there are not many trials
+    #
+    elif task == "simplegng":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 3 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'simple_go.1D'} 'GAM' -stim_label 2 simple_go "
+            f"-stim_times 3 {timing_dir / 'simple_nogo.1D'} 'GAM' -stim_label 3 simple_nogo "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*simple_nogo -1*simple_go' -glt_label 1 simple_nogo_vs_simple_go ",
+        }
+    elif task == "complexgng":
+        deconvolve_cmd = {
+            "num_stimts": "-num_stimts 3 ",
+            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
+            f"-stim_times 2 {timing_dir / 'complex_go.1D'} 'GAM' -stim_label 2 complex_go "
+            f"-stim_times 3 {timing_dir / 'complex_nogo.1D'} 'GAM' -stim_label 3 complex_nogo "
+            f"-ortvec {nuisance_regressors_file} Nuisance "
+            "-gltsym 'SYM: +1*complex_nogo -1*complex_go' -glt_label 1 complex_nogo_vs_complex_go ",
+        }
+    else:
+        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
+        deconvolve_cmd = create_flanker_deconvolve_cmd(
+            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
 
     return deconvolve_cmd
@@ -277,6 +351,7 @@ def main(
     dst_dir,
     deriv_dir,
     space,
+    cohort,
     subject,
     task,
     n_motion_parameters,
@@ -288,12 +363,11 @@ def main(
     acompcor_strategy,
     fwhm,
 ):
-    tasknames = ["princess", "flanker", "nback", "mtle", "mtlr"]
-    if task not in tasknames:
+    if task not in VALID_TASK_NAMES[cohort]:
         LGR.critical(
-            f"The task must be one of the following: {iterable_to_str(tasknames)}"
+            f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
         )
-        sys.exit()
+        sys.exit(status=1)
 
     layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or True)
 
@@ -302,7 +376,7 @@ def main(
     )
     if not sessions:
         LGR.critical(f"No sessions for {subject} for {task}.")
-        sys.exit()
+        sys.exit(status=1)
 
     for session in sessions:
         confounds_tsv_files = layout.get(
@@ -483,7 +557,12 @@ def main(
             subject_dir, afni_img_path, percent_change_nifti_file, mask_file, fwhm
         )
 
-        deconvolve_cmd = get_task_deconvolve_cmd(
+        get_task_deconvolve_cmd = {
+            "kids": get_task_deconvolve_kids_cmd,
+            "adults": get_task_deconvolve_adults_cmd,
+        }
+
+        deconvolve_cmd = get_task_deconvolve_cmd[cohort](
             task, timing_dir, nuisance_regressors_file
         )
         design_matrix_file = create_design_matrix(
@@ -508,7 +587,7 @@ def main(
         betas_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
-            stats_file_relm, betas_dir, afni_img_path, task, analysis_type="glm"
+            stats_file_relm, betas_dir, afni_img_path, cohort, task, analysis_type="glm"
         )
 
 
