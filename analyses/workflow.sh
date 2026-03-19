@@ -142,9 +142,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         fi
     elif [[ $CURRENT_TASK == "flanker" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
-            FIRST_LEVEL_GLT_LABELS=("congruent_vs_neutral" "incongruent_vs_neutral" "nogo_vs_neutral" "incongruent_vs_congruent" "congruent_vs_nogo" "incongruent_vs_nogo")
+            FIRST_LEVEL_GLT_LABELS=("correct_incongruent_vs_correct_congruent" "correct_nogo_vs_correct_neutral")
         else
-            FIRST_LEVEL_GLT_LABELS=("PPI_congruent_vs_PPI_neutral" "PPI_incongruent_vs_PPI_neutral" "PPI_nogo_vs_PPI_neutral" "PPI_incongruent_vs_PPI_congruent" "PPI_congruent_vs_PPI_nogo" "PPI_incongruent_vs_PPI_nogo")
+            FIRST_LEVEL_GLT_LABELS=("PPI_correct_incongruent_vs_PPI_correct_congruent" "PPI_correct_nogo_vs_PPI_correct_neutral")
         fi
     else
         FIRST_LEVEL_GLT_LABELS=("placeholder")

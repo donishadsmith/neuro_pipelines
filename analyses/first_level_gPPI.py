@@ -477,9 +477,8 @@ def get_task_deconvolve_kids_cmd(
             "-gltsym 'SYM: +1*PPI_switch -1*PPI_nonswitch' -glt_label 1 PPI_switch_vs_PPI_nonswitch ",
         }
     else:
-        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
-        deconvolve_cmd = create_flanker_deconvolve_cmd(
-            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+        deconvolve_cmd = create_dynamic_deconvolve_gPPI_cmd(
+            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir, task
         )
 
     return deconvolve_cmd
@@ -527,42 +526,18 @@ def get_task_deconvolve_adults_cmd(
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*PPI_aversive_retrieval -1*PPI_neutral_retrieval' -glt_label 1 PPI_aversive_retrieval_vs_PPI_neutral_retrieval ",
         }
-    # Determine if only want successful instances considering there are not many trials
-    elif task == "simplegng":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 5 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / 'simple_go.1D'} 'GAM' -stim_label 2 simple_go "
-            f"-stim_times 3 {timing_dir / 'simple_nogo.1D'} 'GAM' -stim_label 3 simple_nogo "
-            f"-stim_file 4 {ppi_dir / 'PPI_simple_go.1D'} -stim_label 4 PPI_simple_go"
-            f"-stim_file 5 {ppi_dir / 'PPI_simple_nogo.1D'} -stim_label 5 PPI_simple_nogo "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*PPI_simple_nogo -1*PPI_simple_go' -glt_label 1 PPI_simple_nogo_vs_PPI_simple_go ",
-        }
-    elif task == "complexgng":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 5 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / 'complex_go.1D'} 'GAM' -stim_label 2 complex_go "
-            f"-stim_times 3 {timing_dir / 'complex_nogo.1D'} 'GAM' -stim_label 3 complex_nogo "
-            f"-stim_file 4 {ppi_dir / 'PPI_complex_go.1D'} -stim_label 4 PPI_complex_go"
-            f"-stim_file 5 {ppi_dir / 'PPI_complex_nogo.1D'} -stim_label 5 PPI_complex_nogo "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*PPI_complex_nogo -1*PPI_complex_go' -glt_label 1 PPI_complex_nogo_vs_PPI_complex_go ",
-        }
     else:
-        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
-        deconvolve_cmd = create_flanker_deconvolve_cmd(
-            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+        deconvolve_cmd = create_dynamic_deconvolve_gPPI_cmd(
+            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir, task
         )
 
     return deconvolve_cmd
 
 
-def create_flanker_deconvolve_cmd(
-    timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+def create_dynamic_deconvolve_gPPI_cmd(
+    timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir, task
 ):
-    # Dynamically create the flanker contrast to avoid including contrasts that
+    # Dynamically create the flanker and nogo contrasts to avoid including contrasts that
     # have no data
 
     deconvolve_cmd = {
@@ -570,30 +545,57 @@ def create_flanker_deconvolve_cmd(
         "args": "{stims} -ortvec {nuisance_regressors_file} Nuisance {gltsyms}",
     }
 
-    labels_dict = {
-        "stims": (
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} congruent ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} incongruent ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} nogo ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} neutral ",
-            "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_congruent ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_incongruent ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_nogo ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_neutral ",
-            f"-stim_file {{ppi_file}} -stim_label {{label}} PPI_errors ",
-        ),
-        "gltsyms": (
-            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_neutral' -glt_label {label} PPI_congruent_vs_PPI_neutral ",
-            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_neutral' -glt_label {label} PPI_incongruent_vs_PPI_neutral ",
-            "-gltsym 'SYM: +1*PPI_nogo -1*PPI_neutral' -glt_label {label} PPI_nogo_vs_PPI_neutral ",
-            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_congruent' -glt_label {label} PPI_incongruent_vs_PPI_congruent ",
-            "-gltsym 'SYM: +1*PPI_congruent -1*PPI_nogo' -glt_label {label} PPI_congruent_vs_PPI_nogo ",
-            "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_nogo' -glt_label {label} PPI_incongruent_vs_PPI_nogo ",
-        ),
-    }
+    if task == "flanker":
+        labels_dict = {
+            "stims": (
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_congruent ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_incongruent ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_nogo ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_neutral ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_correct_congruent ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_correct_incongruent ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_correct_nogo ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_correct_neutral ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
+            ),
+            "gltsyms": (
+                "-gltsym 'SYM: +1*PPI_correct_incongruent -1*PPI_correct_congruent' -glt_label {label} PPI_correct_incongruent_vs_PPI_correct_congruent ",
+                "-gltsym 'SYM: +1*PPI_correct_nogo -1*PPI_correct_neutral' -glt_label {label} PPI_correct_nogo_vs_PPI_correct_neutral ",
+            ),
+        }
 
-    files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
+        files = [
+            "correct_congruent.1D",
+            "correct_incongruent.1D",
+            "correct_nogo.1D",
+            "correct_neutral.1D",
+            "errors.1D",
+        ]
+    else:
+        prefix = task.removesuffix("gng")
+        labels_dict = {
+            "stims": (
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
+                + f"correct_{prefix}_go ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
+                + f"correct_{prefix}_nogo ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
+                "-stim_file {ppi_file} -stim_label {label} "
+                + f"PPI_correct_{prefix}_go ",
+                "-stim_file {ppi_file} -stim_label {label} "
+                + f"PPI_correct_{prefix}_nogo ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
+            ),
+            "gltsyms": (
+                f"-gltsym 'SYM: +1*PPI_correct_{prefix}_nogo -1*PPI_correct_{prefix}_go' "
+                + "-glt_label {label} "
+                + f"PPI_correct_{prefix}_nogo_vs_PPI_correct_{prefix}_go ",
+            ),
+        }
+
+        files = [f"correct_{prefix}_go.1D", f"correct_{prefix}_nogo.1D", "errors.1D"]
+
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
     nonempty_files = np.array(files)[~empty_mask]

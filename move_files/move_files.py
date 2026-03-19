@@ -6,6 +6,7 @@ from nifti2bids.logging import setup_logger
 
 LGR = setup_logger(__name__)
 
+
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description="Move events or sessions files to BIDS directory."
@@ -51,7 +52,7 @@ def main(src_dir, bids_dir):
             dst_file = dst_dir / src_file.name
             if not dst_file.parent.exists():
                 continue
-            
+
             if dst_file.exists():
                 dst_file.unlink()
 

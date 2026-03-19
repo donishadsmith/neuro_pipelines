@@ -198,104 +198,97 @@ def get_task_deconvolve_kids_cmd(task, timing_dir, nuisance_regressors_file):
             "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
         }
     else:
-        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
-        deconvolve_cmd = create_flanker_deconvolve_cmd(
-            timing_dir, nuisance_regressors_file
+        deconvolve_cmd = create_dynamic_deconvolve_glm_cmd(
+            timing_dir, nuisance_regressors_file, task
         )
 
     return deconvolve_cmd
 
 
-def get_task_deconvolve_adults_cmd(
-    task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
-):
-    seed_name = str(seed_timeseries_file).split("_desc")[0]
-
+def get_task_deconvolve_adults_cmd(task, timing_dir, nuisance_regressors_file):
     if task == "nback":
         deconvolve_cmd = {
-            "num_stimts": "-num_stimts 3 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 3 0-back "
-            f"-stim_times 3 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 4 2-back "
+            "num_stimts": "-num_stimts 2 ",
+            "args": f"-stim_times 1 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 1 0-back "
+            f"-stim_times 2 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 2 2-back "
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 1 2-back_vs_0-back ",
         }
     elif task == "mtle":
         deconvolve_cmd = {
-            "num_stimts": "-num_stimts 4 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 3 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_encoding "
-            f"-stim_times 4 {timing_dir / 'aversive_encoding.1D'} 'BLOCK(18, 1)' -stim_label 4 aversive_encoding "
+            "num_stimts": "-num_stimts 3 ",
+            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            f"-stim_times 2 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_encoding "
+            f"-stim_times 3 {timing_dir / 'aversive_encoding.1D'} 'BLOCK(18, 1)' -stim_label 3 aversive_encoding "
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*aversive_encoding -1*neutral_encoding' -glt_label 1 aversive_encoding_vs_neutral_encoding ",
         }
     elif task == "mtlr":
         deconvolve_cmd = {
-            "num_stimts": "-num_stimts 4 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 3 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 3 neutral_retrieval "
-            f"-stim_times 4 {timing_dir / 'aversive_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 4 aversive_retrieval "
+            "num_stimts": "-num_stimts 3 ",
+            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
+            f"-stim_times 2 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_retrieval "
+            f"-stim_times 3 {timing_dir / 'aversive_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 3 aversive_retrieval "
             f"-ortvec {nuisance_regressors_file} Nuisance "
             "-gltsym 'SYM: +1*aversive_retrieval -1*neutral_retrieval' -glt_label 1 aversive_retrieval_vs_neutral_retrieval ",
         }
-    # Determine if only want successful instances considering there are not many trials
-    #
-    elif task == "simplegng":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 3 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / 'simple_go.1D'} 'GAM' -stim_label 2 simple_go "
-            f"-stim_times 3 {timing_dir / 'simple_nogo.1D'} 'GAM' -stim_label 3 simple_nogo "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*simple_nogo -1*simple_go' -glt_label 1 simple_nogo_vs_simple_go ",
-        }
-    elif task == "complexgng":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 3 ",
-            "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / 'complex_go.1D'} 'GAM' -stim_label 2 complex_go "
-            f"-stim_times 3 {timing_dir / 'complex_nogo.1D'} 'GAM' -stim_label 3 complex_nogo "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*complex_nogo -1*complex_go' -glt_label 1 complex_nogo_vs_complex_go ",
-        }
     else:
-        # Note: simply multiply the coefficient image by -1 to get the opposite contrast
-        deconvolve_cmd = create_flanker_deconvolve_cmd(
-            timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
+        deconvolve_cmd = create_dynamic_deconvolve_glm_cmd(
+            timing_dir, nuisance_regressors_file, task
         )
 
     return deconvolve_cmd
 
 
-def create_flanker_deconvolve_cmd(timing_dir, nuisance_regressors_file):
-    # Dynamically create the flanker contrast to avoid including contrasts that
+def create_dynamic_deconvolve_glm_cmd(timing_dir, nuisance_regressors_file, task):
+    # Dynamically create the flanker or go nogo contrasts to avoid including contrasts that
     # have no data
     deconvolve_cmd = {
         "num_stimts": "-num_stimts {num_labels} ",
         "args": "{stims} -ortvec {nuisance_regressors_file} Nuisance {gltsyms}",
     }
 
-    labels_dict = {
-        "stims": (
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} congruent ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} incongruent ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} neutral ",
-            "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-        ),
-        "gltsyms": (
-            "-gltsym 'SYM: +1*congruent -1*neutral' -glt_label {label} congruent_vs_neutral ",
-            "-gltsym 'SYM: +1*incongruent -1*neutral' -glt_label {label} incongruent_vs_neutral ",
-            "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label {label} nogo_vs_neutral ",
-            "-gltsym 'SYM: +1*incongruent -1*congruent' -glt_label {label} incongruent_vs_congruent ",
-            "-gltsym 'SYM: +1*congruent -1*nogo' -glt_label {label} congruent_vs_nogo ",
-            "-gltsym 'SYM: +1*incongruent -1*nogo' -glt_label {label} incongruent_vs_nogo ",
-        ),
-    }
+    if task == "flanker":
+        labels_dict = {
+            "stims": (
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_congruent ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_incongruent ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_nogo ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_neutral ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
+            ),
+            "gltsyms": (
+                "-gltsym 'SYM: +1*correct_incongruent -1*correct_congruent' -glt_label {label} correct_incongruent_vs_correct_congruent ",
+                "-gltsym 'SYM: +1*correct_nogo -1*correct_neutral' -glt_label {label} correct_nogo_vs_correct_neutral ",
+            ),
+        }
 
-    files = ["congruent.1D", "incongruent.1D", "nogo.1D", "neutral.1D", "errors.1D"]
+        files = [
+            "correct_congruent.1D",
+            "correct_incongruent.1D",
+            "correct_nogo.1D",
+            "correct_neutral.1D",
+            "errors.1D",
+        ]
+    else:
+        prefix = task.removesuffix("gng")
+        labels_dict = {
+            "stims": (
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
+                + f"correct_{prefix}_go ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
+                + f"correct_{prefix}_nogo ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
+            ),
+            "gltsyms": (
+                f"-gltsym 'SYM: +1*correct_{prefix}_nogo -1*correct_{prefix}_go' "
+                + "-glt_label {label} "
+                + f"correct_{prefix}_nogo_vs_correct_{prefix}_go ",
+            ),
+        }
+
+        files = [f"correct_{prefix}_go.1D", f"correct_{prefix}_nogo.1D", "errors.1D"]
+
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
     nonempty_files = np.array(files)[~empty_mask]

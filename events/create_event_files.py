@@ -493,6 +493,10 @@ def _create_gng_events_files(
             {"go": f"{prefix}_go", "nogo": f"{prefix}_nogo"}
         )
 
+        event_df["trial_type_accuracy"] = (
+            event_df["trial_type"].astype(str) + "_" + event_df["accuracy"].astype(str)
+        )
+
         # Getting subject ID and organising files to get subject ID
         subject_id = re.search("(\d+).*-", log_file.name).group(1)
         session_id = _get_presentation_session(
@@ -778,7 +782,7 @@ def _create_princess_events_files(
                 scanner_start_time=scanner_start_time
             )
             events["duration"] = extractor.extract_durations(
-               offset_column_name="feedback.OffsetTime"
+                offset_column_name="feedback.OffsetTime"
             )
             trial_name_dict = {
                 "daynight": "switch",

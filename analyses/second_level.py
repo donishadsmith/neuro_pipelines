@@ -26,6 +26,7 @@ from _utils import (
 
 LGR = setup_logger(__name__)
 
+
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description="Perform second level analysis. Cool paper: https://onlinelibrary.wiley.com/doi/10.1002/hbm.70437"
@@ -301,6 +302,7 @@ class DataContainer:
     @property
     def exclude_vars(self) -> list[str]:
         return list(set(self.exclude_cols + list(self.categorical_vars)))
+
 
 def get_beta_files(analysis_dir, task, first_level_glt_label):
     return sorted(
@@ -935,12 +937,12 @@ def perform_palm(
     # The corrcon flag is used to control false positive rates since the positive and negative
     # maps are combined programatically later, which doubles the fpr (i.e., 2 × 0.05 = 0.10)
     # Note that Palm also has a two-tailed; however based on source code:
-    # 
+    #
     # https://github.com/andersonwinkler/PALM/blob/d937704489cc8ae8a7dafb273e421536f8b1e1a5/palm_core.m#L1603-L1605
     # if opts.twotail && ~ opts.missingdata && ( ~ opts.accel.lowrank || p > plm.nJ{m}(c))
     #      G{y}{m}{c} = abs(G{y}{m}{c});
     #   end
-    # 
+    #
     # The abs() is applied before tfce is computed:
     # https://github.com/andersonwinkler/PALM/blob/d937704489cc8ae8a7dafb273e421536f8b1e1a5/palm_core.m#L1674-L1675
     # if opts.tfce.uni.do
@@ -962,7 +964,7 @@ def perform_palm(
     # into a single cluster which artificially inflates tfce. The intended behavior
     # for a true bidirectional map where each cluster only represents one direction is to do two separate
     # one-tailed contrasts with -corrcon, which corrects fwer across both contrasts, and merge the results
-    # into a single bidirectional t-stat map. 
+    # into a single bidirectional t-stat map.
     palm_flags = (
         "-noniiclass "
         f"-i {concatenated_filename} "

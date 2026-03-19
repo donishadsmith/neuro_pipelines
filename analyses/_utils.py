@@ -24,12 +24,8 @@ TASK_CONTRASTS = {
         "mtlr": ("neutral_retrieval",),
         "princess": ("switch_vs_nonswitch",),
         "flanker": (
-            "congruent_vs_neutral",
-            "incongruent_vs_neutral",
-            "nogo_vs_neutral",
-            "incongruent_vs_congruent",
-            "congruent_vs_nogo",
-            "incongruent_vs_nogo",
+            "correct_incongruent_vs_correct_congruent",
+            "correct_nogo_vs_correct_neutral",
         ),
     },
     "adults": {
@@ -37,15 +33,11 @@ TASK_CONTRASTS = {
         "mtle": ("aversive_encoding_vs_neutral_encoding",),
         "mtlr": ("aversive_retrieval_vs_neutral_retrieval",),
         "flanker": (
-            "congruent_vs_neutral",
-            "incongruent_vs_neutral",
-            "nogo_vs_neutral",
-            "incongruent_vs_congruent",
-            "congruent_vs_nogo",
-            "incongruent_vs_nogo",
+            "correct_incongruent_vs_correct_congruent",
+            "correct_nogo_vs_correct_neutral",
         ),
-        "simplegng": ("simple_nogo_vs_simple_go",),
-        "complexgng": ("complex_nogo_vs_complex_go",),
+        "simplegng": ("correct_simple_nogo_vs_correct_simple_go",),
+        "complexgng": ("correct_complex_nogo_vs_correct_complex_go",),
     },
 }
 

@@ -79,6 +79,7 @@ def save_event_file(timing_dir, trial_type, timing_data):
 
 
 def create_timing_files(subject_dir, event_file, task):
+    special_tasks = ["flanker", "simplegng", "complexgng"]
     timing_dir = subject_dir / "timing_files" / task
     timing_dir.mkdir(parents=True, exist_ok=True)
 
@@ -89,7 +90,7 @@ def create_timing_files(subject_dir, event_file, task):
         trial_df = event_df[event_df["trial_type"] == trial_type]
         row_mask = (
             np.full(len(trial_df), True, dtype=bool)
-            if task != "flanker"
+            if task not in special_tasks
             else trial_df["accuracy"] == "correct"
         )
 
@@ -105,11 +106,14 @@ def create_timing_files(subject_dir, event_file, task):
         if isinstance(timing_data, pd.Series):
             timing_data = timing_data.to_list()
 
+        trial_type = f"correct_{trial_type}" if task in special_tasks else trial_type
         save_event_file(timing_dir, trial_type, timing_data)
 
-    # Get errors
-    if task == "flanker":
-        timing_data = trial_df.loc[~row_mask, "onset"].astype(str)
+    # Get all errors
+    if task in special_tasks:
+        timing_data = event_df.loc[event_df["accuracy"] == "incorrect", "onset"].astype(
+            str
+        )
 
         save_event_file(timing_dir, trial_type="errors", timing_data=timing_data)
 
