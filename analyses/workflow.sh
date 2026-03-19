@@ -43,8 +43,10 @@ NUM_SUBJECTS=20                                         # Set to "" if using SUB
 
 # Examples TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
 # TASKS=("nback")
-TASKS=("nback" "flanker" "mtle" "mtlr" "princess")      # Set all or specific ones out of "nback", "flanker", "mtle", "mtlr", "princess"
-
+# TASKS=("nback" "flanker" "mtle" "mtlr" "princess") options for kids
+# TASKS=("nback" "flanker" "mtle" "mtlr" "simplegng" "complexgng") options for adults
+TASKS=("all")                                           # Set all or specific ones out of "nback", "flanker", "mtle", "mtlr", "princess"
+                                                        # Can also use ("all") or "all"
 # --------------------------------
 # FIRST LEVEL DENOISING PARAMETERS
 # --------------------------------
@@ -76,11 +78,7 @@ export AFNI_ORIENT="lpi"                                # Orientation of images 
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
 # ======================================
-if [[ $SEND_EMAILS = true ]]; then
-    MAIL_ARGS=("--mail-type=END" "--mail-user=$EMAIL_ADDRESS")
-else
-    MAIL_ARGS=()
-fi
+[ $SEND_EMAILS = true ] && MAIL_ARGS=("--mail-type=END" "--mail-user=$EMAIL_ADDRESS") || MAIL_ARGS=()
 
 if [[ $COHORT == "kids" ]]; then
     export TEMPLATE_SPACE="MNIPediatricAsym_cohort-1_res-2"
@@ -91,6 +89,10 @@ if [[ $COHORT == "kids" ]]; then
     export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
     # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
     export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0"
+
+    if [[ $TASKS == "all" ]]; then
+        TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
+    fi
 else
     export TEMPLATE_SPACE="MNI152NLin2009cAsym_res-02"
 
@@ -99,6 +101,10 @@ else
     export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_desc-brain_mask.nii.gz"
     export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
     export WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
+
+    if [[ $TASKS == "all" ]]; then
+        TASKS=("nback" "flanker" "mtle" "mtlr" "simplegng" "complexgng")
+    fi
 fi
 
 if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
@@ -117,28 +123,19 @@ else
     FIRST_LEVEL_SCRIPT="first_level_glm.sb"
 fi
 
-if [ ${#SUBJECTS_IDS[@]} -eq 0 ]; then
-    N_SUBJECTS=$(( $NUM_SUBJECTS -1 ))
-else
-    N_SUBJECTS=$(( ${#SUBJECTS_IDS[@]} -1 ))
-fi
+[ ${#SUBJECTS_IDS[@]} -eq 0 ] && N_SUBJECTS=$(( $NUM_SUBJECTS -1 )) || N_SUBJECTS=$(( ${#SUBJECTS_IDS[@]} -1 ))
 
+SINGLE_GLT_LABEL_TASKS=("mtle" "mtlr" "princess" "simplegng" "complexgng")
 for CURRENT_TASK in "${TASKS[@]}"; do
     export TASK=$CURRENT_TASK
-
-    if [[ $CURRENT_TASK == "nback" ]]; then
+    
+    if printf "%s\n" "${SINGLE_GLT_LABEL_TASKS[@]}" | grep -qx "$CURRENT_TASK" || [[ $CURRENT_TASK == "nback" && $COHORT == "adults" ]]; then
+        FIRST_LEVEL_GLT_LABELS=("placeholder")
+    elif [[ $CURRENT_TASK == "nback" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
-            if [[ $COHORT == "kids" ]]; then
-                FIRST_LEVEL_GLT_LABELS=("1-back_vs_0-back" "2-back_vs_0-back" "2-back_vs_1-back")
-            else
-                FIRST_LEVEL_GLT_LABELS=("placeholder")
-            fi
+            FIRST_LEVEL_GLT_LABELS=("1-back_vs_0-back" "2-back_vs_0-back" "2-back_vs_1-back")
         else
-            if [[ $COHORT == "kids" ]]; then
-                FIRST_LEVEL_GLT_LABELS=("PPI_1-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_1-back")
-            else
-                FIRST_LEVEL_GLT_LABELS=("placeholder")
-            fi
+            FIRST_LEVEL_GLT_LABELS=("PPI_1-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_1-back")
         fi
     elif [[ $CURRENT_TASK == "flanker" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
@@ -146,8 +143,6 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         else
             FIRST_LEVEL_GLT_LABELS=("PPI_correct_incongruent_vs_PPI_correct_congruent" "PPI_correct_nogo_vs_PPI_correct_neutral")
         fi
-    else
-        FIRST_LEVEL_GLT_LABELS=("placeholder")
     fi
 
     JOB_ID_1=""
@@ -165,6 +160,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ===============
     if [ $RUN_FIRST_LEVEL = true ]; then
         JOB_ID_1=$(sbatch --parsable --array=0-$N_SUBJECTS "${MAIL_ARGS[@]}" $FIRST_LEVEL_SCRIPT)
+
         echo -e "- FIRST LEVEL JOB SUBMITTED (JOB ID: $JOB_ID_1)\n"
     else
         echo -e "- SKIPPING FIRST LEVEL JOB\n"
@@ -175,30 +171,14 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =======================================================
     if [ $RUN_SECOND_LEVEL = true ]; then
         for LABEL in ${FIRST_LEVEL_GLT_LABELS[@]}; do
-            if [[ $LABEL != "placeholder" ]]; then
-                export FIRST_LEVEL_GLT_LABEL=$LABEL
-            else
-                export FIRST_LEVEL_GLT_LABEL=""
-            fi
+            [[ $LABEL != "placeholder" ]] && export FIRST_LEVEL_GLT_LABEL=$LABEL && TEXT_STR="FOR $LABEL" || export FIRST_LEVEL_GLT_LABEL="" && TEXT_STR=""
 
-            if [[ -n $JOB_ID_1 ]]; then
-                JOB_ID_2=$(sbatch --parsable --dependency=afterok:$JOB_ID_1 --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)
-            else
-                JOB_ID_2=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)
-            fi
+            [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_1" || DEPENDENCY_STR=""
+            JOB_ID_2=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)
 
-            if [[ $LABEL != "placeholder" ]]; then
-                echo -e "- SECOND LEVEL SUBMITTED FOR $LABEL (JOB ID: $JOB_ID_2)\n"
-            else
-                echo -e "- SECOND LEVEL SUBMITTED (JOB ID: $JOB_ID_2)\n"
-            fi
+            echo -e "- SECOND LEVEL SUBMITTED $TEXT_STR (JOB ID: $JOB_ID_2)\n" | tr -s " "
 
-            if [[ -z $SECOND_LEVEL_JOB_IDS ]]; then
-                SECOND_LEVEL_JOB_IDS=$JOB_ID_2
-            else
-                # Append the job IDs together
-                SECOND_LEVEL_JOB_IDS=${SECOND_LEVEL_JOB_IDS}:${JOB_ID_2}
-            fi
+            SECOND_LEVEL_JOB_IDS=${SECOND_LEVEL_JOB_IDS:+${SECOND_LEVEL_JOB_IDS}:}${JOB_ID_2}
         done
     else
         echo -e "- SKIPPING SECOND LEVEL JOB\n"
@@ -208,11 +188,8 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_CLUSTER_RESULTS
     # ===================
     if [ $RUN_CLUSTER_RESULTS = true ]; then
-        if [[ -n $SECOND_LEVEL_JOB_IDS ]]; then
-            JOB_ID_3=$(sbatch --parsable --dependency=afterok:$SECOND_LEVEL_JOB_IDS --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
-        else
-            JOB_ID_3=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
-        fi
+        [[ -n $SECOND_LEVEL_JOB_IDS ]] && DEPENDENCY_STR="--dependency=afterok:$SECOND_LEVEL_JOB_IDS" || DEPENDENCY_STR=""
+        JOB_ID_3=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
 
         echo -e "- GET CLUSTER RESULTS SUBMITTED (JOB ID: $JOB_ID_3)\n"
     else
@@ -223,11 +200,8 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_CLUSTER_MNI_LOCATIONS
     # =========================
     if [ $RUN_CLUSTER_MNI_LOCATIONS = true ]; then
-        if [[ -n $JOB_ID_3 ]]; then
-            JOB_ID_4=$(sbatch --parsable --dependency=afterok:$JOB_ID_3 --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
-        else
-            JOB_ID_4=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
-        fi
+        [[ -n $JOB_ID_3 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_3" || DEPENDENCY_STR=""
+        JOB_ID_4=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
 
         echo -e "- IDENTIFY MNI LOCATIONS SUBMITTED (JOB ID: $JOB_ID_4)\n"
     else
@@ -238,11 +212,8 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_EXTRACT_INDIVIDUAL_BETAS
     # ============================
     if [ $RUN_EXTRACT_INDIVIDUAL_BETAS = true ]; then
-        if [[ -n $JOB_ID_4 ]]; then
-            JOB_ID_5=$(sbatch --parsable --dependency=afterok:$JOB_ID_4 --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
-        else
-            JOB_ID_5=$(sbatch --parsable --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
-        fi
+        [[ -n $JOB_ID_4 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_4" || DEPENDENCY_STR=""
+        JOB_ID_5=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
 
         echo -e "- EXTRACT INDIVIDUAL BETAS SUBMITTED (JOB ID: $JOB_ID_5)\n"
     else

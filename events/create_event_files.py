@@ -800,6 +800,10 @@ def _create_princess_events_files(
             # This task doesn't have a rest block or crosshair at the end
             event_df["duration"] = 52
             event_df["onset"] = event_df["onset"].apply(lambda x: int(np.floor(x)))
+            # Needs to be clipped. Timing ends at 472 or 473 for subjects but AFNI's timing_tool.py
+            # results in a rounding, out-of-bounds error because the final switch block is not
+            # proceeded by a rest block or several seconds of a crosshair
+            event_df.loc[event_df.index[-1], "onset"] = min(event_df.loc[event_df.index[-1], "onset"], 471)
 
             subject_id = re.search(r"(\d+)-\d+\.edat3$", edat_file.name).group(1)
             session_id = _get_eprime_session(
