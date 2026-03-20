@@ -1051,8 +1051,9 @@ def main(
             global_regressors,
         )
 
-        # Note, only leaving task black because subject_analysis_dir includes the task name
-        timing_dir = create_timing_files(subject_analysis_dir, event_file, task="")
+        timing_dir = create_timing_files(
+            subject_analysis_dir, event_file, task=task, append_task_name=False
+        )
 
         percent_change_nifti_file = percent_signal_change(
             subject_analysis_dir, afni_img_path, nifti_file, mask_file, censor_file

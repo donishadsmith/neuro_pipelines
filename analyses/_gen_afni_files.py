@@ -78,9 +78,9 @@ def save_event_file(timing_dir, trial_type, timing_data):
         f.write(f"{timing_str}")
 
 
-def create_timing_files(subject_dir, event_file, task):
+def create_timing_files(subject_dir, event_file, task, append_task_name=True):
     special_tasks = ["flanker", "simplegng", "complexgng"]
-    timing_dir = subject_dir / "timing_files" / task
+    timing_dir = subject_dir / "timing_files" / (task if append_task_name else "")
     timing_dir.mkdir(parents=True, exist_ok=True)
 
     event_df = pd.read_csv(event_file, sep="\t")
