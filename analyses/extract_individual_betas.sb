@@ -19,7 +19,7 @@ PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 # Specific mask used as the seed for the gPPI
 GLM_DIR="$BIDS_DIR/derivatives/glm"
 # $BIDS_DIR/derivatives/glm/$TASK/sphere_mask/{path}
-SEED_MASK_PATH=${SEED_MASK_PATH:-}
+SEED_MASK_PATH=${SEED_MASK_PATH:-""}
 
 DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
 
@@ -39,6 +39,7 @@ CMD="$PYTHON extract_individual_betas.py \
     --dst_dir $ANALYSIS_DIR \
     --method $METHOD \
     --cohort $COHORT \
+    --seed_mask_path $SEED_MASK_PATH \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE"
 
