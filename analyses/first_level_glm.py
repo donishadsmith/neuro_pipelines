@@ -21,7 +21,7 @@ from _gen_afni_files import (
     create_nuisance_regressor_file,
     is_timing_file_empty,
 )
-from _argparse_typing import n_dummy_type
+from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
 from _utils import VALID_TASK_NAMES, create_beta_files
 
@@ -72,6 +72,14 @@ def _get_cmd_args():
         help="Subject ID without the 'sub-' entity.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--filter_correct_trials",
+        dest="filter_correct_trials",
+        required=False,
+        default=False,
+        type=boolean_flags,
+        help="Filter correct trials for event-related tasks.",
+    )
     parser.add_argument(
         "--n_motion_parameters",
         dest="n_motion_parameters",
@@ -246,23 +254,23 @@ def create_dynamic_deconvolve_glm_cmd(timing_dir, nuisance_regressors_file, task
     if task == "flanker":
         labels_dict = {
             "stims": (
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_congruent ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_incongruent ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_nogo ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} correct_neutral ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} congruent ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} incongruent ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} neutral ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
             ),
             "gltsyms": (
-                "-gltsym 'SYM: +1*correct_incongruent -1*correct_congruent' -glt_label {label} correct_incongruent_vs_correct_congruent ",
-                "-gltsym 'SYM: +1*correct_nogo -1*correct_neutral' -glt_label {label} correct_nogo_vs_correct_neutral ",
+                "-gltsym 'SYM: +1*incongruent -1*congruent' -glt_label {label} incongruent_vs_congruent ",
+                "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label {label} nogo_vs_neutral ",
             ),
         }
 
         files = [
-            "correct_congruent.1D",
-            "correct_incongruent.1D",
-            "correct_nogo.1D",
-            "correct_neutral.1D",
+            "congruent.1D",
+            "incongruent.1D",
+            "nogo.1D",
+            "neutral.1D",
             "errors.1D",
         ]
     else:
@@ -270,19 +278,19 @@ def create_dynamic_deconvolve_glm_cmd(timing_dir, nuisance_regressors_file, task
         labels_dict = {
             "stims": (
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
-                + f"correct_{prefix}_go ",
+                + f"{prefix}_go ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
-                + f"correct_{prefix}_nogo ",
+                + f"{prefix}_nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
             ),
             "gltsyms": (
-                f"-gltsym 'SYM: +1*correct_{prefix}_nogo -1*correct_{prefix}_go' "
+                f"-gltsym 'SYM: +1*{prefix}_nogo -1*{prefix}_go' "
                 + "-glt_label {label} "
-                + f"correct_{prefix}_nogo_vs_correct_{prefix}_go ",
+                + f"{prefix}_nogo_vs_{prefix}_go ",
             ),
         }
 
-        files = [f"correct_{prefix}_go.1D", f"correct_{prefix}_nogo.1D", "errors.1D"]
+        files = [f"{prefix}_go.1D", f"{prefix}_nogo.1D", "errors.1D"]
 
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
@@ -342,6 +350,7 @@ def main(
     cohort,
     subject,
     task,
+    filter_correct_trials,
     n_motion_parameters,
     n_global_parameters,
     fd_threshold,
@@ -540,7 +549,9 @@ def main(
             global_regressors,
         )
 
-        timing_dir = create_timing_files(subject_dir, event_file, task)
+        timing_dir = create_timing_files(
+            subject_dir, event_file, task, filter_correct_trials
+        )
 
         percent_change_nifti_file = percent_signal_change(
             subject_dir, afni_img_path, nifti_file, mask_file, censor_file

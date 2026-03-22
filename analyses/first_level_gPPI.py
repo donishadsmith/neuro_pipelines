@@ -90,7 +90,7 @@ from _gen_afni_files import (
     create_nuisance_regressor_file,
     is_timing_file_empty,
 )
-from _argparse_typing import n_dummy_type
+from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
 from _utils import (
     VALID_TASK_NAMES,
@@ -183,6 +183,14 @@ def _get_cmd_args():
         help="Subject ID without the 'sub-' entity.",
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
+    parser.add_argument(
+        "--filter_correct_trials",
+        dest="filter_correct_trials",
+        required=False,
+        default=False,
+        type=boolean_flags,
+        help="Filter correct trials for event-related tasks.",
+    )
     parser.add_argument(
         "--n_motion_parameters",
         dest="n_motion_parameters",
@@ -545,28 +553,28 @@ def create_dynamic_deconvolve_gPPI_cmd(
     if task == "flanker":
         labels_dict = {
             "stims": (
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_congruent ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_incongruent ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_nogo ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} correct_neutral ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} congruent ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} incongruent ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} nogo ",
+                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} neutral ",
                 "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_correct_congruent ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_correct_incongruent ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_correct_nogo ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_correct_neutral ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_congruent ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_incongruent ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_nogo ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_neutral ",
                 "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
             ),
             "gltsyms": (
-                "-gltsym 'SYM: +1*PPI_correct_incongruent -1*PPI_correct_congruent' -glt_label {label} PPI_correct_incongruent_vs_PPI_correct_congruent ",
-                "-gltsym 'SYM: +1*PPI_correct_nogo -1*PPI_correct_neutral' -glt_label {label} PPI_correct_nogo_vs_PPI_correct_neutral ",
+                "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_congruent' -glt_label {label} PPI_incongruent_vs_PPI_congruent ",
+                "-gltsym 'SYM: +1*PPI_nogo -1*PPI_neutral' -glt_label {label} PPI_nogo_vs_PPI_neutral ",
             ),
         }
 
         files = [
-            "correct_congruent.1D",
-            "correct_incongruent.1D",
-            "correct_nogo.1D",
-            "correct_neutral.1D",
+            "congruent.1D",
+            "incongruent.1D",
+            "nogo.1D",
+            "neutral.1D",
             "errors.1D",
         ]
     else:
@@ -574,24 +582,22 @@ def create_dynamic_deconvolve_gPPI_cmd(
         labels_dict = {
             "stims": (
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
-                + f"correct_{prefix}_go ",
+                + f"{prefix}_go ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
-                + f"correct_{prefix}_nogo ",
+                + f"{prefix}_nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-                "-stim_file {ppi_file} -stim_label {label} "
-                + f"PPI_correct_{prefix}_go ",
-                "-stim_file {ppi_file} -stim_label {label} "
-                + f"PPI_correct_{prefix}_nogo ",
+                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_{prefix}_go ",
+                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_{prefix}_nogo ",
                 "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
             ),
             "gltsyms": (
-                f"-gltsym 'SYM: +1*PPI_correct_{prefix}_nogo -1*PPI_correct_{prefix}_go' "
+                f"-gltsym 'SYM: +1*PPI_{prefix}_nogo -1*PPI_{prefix}_go' "
                 + "-glt_label {label} "
-                + f"PPI_correct_{prefix}_nogo_vs_PPI_correct_{prefix}_go ",
+                + f"PPI_{prefix}_nogo_vs_PPI_{prefix}_go ",
             ),
         }
 
-        files = [f"correct_{prefix}_go.1D", f"correct_{prefix}_nogo.1D", "errors.1D"]
+        files = [f"{prefix}_go.1D", f"{prefix}_nogo.1D", "errors.1D"]
 
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
@@ -850,6 +856,7 @@ def main(
     subject,
     space,
     task,
+    filter_correct_trials,
     n_motion_parameters,
     n_global_parameters,
     fd_threshold,
@@ -1054,7 +1061,11 @@ def main(
         )
 
         timing_dir = create_timing_files(
-            subject_analysis_dir, event_file, task=task, append_task_name=False
+            subject_analysis_dir,
+            event_file,
+            task=task,
+            filter_correct_trials=filter_correct_trials,
+            append_task_name=False,
         )
 
         percent_change_nifti_file = percent_signal_change(

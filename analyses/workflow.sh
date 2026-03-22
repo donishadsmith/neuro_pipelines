@@ -58,6 +58,7 @@ export FD_THRESHOLD=0.9                                 # Choose a float between
 export EXCLUSION_CRITERIA=0.3                           # Choose a float between 0.20-0.40
 export FWHM=6                                           # Choose integer
 export GPPI_PAD_SECONDS=10.0                            # Choose float, pads timeseries for deconvolution for gPPI
+export FILTER_CORRECT_TRIALS=false                      # Filter event-related tasks for correctness set to true or false
 
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
@@ -141,9 +142,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         fi
     elif [[ $CURRENT_TASK == "flanker" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
-            FIRST_LEVEL_GLT_LABELS=("correct_incongruent_vs_correct_congruent" "correct_nogo_vs_correct_neutral")
+            FIRST_LEVEL_GLT_LABELS=("incongruent_vs_congruent" "nogo_vs_neutral")
         else
-            FIRST_LEVEL_GLT_LABELS=("PPI_correct_incongruent_vs_PPI_correct_congruent" "PPI_correct_nogo_vs_PPI_correct_neutral")
+            FIRST_LEVEL_GLT_LABELS=("PPI_incongruent_vs_PPI_congruent" "PPI_nogo_vs_PPI_neutral")
         fi
     fi
 

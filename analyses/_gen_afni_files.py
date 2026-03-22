@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np, pandas as pd
 
 from nifti2bids.logging import setup_logger
@@ -68,6 +70,9 @@ def create_nuisance_regressor_file(
 
 
 def is_timing_file_empty(timing_file):
+    if not Path(timing_file).exists():
+        return True
+
     return np.loadtxt(timing_file, delimiter=" ").size == 0
 
 
@@ -78,8 +83,25 @@ def save_event_file(timing_dir, trial_type, timing_data):
         f.write(f"{timing_str}")
 
 
-def create_timing_files(subject_dir, event_file, task, append_task_name=True):
-    special_tasks = ["flanker", "simplegng", "complexgng"]
+def create_timing_files(
+    subject_dir, event_file, task, filter_correct_trials=False, append_task_name=True
+):
+    event_related_tasks = ["flanker", "simplegng", "complexgng"]
+    special_tasks = event_related_tasks if filter_correct_trials else []
+    if task in event_related_tasks:
+        if filter_correct_trials:
+            LGR.info(
+                f"**FILTERING** the following task for correct trials only: {task}. "
+                "Contrasts related to this task will **ONLY** include trials that subject "
+                "answered correctly on."
+            )
+        else:
+            LGR.info(
+                f"**NOT FILTERING** the following task for correct trials only: {task} "
+                "Contrasts related to this task will include **ALL** trials for subject "
+                "regardless if they answered correctly or incorrectly."
+            )
+
     timing_dir = subject_dir / "timing_files" / (task if append_task_name else "")
     timing_dir.mkdir(parents=True, exist_ok=True)
 
@@ -106,7 +128,6 @@ def create_timing_files(subject_dir, event_file, task, append_task_name=True):
         if isinstance(timing_data, pd.Series):
             timing_data = timing_data.to_list()
 
-        trial_type = f"correct_{trial_type}" if task in special_tasks else trial_type
         save_event_file(timing_dir, trial_type, timing_data)
 
     # Get all errors
