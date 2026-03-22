@@ -13,6 +13,11 @@ from nifti2bids.io import replace_ext
 
 LGR = setup_logger(__name__)
 
+VALID_TASK_NAMES = {
+    "kids": ["nback", "mtlr", "mtle", "flanker", "princess"],
+    "adults": ["nback", "mtlr", "mtle", "flanker", "simplegng", "complexgng"],
+}
+
 TASK_CONTRASTS = {
     "kids": {
         "nback": (

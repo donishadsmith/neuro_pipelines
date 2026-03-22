@@ -94,12 +94,12 @@ if [[ $COHORT == "kids" ]]; then
         TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
     fi
 else
-    export TEMPLATE_SPACE="MNI152NLin2009cAsym_res-02"
+    export TEMPLATE_SPACE="MNI152NLin2009cAsym"
 
     TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNI152NLin2009cAsym"
-    export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_label-GM_probseg.nii.gz"
-    export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_desc-brain_mask.nii.gz"
-    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
+    export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_res-02_label-GM_probseg.nii.gz"
+    export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_res-02_desc-brain_mask.nii.gz"
+    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_res-01_T1w.nii.gz"
     export WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
 
     if [[ $TASKS == "all" ]]; then
@@ -128,7 +128,7 @@ fi
 SINGLE_GLT_LABEL_TASKS=("mtle" "mtlr" "princess" "simplegng" "complexgng")
 for CURRENT_TASK in "${TASKS[@]}"; do
     export TASK=$CURRENT_TASK
-    
+
     if printf "%s\n" "${SINGLE_GLT_LABEL_TASKS[@]}" | grep -qx "$CURRENT_TASK" || [[ $CURRENT_TASK == "nback" && $COHORT == "adults" ]]; then
         FIRST_LEVEL_GLT_LABELS=("placeholder")
     elif [[ $CURRENT_TASK == "nback" ]]; then

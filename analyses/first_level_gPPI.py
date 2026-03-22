@@ -93,6 +93,7 @@ from _gen_afni_files import (
 from _argparse_typing import n_dummy_type
 from _models import create_design_matrix, perform_first_level
 from _utils import (
+    VALID_TASK_NAMES,
     create_beta_files,
     get_beta_names,
     get_coordinate_from_filename,
@@ -102,10 +103,6 @@ from _utils import (
 
 LGR = setup_logger(__name__)
 
-VALID_TASK_NAMES = {
-    "kids": ["nback", "mtlr", "mtle", "flanker", "princess"],
-    "adults": ["nback", "mtlr", "mtle", "flanker", "simplegng", "repeatgng"],
-}
 # Using constant durations instead of BIDS one, which have small
 # stimulus presentation delays
 # Instruction has the same duration for all three tasks but in the
@@ -891,6 +888,7 @@ def main(
             return_type="file",
         )
         if not confounds_tsv_files:
+            LGR.info(f"No confound TSV files found for session: {session}")
             continue
         else:
             confounds_tsv_file = confounds_tsv_files[0]
@@ -906,6 +904,7 @@ def main(
                 return_type="file",
             )
             if not confounds_json_file:
+                LGR.info(f"No confound files JSON found for session: {session}")
                 continue
             else:
                 confounds_json_file = confounds_json_file[0]
@@ -920,6 +919,7 @@ def main(
             return_type="file",
         )
         if not event_file:
+            LGR.info(f"No event files found for session: {session}")
             continue
         else:
             event_file = event_file[0]
@@ -935,6 +935,7 @@ def main(
             return_type="file",
         )
         if not mask_files:
+            LGR.info(f"No mask files found for session: {session}")
             continue
         else:
             mask_file = [file for file in mask_files if space in str(Path(file).name)][
@@ -952,6 +953,7 @@ def main(
             return_type="file",
         )
         if not nifti_files:
+            LGR.info(f"No nifti files found for session: {session}")
             continue
         else:
             nifti_file = [
