@@ -344,7 +344,7 @@ def main(
                 continue
 
             truncated_df = drop_dose_rows(
-                data_table, get_nontarget_dose(second_level_glt_code)
+                data_table, get_nontarget_dose(second_level_glt_code, cohort)
             )
             beta_names = get_beta_names(first_level_glt_label)
             for beta_name in beta_names:

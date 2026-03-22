@@ -311,15 +311,13 @@ def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correcti
         )
 
 
-def get_nontarget_dose(second_level_glt_code):
+def get_nontarget_dose(second_level_glt_code, cohort):
     if second_level_glt_code == "mean":
         return None
 
-    return list(
-        {"0", "5", "10"}.difference(
-            second_level_glt_code.replace("PPI_", "").split("_vs_")
-        )
-    )
+    doses = {"kids": {"0", "5", "10"}, "adults": {"mph", "placebo"}}
+
+    return list(doses[cohort].difference(second_level_glt_code.split("_vs_")))
 
 
 def drop_dose_rows(data_table, dose_list, only_paired_data=False):
@@ -332,13 +330,13 @@ def drop_dose_rows(data_table, dose_list, only_paired_data=False):
         duplicated_mask = data_table["participant_id"].duplicated(keep=False)
         if not duplicated_mask.to_numpy().all():
             contrast_name = get_contrast_name_from_file(
-                data_table["InputFile"].tolist[0]
+                data_table["InputFile"].tolist()[0]
             )
             removed_subjects = data_table.loc[
                 ~duplicated_mask, "participant_id"
             ].tolist()
-            total_subjects = set(data_table["participant_id"].tolist()).difference(
-                removed_subjects
+            total_subjects = len(
+                set(data_table["participant_id"].tolist()).difference(removed_subjects)
             )
             LGR.warning(
                 f"For contrast ({contrast_name}), the following subjects have been removed: {removed_subjects}. "

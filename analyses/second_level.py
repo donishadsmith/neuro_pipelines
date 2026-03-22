@@ -2,6 +2,7 @@ import argparse, shutil, subprocess, sys
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
@@ -671,7 +672,8 @@ def create_design_matrix(
         design_matrix = prioritize_regressors(design_matrix, datacontainer)
 
     if include_intercept:
-        intercept = [1] * design_matrix.shape[0]
+        # Using row shape of original table for case where design matrix is empty
+        intercept = [1] * (glt_data_table.shape[0])
         design_matrix.insert(0, "intercept", intercept)
     else:
         first_label, _ = get_interpretation_labels(second_level_glt_code)
@@ -1189,7 +1191,9 @@ def main(
 
                 vs_in_code = "_vs_" in second_level_glt_code
                 glt_data_table = drop_dose_rows(
-                    data_table, get_nontarget_dose(second_level_glt_code), vs_in_code
+                    data_table,
+                    get_nontarget_dose(second_level_glt_code, cohort),
+                    vs_in_code,
                 )
                 glt_data_table = drop_constant_columns(glt_data_table)
 
