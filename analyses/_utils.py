@@ -25,7 +25,7 @@ TASK_CONTRASTS = {
             "2-back_vs_0-back",
             "2-back_vs_1-back",
         ),
-        "mtle": ("neutral_encoding"),
+        "mtle": ("neutral_encoding",),
         "mtlr": ("neutral_retrieval",),
         "princess": ("switch_vs_nonswitch",),
         "flanker": (
@@ -34,7 +34,7 @@ TASK_CONTRASTS = {
         ),
     },
     "adults": {
-        "nback": "2-back_vs_0-back",
+        "nback": ("2-back_vs_0-back",),
         "mtle": ("aversive_encoding_vs_neutral_encoding",),
         "mtlr": ("aversive_retrieval_vs_neutral_retrieval",),
         "flanker": (
@@ -102,6 +102,12 @@ def get_beta_names(gltsyms, add_coef_str=False):
     return list(set(beta_names))
 
 
+def get_contrast_name_from_file(filename):
+    filename = Path(filename).name
+
+    return filename.split("desc-")[-1].split("_betas")[0]
+
+
 def get_contrast_entity_key(input_str):
     input_str = Path(input_str).name
 
@@ -151,6 +157,7 @@ def create_beta_files(
         )
         if beta_file.exists() and overwrite:
             beta_file.unlink()
+
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
             f"{stats_file}'[{beta_name}]' "
@@ -322,7 +329,23 @@ def drop_dose_rows(data_table, dose_list, only_paired_data=False):
     data_table = data_table[~data_table["dose"].astype(str).isin(dose_list)]
     if only_paired_data:
         # Keep only subjects who have both remaining doses (i.e., appear more than once)
-        return data_table[data_table["participant_id"].duplicated(keep=False)]
+        duplicated_mask = data_table["participant_id"].duplicated(keep=False)
+        if not duplicated_mask.to_numpy().all():
+            contrast_name = get_contrast_name_from_file(
+                data_table["InputFile"].tolist[0]
+            )
+            removed_subjects = data_table.loc[
+                ~duplicated_mask, "participant_id"
+            ].tolist()
+            total_subjects = set(data_table["participant_id"].tolist()).difference(
+                removed_subjects
+            )
+            LGR.warning(
+                f"For contrast ({contrast_name}), the following subjects have been removed: {removed_subjects}. "
+                f"A total of {total_subjects} unique subjects with two timepoints remain."
+            )
+
+        return data_table[duplicated_mask]
 
     return data_table
 
