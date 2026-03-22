@@ -10,7 +10,7 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/fmriprep_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/fmriprep_%A_%a.err
 # -------------------------------------------------------------------------
-# Use --array to process multiple subjects at the same time
+# Use --array=0-NUMSUBS (e.g., sbatch --array=0-16 fmriprep.sb) to process multiple subjects at the same time
 FMRIPREP_VERSION="25.2.3"
 
 DATASET="mph"
@@ -44,6 +44,25 @@ fi
 
 DERIVS_DIR="$BIDS_DIR/derivatives/fmriprep-$FMRIPREP_VERSION"
 mkdir -p $DERIVS_DIR
+
+FREESURFER_DIR="$DERIVS_DIR/sourcedata/freesurfer"
+mkdir -p $FREESURFER_DIR
+
+# https://grahamwatts.co.uk/blog/2024/10/09/lock-files-in-bash/
+# https://stackoverflow.com/questions/185451/quick-and-dirty-way-to-ensure-only-one-instance-of-a-shell-script-is-running-at
+# https://github.com/nipreps/fmriprep/issues/3258#issuecomment-2032118214
+# To help with race condition, use file locking so that only one process copies the folder and the other
+# processes wait to prevent interleaved writes and corrupted files
+if [[ ! -f "$FREESURFER_DIR/fsaverage.done" ]]; then
+	if mkdir "$FREESURFER_DIR/fsaverage.lock" 2>/dev/null; then
+		apptainer exec -B $DERIVS_DIR:/out $IMG_DIR cp -r /opt/freesurfer/subjects/fsaverage /out/sourcedata/freesurfer
+		touch "$FREESURFER_DIR/fsaverage.done"
+	else
+		while [[ ! -f "$FREESURFER_DIR/fsaverage.done" ]]; do
+			sleep 10
+		done
+	fi
+fi
 
 SCRATCH_DIR="/scratch/$USER/$DATASET/$COHORT/fmriprep-$FMRIPREP_VERSION/$SUBJECT"
 mkdir -p $SCRATCH_DIR

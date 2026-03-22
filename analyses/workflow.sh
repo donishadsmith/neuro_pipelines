@@ -95,12 +95,13 @@ if [[ $COHORT == "kids" ]]; then
         TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
     fi
 else
-    export TEMPLATE_SPACE="MNI152NLin2009cAsym"
+    export TEMPLATE_SPACE="MNI152NLin2009cAsym_res-2"
 
+    BASE_SPACE="MNI152NLin2009cAsym"
     TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNI152NLin2009cAsym"
-    export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_res-02_label-GM_probseg.nii.gz"
-    export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_res-02_desc-brain_mask.nii.gz"
-    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_res-01_T1w.nii.gz"
+    export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-02_label-GM_probseg.nii.gz"
+    export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-02_desc-brain_mask.nii.gz"
+    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-01_T1w.nii.gz"
     export WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
 
     if [[ $TASKS == "all" ]]; then
