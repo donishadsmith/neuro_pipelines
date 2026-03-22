@@ -137,12 +137,12 @@ def _get_cmd_args():
     parser.add_argument(
         "--exclude_covariates",
         dest="exclude_covariates",
-        default=None,
+        default="",
         required=False,
-        nargs="+",
+        type=str,
         help=(
-            "Additional covariates to exclude from second level model. Each covariate should be in a single string "
-            "separated by space"
+            "Additional covariates to exclude from second level model. "
+            "Should be a single string with variables separated as space or 'all' to exclude everything."
         ),
     )
     parser.add_argument(
@@ -286,6 +286,7 @@ class DataContainer:
         if not exclude_covariates:
             return
 
+        exclude_covariates = exclude_covariates.strip()
         if exclude_covariates == "all":
             self.exclude_cols.extend(self.deprioritized_regressors)
             LGR.info(

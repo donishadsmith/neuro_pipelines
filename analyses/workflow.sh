@@ -62,9 +62,10 @@ export GPPI_PAD_SECONDS=10.0                            # Choose float, pads tim
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export EXCLUDE_COVARIATES="all"                         # Covariates to save dof; separated by space; Use "" to include are covariates or "all" to exclude all
+export EXCLUDE_COVARIATES="all"                         # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all.
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
-
+export EXCLUDE_NIFTI_FILE=""                            # Path to a text file containing prefixes of the filename of the NIfTI images to exclude.
+                                                        # Should contain a single column named 'nifti_prefix_filename'.
 # ------------------------------------------------
 # PARAMETERS USED WHEN GETTING THE CLUSTER RESULTS
 # ------------------------------------------------
