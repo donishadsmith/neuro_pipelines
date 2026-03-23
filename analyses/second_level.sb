@@ -46,7 +46,7 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
 # e.g. sbatch second_level.sb nback
 TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 FIRST_LEVEL_GLT_LABEL=${FIRST_LEVEL_GLT_LABEL:-}
-EXCLUDE_COVARIATES=${EXCLUDE_COVARIATES:-""}
+EXCLUDED_COVARIATES=${EXCLUDED_COVARIATES:-""}
 GM_PROBSEG_IMG_PATH=${GM_PROBSEG_IMG_PATH:-""}
 GM_MASK_THRESHOLD=${GM_MASK_THRESHOLD:-0.20}
 
@@ -77,7 +77,7 @@ CMD="$PYTHON second_level.py \
 	--task $TASK \
 	--cohort $COHORT \
 	--space $TEMPLATE_SPACE \
-	--exclude_covariates $EXCLUDE_COVARIATES \
+	--excluded_covariates $EXCLUDED_COVARIATES \
 	--analysis_type $ANALYSIS_TYPE \
     --n_cores $SLURM_CPUS_PER_TASK"
 

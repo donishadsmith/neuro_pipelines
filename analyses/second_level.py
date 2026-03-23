@@ -135,8 +135,8 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--exclude_covariates",
-        dest="exclude_covariates",
+        "--excluded_covariates",
+        dest="excluded_covariates",
         default="",
         required=False,
         type=str,
@@ -240,17 +240,18 @@ def _get_cmd_args():
 
 @dataclass
 class DataContainer:
-    exclude_cols: list[str] = field(
+    columns_to_ignore: list[str] = field(
         default_factory=lambda: ["Subj", "session_id", "InputFile", "dose"],
     )
-    categorical_vars: set = field(
+    excluded_regressors: list = field(default_factory=list)
+    categorical_regressors: set = field(
         default_factory=lambda: set(["sex", "race", "ethnicity"])
     )
-    subject_constant_vars: list[str] = field(
+    constant_regressors: list[str] = field(
         default_factory=lambda: ["age", "sex", "race", "ethnicity"]
     )
     # From most to least
-    deprioritized_regressors: list[str] = field(
+    deprioritized_regressors_order: list[str] = field(
         default_factory=lambda: [
             "ethnicity",
             "race",
@@ -282,27 +283,33 @@ class DataContainer:
 
         return glt_codes[cohort]
 
-    def update_exclude_cols(self, exclude_covariates: str) -> None:
-        if not exclude_covariates:
+    def update_excluded_regressors(self, excluded_covariates: str) -> None:
+        if not excluded_covariates:
             return
 
-        exclude_covariates = exclude_covariates.strip()
-        if exclude_covariates == "all":
-            self.exclude_cols.extend(self.deprioritized_regressors)
+        excluded_covariates = excluded_covariates.strip()
+        if excluded_covariates == "all":
+            self.excluded_regressors.extend(self.deprioritized_regressors_order)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
-                f"{self.deprioritized_regressors}"
+                f"{self.deprioritized_regressors_order}"
             )
         else:
-            self.exclude_cols.extend(exclude_covariates)
+            self.excluded_regressors.extend(excluded_covariates)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
-                f"{exclude_covariates}"
+                f"{excluded_covariates}"
             )
 
     @property
-    def exclude_vars(self) -> list[str]:
-        return list(set(self.exclude_cols + list(self.categorical_vars)))
+    def non_continuous_cols(self) -> list[str]:
+        return self.columns_to_ignore + list(self.categorical_regressors)
+
+    @property
+    def exclude_afni_regressor_columns(self) -> list[str]:
+        columns_to_skip = [col for col in self.columns_to_ignore if col != "dose"]
+
+        return columns_to_skip + self.excluded_regressors
 
 
 def get_beta_files(analysis_dir, task, first_level_glt_label):
@@ -407,7 +414,9 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     else:
         data_table["dose"] = data_table["dose"].astype(str)
 
-    continuous_vars = set(data_table.columns).difference(datacontainer.exclude_vars)
+    continuous_vars = set(data_table.columns).difference(
+        datacontainer.non_continuous_cols + datacontainer.excluded_regressors
+    )
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
@@ -519,10 +528,12 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
 
 def get_model_str(data_table, datacontainer):
     columns = [
-        col for col in data_table.columns if col not in datacontainer.exclude_vars
+        col
+        for col in data_table.columns
+        if col not in datacontainer.exclude_afni_regressor_columns
     ]
 
-    model_str = "+".join(columns)
+    model_str = "+".join(set(columns))
     model_str += "+(1|participant_id)"
 
     LGR.info(f"The following model will be used: {model_str}")
@@ -531,7 +542,9 @@ def get_model_str(data_table, datacontainer):
 
 
 def get_centering_str(data_table, datacontainer):
-    continuous_vars = set(data_table.columns).difference(datacontainer.exclude_vars)
+    continuous_vars = set(data_table.columns).difference(
+        datacontainer.non_continuous_cols + datacontainer.excluded_regressors
+    )
     if not continuous_vars:
         return ""
 
@@ -581,7 +594,7 @@ def prioritize_regressors(design_matrix, datacontainer):
     if has_dof(design_matrix):
         return design_matrix
 
-    for regressor in datacontainer.deprioritized_regressors:
+    for regressor in datacontainer.deprioritized_regressors_order:
         if drop_columns := [
             col for col in design_matrix.columns if col.startswith(regressor)
         ]:
@@ -607,14 +620,18 @@ def create_design_matrix(
     categorical_cols = [
         col
         for col in glt_data_table.columns
-        if col in datacontainer.categorical_vars
-        and col not in datacontainer.exclude_vars
+        if col in datacontainer.categorical_regressors
+        and col
+        not in datacontainer.excluded_regressors + datacontainer.columns_to_ignore
     ]
 
     continuous_cols = [
         col
         for col in glt_data_table.columns
-        if col not in datacontainer.exclude_vars and col not in categorical_cols
+        if col
+        not in datacontainer.non_continuous_cols
+        + datacontainer.excluded_regressors
+        + categorical_cols
     ]
 
     for col in categorical_cols:
@@ -804,7 +821,7 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    for col in datacontainer.subject_constant_vars:
+    for col in datacontainer.constant_regressors:
         if col in glt_data_table.columns:
             glt_data_table = glt_data_table.drop(col, axis=1)
 
@@ -1074,7 +1091,7 @@ def main(
     cluster_correction_p,
     n_cores,
     exclude_niftis_file,
-    exclude_covariates,
+    excluded_covariates,
 ):
     bids_dir = Path(bids_dir)
     deriv_dir = Path(deriv_dir) if deriv_dir else None
@@ -1091,7 +1108,7 @@ def main(
         )
 
     datacontainer = DataContainer()
-    datacontainer.update_exclude_cols(exclude_covariates)
+    datacontainer.update_excluded_regressors(excluded_covariates)
 
     for first_level_glt_label in first_level_glt_labels:
         entity_key = get_contrast_entity_key(first_level_glt_label)
