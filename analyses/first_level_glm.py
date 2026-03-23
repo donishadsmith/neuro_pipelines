@@ -142,7 +142,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_global_parameters",
         dest="n_global_parameters",
-        default=0,
+        default=1,
         choices=[0, 1, 2, 3, 4],
         type=int,
         required=False,
