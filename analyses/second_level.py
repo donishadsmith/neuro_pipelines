@@ -2,7 +2,6 @@ import argparse, shutil, subprocess, sys
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
@@ -261,7 +260,7 @@ class DataContainer:
         ],
     )
 
-    @classmethod
+    @staticmethod
     def get_glt_codes(cohort: str) -> str:
         glt_codes = {
             "kids": (
