@@ -534,7 +534,7 @@ def get_model_str(data_table, datacontainer):
     ]
 
     model_str = "+".join(set(columns))
-    model_str += "+(1|participant_id)"
+    model_str += "+(1|Subj)"
 
     LGR.info(f"The following model will be used: {model_str}")
 
@@ -1048,6 +1048,10 @@ def perform_3dlmer(
     residual_filename = Path(str(output_filename).replace("_stats", "_residuals"))
     if residual_filename.exists():
         residual_filename.unlink()
+
+    residual_log = Path(str(residual_filename).replace(".nii.gz", "_log.txt"))
+    if residual_log.exists():
+        residual_log.unlink()
 
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dLMEr "
