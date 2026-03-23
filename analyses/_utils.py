@@ -199,6 +199,12 @@ def estimate_noise_smoothness(
     if acf_parameters_filename.exists():
         acf_parameters_filename.unlink()
 
+    curr_dir = Path.cwd()
+    for filename in ["3dFWHMx.1D", "3dFWHMx.1D.png"]:
+        curr_filename = curr_dir / filename
+        if curr_filename.exists():
+            curr_filename.unlink()
+
     # Use -acf for more accurate false positive rate control for fMRI data
     cmd = (
         f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dFWHMx "
@@ -227,12 +233,6 @@ def perform_cluster_simulation(
         / f"task-{task}_{entity_key}-{first_level_glt}_desc-cluster_correction"
     )
     output_filename_prefix.parent.mkdir(parents=True, exist_ok=True)
-
-    curr_dir = Path.cwd()
-    for filename in ("3dFWHMx.1D", "3dFWHMx.1D.png"):
-        curr_filename = curr_dir / filename
-        if curr_filename.exists():
-            curr_filename.unlink()
 
     cmd = (
         f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dClustSim "
