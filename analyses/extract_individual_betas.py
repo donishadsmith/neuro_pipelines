@@ -277,9 +277,7 @@ def compute_average_betas(
         beta_img = nib.load(subject_beta_filename)
         beta_img_fdata = beta_img.get_fdata()
         average_beta = beta_img_fdata[mask_img.get_fdata() == 1].mean()
-        subject_mask = (data_table["participant_id"] == subject) & (
-            data_table["dose"] == dose
-        )
+        subject_mask = (data_table["Subj"] == subject) & (data_table["dose"] == dose)
         average_betas[subject_mask] = average_beta
 
     return average_betas
@@ -323,7 +321,7 @@ def main(
             continue
 
         data_table = pd.read_csv(data_table_file, sep=None, engine="python")
-        data_table["participant_id"] = data_table["participant_id"].astype(str)
+        data_table["Subj"] = data_table["Subj"].astype(str)
         data_table["dose"] = data_table["dose"].astype(int)
         for second_level_glt_code in get_second_level_glt_codes(cohort):
             LGR.info(

@@ -241,7 +241,7 @@ def _get_cmd_args():
 @dataclass
 class DataContainer:
     exclude_cols: list[str] = field(
-        default_factory=lambda: ["participant_id", "session_id", "InputFile", "dose"],
+        default_factory=lambda: ["Subj", "session_id", "InputFile", "dose"],
     )
     categorical_vars: set = field(
         default_factory=lambda: set(["sex", "race", "ethnicity"])
@@ -384,17 +384,19 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
 
     all_sessions = pd.concat(sessions_dfs, ignore_index=True)
     data_table = all_sessions.merge(participants_df, on="participant_id")
+    # AFNI 26 requires first column to be named "Subj"
+    data_table = data_table.rename(columns={"participant_id": "Subj"})
 
     for col in ["acq_time", "dose_mg"]:
         if col in data_table.columns:
             data_table = data_table.drop(col, axis=1)
 
     column_names = (
-        ["participant_id", "dose"]
+        ["Subj", "dose"]
         + [
             name
             for name in data_table.columns
-            if name not in ["participant_id", "dose", "InputFile"]
+            if name not in ["Subj", "dose", "InputFile"]
         ]
         + ["InputFile"]
     )
@@ -621,20 +623,20 @@ def create_design_matrix(
     # Assumed to be the mean glt code
     if average_within_subjects:
         numeric_table = (
-            glt_data_table.groupby("participant_id")
+            glt_data_table.groupby("Subj")
             .mean(numeric_only=True)
             .reset_index(drop=True)
         )
-        if "participant_id" in numeric_table.columns:
-            numeric_table = numeric_table.drop(columns=["participant_id"])
+        if "Subj" in numeric_table.columns:
+            numeric_table = numeric_table.drop(columns=["Subj"])
 
         categorical_table = (
-            glt_data_table.groupby("participant_id")[categorical_cols]
+            glt_data_table.groupby("Subj")[categorical_cols]
             .first()
             .reset_index(drop=True)
         )
-        if "participant_id" in categorical_table.columns:
-            categorical_table = categorical_table.drop(columns=["participant_id"])
+        if "Subj" in categorical_table.columns:
+            categorical_table = categorical_table.drop(columns=["Subj"])
 
         glt_data_table = pd.concat([numeric_table, categorical_table], axis=1)
 
@@ -679,7 +681,7 @@ def create_design_matrix(
         dose_codes = np.where(glt_data_table["dose"].astype(str) == first_label, 1, -1)
         design_matrix.insert(0, "dose", dose_codes)
         subject_regressors = pd.get_dummies(
-            glt_data_table["participant_id"], prefix="", prefix_sep=""
+            glt_data_table["Subj"], prefix="", prefix_sep=""
         ).astype(int)
         design_matrix = pd.concat(
             [
@@ -806,7 +808,7 @@ def create_comparison_matrices(
         if col in glt_data_table.columns:
             glt_data_table = glt_data_table.drop(col, axis=1)
 
-    eb_data = glt_data_table["participant_id"].factorize()[0] + 1
+    eb_data = glt_data_table["Subj"].factorize()[0] + 1
     np.savetxt(matrices_filenames_dict["eb_file"], eb_data, delimiter=",", fmt="%d")
 
     design_matrix = create_design_matrix(
@@ -834,7 +836,7 @@ def create_comparison_matrices(
 
 
 def compute_n_permutation(glt_data_table):
-    n_subjects = len(glt_data_table["participant_id"].unique())
+    n_subjects = len(glt_data_table["Subj"].unique())
     max_permutation = 2**n_subjects
     LGR.info(f"Maximum permutations possible: {max_permutation}")
 
@@ -877,7 +879,7 @@ def create_concatenated_image(
         LGR.info("Averaging doses within subjects for the mean contrast.")
 
         subject_mean_images = []
-        for subject, group in glt_data_table.groupby("participant_id"):
+        for subject, group in glt_data_table.groupby("Subj"):
             subject_files = group["InputFile"].tolist()
             subject_temp_merged = (
                 concatenated_filename.parent / f"temp_{subject}_merged.nii.gz"
@@ -1124,7 +1126,7 @@ def main(
 
             LGR.critical(
                 f"Using {len(data_table['InputFile'].tolist())} files "
-                f"from {len(data_table['participant_id'].unique())} subjects for analysis "
+                f"from {len(data_table['Subj'].unique())} subjects for analysis "
             )
             LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
             group_mask_filename = create_group_mask(
@@ -1204,7 +1206,7 @@ def main(
 
                 LGR.critical(
                     f"Using {len(data_table['InputFile'].tolist())} files "
-                    f"from {len(data_table['participant_id'].unique())} subjects for analysis "
+                    f"from {len(data_table['Subj'].unique())} subjects for analysis "
                     f"using {second_level_glt_code}"
                 )
                 LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")

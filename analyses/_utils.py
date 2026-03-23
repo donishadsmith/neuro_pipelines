@@ -327,16 +327,14 @@ def drop_dose_rows(data_table, dose_list, only_paired_data=False):
     data_table = data_table[~data_table["dose"].astype(str).isin(dose_list)]
     if only_paired_data:
         # Keep only subjects who have both remaining doses (i.e., appear more than once)
-        duplicated_mask = data_table["participant_id"].duplicated(keep=False)
+        duplicated_mask = data_table["Subj"].duplicated(keep=False)
         if not duplicated_mask.to_numpy().all():
             contrast_name = get_contrast_name_from_file(
                 data_table["InputFile"].tolist()[0]
             )
-            removed_subjects = data_table.loc[
-                ~duplicated_mask, "participant_id"
-            ].tolist()
+            removed_subjects = data_table.loc[~duplicated_mask, "Subj"].tolist()
             total_subjects = len(
-                set(data_table["participant_id"].tolist()).difference(removed_subjects)
+                set(data_table["Subj"].tolist()).difference(removed_subjects)
             )
             LGR.warning(
                 f"For contrast ({contrast_name}), the following subjects have been removed: {removed_subjects}. "
