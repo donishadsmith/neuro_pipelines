@@ -10,6 +10,7 @@ from nilearn.reporting import get_clusters_table
 from scipy.stats import norm
 
 from nifti2bids.logging import setup_logger
+from nifti2bids.parsers import _is_float
 
 from _utils import (
     get_contrast_entity_key,
@@ -263,6 +264,9 @@ def identify_clusters(
         negative_interpretation = (
             "Deactivation" if analysis_type == "glm" else "Decreased Connectivity"
         )
+
+        suffix = " mg MPH" if _is_float(second_level_glt_code) else ""
+
         if second_level_glt_code == "mean":
             clusters_table.loc[mask_pos, "Interpretation"] = (
                 f"Mean {positive_interpretation.removesuffix('Increased').lower()} across doses > 0"
@@ -271,17 +275,17 @@ def identify_clusters(
                 f"Mean {positive_interpretation.removesuffix('Increased').lower()} across doses < 0"
             )
         elif "_vs_" not in second_level_glt_code:
-            clusters_table["Group"] = f"Within {second_level_glt_code} mg MPH only"
+            clusters_table["Group"] = f"Within {second_level_glt_code}{suffix} only"
             clusters_table.loc[mask_pos, "Interpretation"] = positive_interpretation
             clusters_table.loc[mask_neg, "Interpretation"] = negative_interpretation
         else:
             first_label, second_label = get_interpretation_labels(second_level_glt_code)
 
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"{positive_interpretation}: {first_label} mg MPH > {second_label} mg MPH"
+                f"{positive_interpretation}: {first_label}{suffix} > {second_label}{suffix}"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"{positive_interpretation}: {second_label} mg MPH > {first_label} mg MPH"
+                f"{positive_interpretation}: {second_label}{suffix} > {first_label}{suffix}"
             )
 
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
@@ -354,10 +358,12 @@ def plot_thresholded_img(
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
 
-    if first_level_glt_label not in ["seen", "indoor"]:
+    if get_contrast_entity_key(first_level_glt_label) == "contrast":
         first_level_code = first_level_glt_label.replace("_vs_", " > ")
     else:
         first_level_code = first_level_glt_label
+
+    suffix = " mg MPH" if _is_float(second_level_glt_code) else ""
 
     if second_level_glt_code == "mean":
         title = (
@@ -367,12 +373,12 @@ def plot_thresholded_img(
     elif "_vs_" not in second_level_glt_code:
         title = (
             f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
-            f"GROUP: Within {second_level_glt_code} mg MPH"
+            f"GROUP: Within {second_level_glt_code}{suffix}"
         )
     else:
         first_label, second_label = get_interpretation_labels(second_level_glt_code)
-        first_group = f"{first_label} mg MPH"
-        second_group = f"{second_label} mg MPH"
+        first_group = f"{first_label}{suffix}"
+        second_group = f"{second_label}{suffix}"
         title = (
             f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
             f"GROUP CONTRAST: {first_group} > {second_group}"
