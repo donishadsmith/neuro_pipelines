@@ -261,10 +261,10 @@ class DataContainer:
         ],
     )
 
-    @property
-    def get_glt_codes(self, cohort: str) -> str:
+    @classmethod
+    def get_glt_codes(cohort: str) -> str:
         glt_codes = {
-            "kids": {
+            "kids": (
                 "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
                 "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
                 "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
@@ -272,13 +272,13 @@ class DataContainer:
                 "-gltCode 5 'dose : 1*'5'' ",
                 "-gltCode 10 'dose : 1*'10'' ",
                 "-gltCode mean 'dose : {mean_code}' ",
-            },
-            "adults": {
+            ),
+            "adults": (
                 "-gltCode mph_vs_placebo 'dose : 1*'mph' -1*'placebo' ",
                 "-gltCode mph 'dose : 1*mph'' ",
                 "-gltCode placebo 'dose : 1*'placebo'' ",
                 "-gltCode mean 'dose : {mean_code}' ",
-            },
+            ),
         }
 
         return glt_codes[cohort]
