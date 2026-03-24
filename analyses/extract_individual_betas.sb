@@ -39,7 +39,6 @@ CMD="$PYTHON extract_individual_betas.py \
     --dst_dir $ANALYSIS_DIR \
     --method $METHOD \
     --cohort $COHORT \
-    --seed_mask_path $SEED_MASK_PATH \
 	--task $TASK \
     --analysis_type $ANALYSIS_TYPE"
 
@@ -47,7 +46,7 @@ if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
     CMD+=" --glm_dir $GLM_DIR"
 fi
 
-if [[ $ANALYSIS_TYPE == "gPPI" && -n $SEED_MASK_PATH ]]; then
+if [[ -n $SEED_MASK_PATH ]]; then
 	CMD+=" --seed_mask_path $SEED_MASK_PATH"
 fi
 
