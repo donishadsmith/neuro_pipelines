@@ -202,7 +202,7 @@ def get_cluster_size(
     )
     cluster_p_str = cluster_correction_table.columns[clust_p_index]
 
-    return int(
+    cluster_size = int(
         np.ceil(
             cluster_correction_table.loc[
                 cluster_correction_table["pthr"] == voxel_correction_p,
@@ -210,6 +210,13 @@ def get_cluster_size(
             ].to_numpy(copy=True)[0]
         )
     )
+
+    LGR.info(
+        "Cluster side for bisided using cluster-forming threshold "
+        f"{voxel_correction_p} and cluster correction {cluster_correction_p}: {cluster_size}"
+    )
+
+    return cluster_size
 
 
 def identify_clusters(
