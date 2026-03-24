@@ -43,11 +43,13 @@ CMD="$PYTHON extract_individual_betas.py \
     --analysis_type $ANALYSIS_TYPE"
 
 if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
-    CMD+=" --glm_dir $GLM_DIR"
-fi
+    if [[ -d $GLM_DIR ]]; then
+        CMD+=" --glm_dir $GLM_DIR"
+    fi
 
-if [[ -n $SEED_MASK_PATH ]]; then
-	CMD+=" --seed_mask_path $SEED_MASK_PATH"
+    if [[ -n $SEED_MASK_PATH ]]; then
+	    CMD+=" --seed_mask_path $SEED_MASK_PATH"
+    fi
 fi
 
 # hostname
