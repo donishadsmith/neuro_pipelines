@@ -33,6 +33,9 @@ ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
 TEMPLATE_MASK_PATH=${TEMPLATE_MASK_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz"}
 TEMPLATE_IMG_PATH=${TEMPLATE_IMG_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz"}
 
+VOXEL_CORRECTION_P=${VOXEL_CORRECTION_P:-0.001}
+CLUSTER_CORRECTION_P=${CLUSTER_CORRECTION_P:-0.05}
+
 CMD="$PYTHON get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
     --dst_dir $ANALYSIS_DIR \
@@ -44,7 +47,7 @@ CMD="$PYTHON get_cluster_results.py \
     --template_img_path $TEMPLATE_IMG_PATH"
 
 if [[ $METHOD == "parametric" ]]; then
-	CMD+=" --afni_img_path $AFNI_IMG_PATH"
+	CMD+=" --afni_img_path $AFNI_IMG_PATH --voxel_correction_p $VOXEL_CORRECTION_P --cluster_correction_p $CLUSTER_CORRECTION_P"
 fi
 
 # hostname

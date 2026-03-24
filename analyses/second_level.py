@@ -179,6 +179,7 @@ def _get_cmd_args():
         dest="tfce_H",
         default=2,
         required=False,
+        type=float,
         help=(
             "The height power. Higher values weigh signal intensity more. "
             "See https://www.fmrib.ox.ac.uk/datasets/techrep/tr08ss1/tr08ss1.pdf"
@@ -189,6 +190,7 @@ def _get_cmd_args():
         dest="tfce_E",
         default=0.5,
         required=False,
+        type=float,
         help=(
             "The extent power. Higher values weigh cluster extent more. "
             "See https://www.fmrib.ox.ac.uk/datasets/techrep/tr08ss1/tr08ss1.pdf"

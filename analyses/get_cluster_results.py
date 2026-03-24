@@ -92,6 +92,7 @@ def _get_cmd_args():
         dest="voxel_correction_p",
         required=False,
         default=0.001,
+        type=float,
         help=("P-value for voxel correction. Only used for the parametric approach."),
     )
     parser.add_argument(
@@ -99,6 +100,7 @@ def _get_cmd_args():
         dest="cluster_correction_p",
         required=False,
         default=0.05,
+        type=float,
         help="P-value for cluster correction. Only used for the parametric approach.",
     )
     parser.add_argument(
@@ -231,6 +233,9 @@ def identify_clusters(
     first_level_glt_label,
     second_level_glt_code,
 ):
+    # https://github.com/nilearn/nilearn/blob/b33c40c9cd2995811863acf67bcb5594320ea7ec/nilearn/reporting/get_clusters_table.py#L505-L506
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.generate_binary_structure.html
+    # Nilearn uses NN1: bin_struct = generate_binary_structure(rank=3, connectivity=1)
     clusters_table, labels_map_list = get_clusters_table(
         thresholded_img,
         stat_threshold=(
