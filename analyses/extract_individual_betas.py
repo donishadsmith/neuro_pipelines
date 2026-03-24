@@ -296,8 +296,9 @@ def main(
 ):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
-    glm_dir = Path(glm_dir) if glm_dir else None
-    if not glm_dir.exists():
+    if glm_dir and Path(glm_dir).exists():
+        glm_dir = Path(glm_dir)
+    else:
         glm_dir = None
 
     seed_mask_path = Path(seed_mask_path) if seed_mask_path else None
