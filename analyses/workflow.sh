@@ -53,7 +53,7 @@ TASKS=("all")                                           # Set all or specific on
 # FIRST LEVEL DENOISING PARAMETERS
 # --------------------------------
 export N_MOTION_PARAMETERS=6                            # Choose 6, 12, 18, 24
-export ACOMPCOR_STRATEGY="combined"                     # Choose "combined", "separate", or "none"
+export ACOMPCOR_STRATEGY="combined"                     # Choose "combined", "separate", or "none"; The "separate" options uses the white matter and CSF acompcor, so N_ACOMPCORS=5 adds 10 parameters
 export N_ACOMPCORS=5                                    # Recommend choosing 5 or 6
 export N_GLOBAL_PARAMETERS=1                            # Choose 0, 1, 2, 3, or 4
 export FD_THRESHOLD=0.9                                 # Choose a float between 0-1.0
