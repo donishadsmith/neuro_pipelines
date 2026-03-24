@@ -14,6 +14,8 @@
 # If multiple, you can do something like `git annex whereis *.nii.gz | grep "https:" | cut -c 7-"` or
 # `git annex whereis *.nii.gz | grep "https:" | cut -c 7- > links.txt`
 
+# Pharmacological fMRI paper: https://pmc.ncbi.nlm.nih.gov/articles/PMC5067101/
+
 # =============================================
 # CONTROL FLOW VARIABLES (Set to true or false)
 # =============================================
