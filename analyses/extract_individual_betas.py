@@ -324,7 +324,9 @@ def main(
 
         data_table = pd.read_csv(data_table_file, sep=None, engine="python")
         data_table["Subj"] = data_table["Subj"].astype(str)
-        data_table["dose"] = data_table["dose"].astype(int)
+        if cohort == "kids":
+            data_table["dose"] = data_table["dose"].astype(int)
+
         for second_level_glt_code in get_second_level_glt_codes(cohort):
             LGR.info(
                 f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: "
