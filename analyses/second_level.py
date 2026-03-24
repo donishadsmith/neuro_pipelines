@@ -76,7 +76,7 @@ def _get_cmd_args():
         default=None,
         required=False,
         help=(
-            "The probability mask for gray matter voxels. Should be in same space as the template."
+            "The probability mask for gray matter voxels. Should approximately be in same space as the template."
             "Used to exclude non-gray matter voxels in the group mask and exclude false activations from "
             "white matter and ventricles. http://jpeelle.net/mri/misc/creating_explicit_mask.html"
         ),
@@ -88,6 +88,20 @@ def _get_cmd_args():
         type=float,
         required=False,
         help="The probability for gray matter voxels in the mask. See: https://pmc.ncbi.nlm.nih.gov/articles/PMC3812339/",
+    )
+    parser.add_argument(
+        "--apriori_img_path",
+        dest="apriori_img_path",
+        default=None,
+        required=False,
+        help=(
+            "Reduce the search space to the mask. If ``gm_probseg_img_path`` is supplied, the intersected group "
+            "mask is restricted to the gray matter mask then restricted to the apriori mask. Note that "
+            "cluster-based inference relies on spatially contiguous voxels, it is possible for clusters with the highest "
+            "voxel statistical value to be in an apriori region and spread to non-apriori regions. This can result in the cluster  "
+            "being deemed insignificant since the cluster extent can be reduced significantly. Recommend the apriori mask to be "
+            "large regions (e.g., networks). Mask should approximately be in the same space as template."
+        ),
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
     parser.add_argument(
@@ -439,6 +453,7 @@ def create_group_mask(
     filtered_beta_files,
     gm_probseg_img_path,
     gm_mask_threshold,
+    apriori_img_path,
     method,
     entity_key,
     first_level_glt_label,
@@ -479,31 +494,37 @@ def create_group_mask(
         subject_mask_files.extend(mask_files)
 
     group_mask = intersect_masks(subject_mask_files, threshold=group_mask_threshold)
-    group_mask = create_gm_only_group_mask(
-        gm_probseg_img_path, gm_mask_threshold, group_mask
+    group_mask = reduce_search_space(
+        group_mask,
+        gm_probseg_img_path,
+        mask_type="gray_matter",
+        gm_mask_threshold=gm_mask_threshold,
     )
+    group_mask = reduce_search_space(group_mask, apriori_img_path, mask_type="apriori")
 
     nib.save(group_mask, group_mask_filename)
 
     return group_mask_filename
 
 
-def create_gm_only_group_mask(gm_probseg_img_path, gm_mask_threshold, group_mask):
-    if not gm_probseg_img_path:
+def reduce_search_space(group_mask, mask_img_path, mask_type, gm_mask_threshold=0.20):
+    if not mask_img_path:
         return group_mask
 
-    LGR.info(
-        "Thresholding GM probability mask, any voxel with a probability greater than "
-        f"{gm_mask_threshold} will be retained in the group mask."
-    )
+    mask_img = nib.load(mask_img_path)
+    resmapled_mask_img = resample_to_img(mask_img, group_mask, interpolation="nearest")
 
-    gm_prob_img = nib.load(gm_probseg_img_path)
-    resmapled_gm_prob_img = resample_to_img(
-        gm_prob_img, group_mask, interpolation="nearest"
-    )
-    binarized_gm_image = resmapled_gm_prob_img.get_fdata() > gm_mask_threshold
+    if mask_type == "gray_matter":
+        LGR.info(
+            f"Thresholding gray metter probability mask using {Path(mask_img_path).name},  "
+            f"any voxel with a probability greater than {gm_mask_threshold} "
+            "will be retained in the group mask."
+        )
+        binarized_mask_image = resmapled_mask_img.get_fdata() > gm_mask_threshold
+    else:
+        binarized_mask_image = resmapled_mask_img.get_fdata() != 0
 
-    group_mask_data = group_mask.get_fdata() * binarized_gm_image
+    group_mask_data = group_mask.get_fdata() * binarized_mask_image
 
     return nib.nifti1.Nifti1Image(group_mask_data, group_mask.affine, group_mask.header)
 
@@ -1087,6 +1108,7 @@ def main(
     gm_probseg_img_path,
     gm_mask_threshold,
     group_mask_threshold,
+    apriori_img_path,
     afni_img_path,
     fsl_img_path,
     method,
@@ -1161,6 +1183,7 @@ def main(
                 data_table["InputFile"].tolist(),
                 gm_probseg_img_path,
                 gm_mask_threshold,
+                apriori_img_path,
                 method,
                 entity_key,
                 first_level_glt_label,

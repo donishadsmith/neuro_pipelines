@@ -65,10 +65,11 @@ export FILTER_CORRECT_TRIALS=false                      # Filter event-related t
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export EXCLUDED_COVARIATES="all"                        # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all.
+export EXCLUDED_COVARIATES="all"                        # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
-export EXCLUDE_NIFTI_FILE=""                            # Path to a text file containing prefixes of the filename of the NIfTI images to exclude.
-                                                        # Should contain a single column named 'nifti_prefix_filename'.
+export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
+export EXCLUDE_NIFTI_FILE=""                            # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
+                                                        # should contain a single column named 'nifti_prefix_filename'
 export VOXEL_CORRECTION_P=0.001                         # Cluster forming threshold for parametric method
 export CLUSTER_CORRECTION_P=0.05                        # Cluster correction threshold for parametric method
 export TFCE_H=2                                         # The height power for nonparametric method
