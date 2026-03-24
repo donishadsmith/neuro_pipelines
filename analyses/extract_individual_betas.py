@@ -301,8 +301,9 @@ def main(
     else:
         glm_dir = None
 
-    seed_mask_path = Path(seed_mask_path) if seed_mask_path else None
-    if not seed_mask_path.exists():
+    if seed_mask_path and Path(seed_mask_path).exists():
+        seed_mask_path = Path(seed_mask_path)
+    else:
         seed_mask_path = None
 
     first_level_glt_labels = get_first_level_gltsym_codes(
