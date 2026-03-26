@@ -52,20 +52,20 @@ TASKS=("all")                                           # Set all or specific on
 # --------------------------------
 # FIRST LEVEL DENOISING PARAMETERS
 # --------------------------------
-export N_MOTION_PARAMETERS=6                            # Choose 6, 12, 18, 24
-export ACOMPCOR_STRATEGY="combined"                     # Choose "combined", "separate", or "none"; The "separate" options uses the white matter and CSF acompcor, so N_ACOMPCORS=5 adds 10 parameters
-export N_ACOMPCORS=5                                    # Recommend choosing 5 or 6
-export N_GLOBAL_PARAMETERS=1                            # Choose 0, 1, 2, 3, or 4
-export FD_THRESHOLD=0.9                                 # Choose a float between 0-1.0
-export EXCLUSION_CRITERIA=0.3                           # Choose a float between 0.20-0.40
-export FWHM=6                                           # Choose integer
-export GPPI_PAD_SECONDS=10.0                            # Choose float, pads timeseries for deconvolution for gPPI
-export FILTER_CORRECT_TRIALS=false                      # Filter event-related tasks for correctness set to true or false
+export N_MOTION_PARAMETERS=12                            # Choose 6, 12, 18, 24
+export ACOMPCOR_STRATEGY="separate"                      # Choose "combined", "separate", or "none"; The "separate" options uses the white matter and CSF acompcor, so N_ACOMPCORS=5 adds 10 parameters
+export N_ACOMPCORS=5                                     # Recommend choosing 5 or 6
+export N_GLOBAL_PARAMETERS=0                             # Choose 0, 1, 2, 3, or 4
+export FD_THRESHOLD=0.5                                  # Choose a float between 0-1.0
+export EXCLUSION_CRITERIA=0.3                            # Choose a float between 0.20-0.40
+export FWHM=6                                            # Choose integer
+export GPPI_PAD_SECONDS=10.0                             # Choose float, pads timeseries for deconvolution for gPPI
+export FILTER_CORRECT_TRIALS=false                       # Filter event-related tasks for correctness set to true or false
 
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export EXCLUDED_COVARIATES="all"                        # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all
+export EXCLUDED_COVARIATES="race ethnicity"             # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
 export EXCLUDE_NIFTI_FILE=""                            # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path

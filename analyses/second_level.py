@@ -155,8 +155,9 @@ def _get_cmd_args():
     parser.add_argument(
         "--excluded_covariates",
         dest="excluded_covariates",
-        default="",
+        default=["race", "ethnicity"],
         required=False,
+        nargs="*",
         type=str,
         help=(
             "Additional covariates to exclude from second level model. "
@@ -261,14 +262,11 @@ def _get_cmd_args():
 @dataclass
 class DataContainer:
     columns_to_ignore: list[str] = field(
-        default_factory=lambda: ["Subj", "session_id", "InputFile", "dose", "dosemg"],
+        default_factory=lambda: ["Subj", "session_id", "InputFile", "dose", "dose_mg"],
     )
     excluded_regressors: list = field(default_factory=list)
     categorical_regressors: set = field(
         default_factory=lambda: set(["sex", "race", "ethnicity"])
-    )
-    constant_regressors: list[str] = field(
-        default_factory=lambda: ["age", "sex", "race", "ethnicity"]
     )
     # From most to least
     deprioritized_regressors_order: list[str] = field(
@@ -303,19 +301,20 @@ class DataContainer:
 
         return glt_codes[cohort]
 
-    def update_excluded_regressors(self, excluded_covariates: str) -> None:
+    def update_excluded_regressors(self, excluded_covariates: list[str]) -> None:
+        excluded_covariates = [
+            item for cov in excluded_covariates for item in cov.split() if cov
+        ]
         if not excluded_covariates:
             return
 
-        excluded_covariates = excluded_covariates.strip()
-        if excluded_covariates == "all":
+        if "all" in excluded_covariates:
             self.excluded_regressors.extend(self.deprioritized_regressors_order)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
                 f"{self.deprioritized_regressors_order}"
             )
         else:
-            excluded_covariates = excluded_covariates.split(" ")
             self.excluded_regressors.extend(excluded_covariates)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
@@ -419,10 +418,6 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
         if col in data_table.columns:
             data_table = data_table.drop(col, axis=1)
 
-    if "dose_mg" in data_table.columns:
-        data_table = data_table.rename(columns={"dose_mg": "dosemg"})
-        data_table["dosemg"] = data_table["dosemg"].astype(int).astype(str)
-
     column_names = (
         ["Subj", "dose"]
         + [
@@ -438,6 +433,9 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
         data_table["dose"] = data_table["dose"].astype(int).astype(str)
     else:
         data_table["dose"] = data_table["dose"].astype(str)
+
+    if "dose_mg" in data_table.columns:
+        data_table["dose_mg"] = data_table["dose_mg"].astype(int).astype(str)
 
     continuous_vars = set(data_table.columns).difference(
         datacontainer.non_continuous_cols + datacontainer.excluded_regressors
@@ -863,7 +861,9 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    glt_data_table = drop_constant_regressors(datacontainer, glt_data_table)
+    glt_data_table = drop_within_subject_constant_regressors(
+        datacontainer, glt_data_table
+    )
 
     eb_data = glt_data_table["Subj"].factorize()[0] + 1
     np.savetxt(matrices_filenames_dict["eb_file"], eb_data, delimiter=",", fmt="%d")
@@ -1036,7 +1036,7 @@ def create_difference_maps(
         LGR.info(f"Creating difference map for {subject}: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
 
-        # Take the mph row as the template (has dosemg) and update InputFile
+        # Take the mph row as the template (has dose_mg) and update InputFile
         row = mph_rows.iloc[0].copy()
         row["InputFile"] = str(diff_filename)
         diff_rows.append(row)
@@ -1053,10 +1053,27 @@ def create_difference_maps(
     return diff_table
 
 
-def drop_constant_regressors(datacontainer, glt_data_table):
-    for col in datacontainer.constant_regressors:
-        if col in glt_data_table.columns:
-            glt_data_table = glt_data_table.drop(col, axis=1)
+def drop_within_subject_constant_regressors(datacontainer, glt_data_table):
+    remaining_columns = [
+        col
+        for col in glt_data_table.columns
+        if col not in datacontainer.columns_to_ignore
+    ]
+    is_constant = lambda col: glt_data_table.groupby("Subj")[col].nunique().max() <= 1
+
+    constant_columns = []
+    for column in remaining_columns:
+        if is_constant(column):
+            constant_columns.append(column)
+
+    if constant_columns:
+        LGR.info(
+            f"Removing the following columns that are constant within subjects: {constant_columns}"
+        )
+
+        for col in constant_columns:
+            if col in glt_data_table.columns:
+                glt_data_table = glt_data_table.drop(col, axis=1)
 
     return glt_data_table
 
@@ -1079,7 +1096,9 @@ def create_between_group_matrices(
     group_column = get_between_group_column(second_level_glt_code, cohort)
     first_label, second_label = get_group_labels(second_level_glt_code)
 
-    glt_data_table = drop_constant_regressors(datacontainer, glt_data_table)
+    glt_data_table = drop_within_subject_constant_regressors(
+        datacontainer, glt_data_table
+    )
 
     group1_mask = (
         (glt_data_table[group_column].astype(str) == first_label).astype(int).to_numpy()

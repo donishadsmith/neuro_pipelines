@@ -33,10 +33,10 @@ TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 FILTER_CORRECT_TRIALS=${FILTER_CORRECT_TRIALS:-false} # Filter event-related tasks for correctness set to true or false
 N_MOTION_PARAMETERS=${N_MOTION_PARAMETERS:-12}        # Choose 6, 12, 18, 24
 N_ACOMPCORS=${N_ACOMPCORS:-5}                         # Recommend choosing 5 or 6
-ACOMPCOR_STRATEGY=${ACOMPCOR_STRATEGY:-"combined"}    # Choose "combined" or "separate"
-N_GLOBAL_PARAMETERS=${N_GLOBAL_PARAMETERS:-1}         # Choose 0, 1, 2, 3, or 4
-FD_THRESHOLD=${FD_THRESHOLD:-0.9}                     # Choose a float between 0-1.0
-EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.4}         # Choose a float between 0.20-0.40
+ACOMPCOR_STRATEGY=${ACOMPCOR_STRATEGY:-"separate"}    # Choose "combined" or "separate"
+N_GLOBAL_PARAMETERS=${N_GLOBAL_PARAMETERS:-0}         # Choose 0, 1, 2, 3, or 4
+FD_THRESHOLD=${FD_THRESHOLD:-0.5}                     # Choose a float between 0-1.0
+EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.3}         # Choose a float between 0.20-0.40
 FWHM=${FWHM:-6}                                       # Choose integer
 GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-10.0}            # Choose float, pads timeseries for deconvolution for gPPI
 

@@ -83,7 +83,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_motion_parameters",
         dest="n_motion_parameters",
-        default=6,
+        default=12,
         type=int,
         choices=[6, 12, 18, 24],
         required=False,
@@ -96,7 +96,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--fd_threshold",
         dest="fd_threshold",
-        default=0.9,
+        default=0.5,
         type=float,
         required=False,
         help="Framewise displacement threshold.",
@@ -134,7 +134,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--acompcor_strategy",
         dest="acompcor_strategy",
-        default="combined",
+        default="separate",
         choices=["combined", "separate", "none"],
         required=False,
         help="Whether to use 'combined' aCompCor, 'separate' components, or 'none'",
@@ -142,7 +142,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_global_parameters",
         dest="n_global_parameters",
-        default=1,
+        default=0,
         choices=[0, 1, 2, 3, 4],
         type=int,
         required=False,

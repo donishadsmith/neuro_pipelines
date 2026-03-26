@@ -51,7 +51,7 @@ CONTRAST_CODES = {
 }
 
 BETWEEN_GROUP_DOSE_CODES = {
-    "adults": {"15_vs_10": "dosemg"},
+    "adults": {"15_vs_10": "dose_mg"},
 }
 
 
