@@ -170,12 +170,12 @@ def get_task_deconvolve_kids_cmd(task, timing_dir, nuisance_regressors_file):
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 4 ",
             "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 2 0-back "
+            f"-stim_times 2 {timing_dir / 'center.1D'} 'BLOCK(32, 1)' -stim_label 2 center "
             f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 3 1-back "
             f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 4 2-back "
             f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*1-back -1*0-back' -glt_label 1 1-back_vs_0-back "
-            "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 2 2-back_vs_0-back "
+            "-gltsym 'SYM: +1*1-back -1*center' -glt_label 1 1-back_vs_center "
+            "-gltsym 'SYM: +1*2-back -1*center' -glt_label 2 2-back_vs_center "
             "-gltsym 'SYM: +1*2-back -1*1-back' -glt_label 3 2-back_vs_1-back ",
         }
     elif task == "mtle":

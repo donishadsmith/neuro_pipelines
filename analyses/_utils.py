@@ -20,8 +20,8 @@ VALID_TASK_NAMES = {
 TASK_CONTRASTS = {
     "kids": {
         "nback": (
-            "1-back_vs_0-back",
-            "2-back_vs_0-back",
+            "1-back_vs_center",
+            "2-back_vs_center",
             "2-back_vs_1-back",
         ),
         "mtle": ("neutral_encoding",),
@@ -231,7 +231,7 @@ def estimate_noise_smoothness(
         if curr_filename.exists():
             curr_filename.unlink()
 
-    # Use -acf for more accurate false positive rate control for fMRI data
+    # Use -acf for more accurate false positive rate center for fMRI data
     cmd = (
         f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dFWHMx "
         f"-mask {group_mask_filename} "

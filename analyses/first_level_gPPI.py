@@ -438,16 +438,16 @@ def get_task_deconvolve_kids_cmd(
             "num_stimts": "-num_stimts 9 ",
             "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
             f"-stim_times 2 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 2 instruction "
-            f"-stim_times 3 {timing_dir / '0-back.1D'} 'BLOCK(32, 1)' -stim_label 3 0-back "
+            f"-stim_times 3 {timing_dir / 'center.1D'} 'BLOCK(32, 1)' -stim_label 3 center "
             f"-stim_times 4 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 4 1-back "
             f"-stim_times 5 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 5 2-back "
             f"-stim_file 6 {ppi_dir / 'PPI_instruction.1D'} -stim_label 6 PPI_instruction "
-            f"-stim_file 7 {ppi_dir / 'PPI_0-back.1D'} -stim_label 7 PPI_0-back "
+            f"-stim_file 7 {ppi_dir / 'PPI_center.1D'} -stim_label 7 PPI_center "
             f"-stim_file 8 {ppi_dir / 'PPI_1-back.1D'} -stim_label 8 PPI_1-back "
             f"-stim_file 9 {ppi_dir / 'PPI_2-back.1D'} -stim_label 9 PPI_2-back "
             f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*PPI_1-back -1*PPI_0-back' -glt_label 1 PPI_1-back_vs_PPI_0-back "
-            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back "
+            "-gltsym 'SYM: +1*PPI_1-back -1*PPI_center' -glt_label 1 PPI_1-back_vs_PPI_center "
+            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_center' -glt_label 2 PPI_2-back_vs_PPI_center "
             "-gltsym 'SYM: +1*PPI_2-back -1*PPI_1-back' -glt_label 3 PPI_2-back_vs_PPI_1-back ",
         }
     elif task == "mtle":

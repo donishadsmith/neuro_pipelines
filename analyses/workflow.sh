@@ -17,7 +17,7 @@
 # Pharmacological fMRI paper: https://pmc.ncbi.nlm.nih.gov/articles/PMC5067101/
 
 # =============================================
-# CONTROL FLOW VARIABLES (Set to true or false)
+# center FLOW VARIABLES (Set to true or false)
 # =============================================
 RUN_FIRST_LEVEL=true                                    # Runs the individual first level analysis
 RUN_SECOND_LEVEL=true                                   # Runs the group level second level analysis
@@ -144,9 +144,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         FIRST_LEVEL_GLT_LABELS=("placeholder")
     elif [[ $CURRENT_TASK == "nback" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
-            FIRST_LEVEL_GLT_LABELS=("1-back_vs_0-back" "2-back_vs_0-back" "2-back_vs_1-back")
+            FIRST_LEVEL_GLT_LABELS=("1-back_vs_center" "2-back_vs_center" "2-back_vs_1-back")
         else
-            FIRST_LEVEL_GLT_LABELS=("PPI_1-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_0-back" "PPI_2-back_vs_PPI_1-back")
+            FIRST_LEVEL_GLT_LABELS=("PPI_1-back_vs_PPI_center" "PPI_2-back_vs_PPI_center" "PPI_2-back_vs_PPI_1-back")
         fi
     elif [[ $CURRENT_TASK == "flanker" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then

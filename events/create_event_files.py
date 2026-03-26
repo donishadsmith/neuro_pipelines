@@ -539,7 +539,7 @@ def _create_nback_eprime_events_files(
             input_df["Procedure[Block]"] = input_df["Procedure[Block]"].map(
                 {
                     "ExpBloc": "1-back",
-                    "ContBloc": "0-back",
+                    "ContBloc": "center",
                     "Exp2Bloc": "2-back",
                     "Rest": "Rest",
                 }
@@ -550,7 +550,7 @@ def _create_nback_eprime_events_files(
                 input_df,
                 onset_column_name="StimDisplay.OnsetTime",
                 procedure_column_name="Procedure[Block]",
-                block_cue_names=("1-back", "0-back", "2-back"),
+                block_cue_names=("1-back", "center", "2-back"),
                 convert_to_seconds=["StimDisplay.OnsetTime", "StimDisplay.OffsetTime"],
                 rest_block_codes="Rest",
                 quit_code="Quit",
