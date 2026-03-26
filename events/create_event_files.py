@@ -104,6 +104,7 @@ def _get_cmd_args():
         dest="exclude_filenames",
         required=False,
         default=None,
+        nargs="+",
         help="Exclude specific filenames (i.e., 101_nback.txt)",
     )
 
