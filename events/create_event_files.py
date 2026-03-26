@@ -585,7 +585,7 @@ def _create_nback_eprime_events_files(
                 {
                     "1-back_instruction": "instruction",
                     "2-back_instruction": "instruction",
-                    "0-back_instruction": "instruction",
+                    "center_instruction": "instruction",
                 }
             )
 
