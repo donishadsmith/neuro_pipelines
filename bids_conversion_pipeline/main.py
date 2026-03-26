@@ -52,7 +52,15 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         required=False,
         nargs="+",
         default=None,
-        help="Names of the source folders to exclude.",
+        help="Names of the source folders to exclude (i.e., 101_1111).",
+    )
+    parser.add_argument(
+        "--exclude_nifti_filenames",
+        dest="exclude_nifti_filenames",
+        required=False,
+        nargs="+",
+        default=None,
+        help="Names of the NIfTI filenames to exclude (i.e., 101_4444.nii).",
     )
     parser.add_argument(
         "--delete_temp_dir",
@@ -156,6 +164,10 @@ def _filter_source_folders(
     if not exclude_src_folder_names:
         return folders
 
+    exclude_src_folder_names = [
+        Path(folder).name for folder in exclude_src_folder_names
+    ]
+
     return [folder for folder in folders if folder.name not in exclude_src_folder_names]
 
 
@@ -220,6 +232,7 @@ def _copy_data_to_temp_dir(
     temp_dir: Path,
     subjects: Optional[list[str | int]],
     exclude_src_folder_names: Optional[list[str]],
+    exclude_nifti_filenames: Optional[list[str]],
 ) -> None:
     subject_folders = regex_glob(src_dir, pattern=r"^\d+.*_\d+$")
     subject_folders = _filter_subjects(subject_folders, subjects)
@@ -230,6 +243,8 @@ def _copy_data_to_temp_dir(
         )
         sys.exit(1)
 
+    exclude_nifti_filenames = exclude_nifti_filenames or []
+    exclude_nifti_filenames = [Path(file).name for file in exclude_nifti_filenames]
     for subject_folder in subject_folders:
         date_str = subject_folder.name.split("_")[-1]
         if not is_valid_date(date_str, "%y%m%d") or len(date_str) != 6:
@@ -244,6 +259,9 @@ def _copy_data_to_temp_dir(
             subject_folder, pattern=r"^\d+_(\d+)?.*\.(nii|nii.gz)$"
         )
         for nifti_file in nifti_files:
+            if nifti_file.name in exclude_nifti_filenames:
+                continue
+
             _copy_nifti_files(nifti_file, temp_dir)
 
 
@@ -253,6 +271,7 @@ def main(
     bids_dir: str,
     subjects: Optional[list[str | int]],
     exclude_src_folder_names: Optional[list[str]],
+    exclude_nifti_filenames: Optional[list[str]],
     cohort: Literal["kids", "adults"],
     delete_temp_dir: bool,
     create_dataset_metadata: bool,
@@ -284,7 +303,11 @@ def main(
             subjects = _strip_entity(subjects)
 
         _copy_data_to_temp_dir(
-            Path(src_dir), temp_dir, subjects, exclude_src_folder_names
+            Path(src_dir),
+            temp_dir,
+            subjects,
+            exclude_src_folder_names,
+            exclude_nifti_filenames,
         )
 
         # Pipeline to identify un-named NIfTI images and standardize task names

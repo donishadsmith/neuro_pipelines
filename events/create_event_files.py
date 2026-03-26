@@ -104,7 +104,7 @@ def _get_cmd_args():
         dest="exclude_filenames",
         required=False,
         default=None,
-        help="Exclude specific filenames.",
+        help="Exclude specific filenames (i.e., 101_nback.txt)",
     )
 
     return parser
@@ -139,8 +139,9 @@ def _filter_log_files(log_files, subjects, exclude_filenames):
         ]
 
     if exclude_filenames:
+        exclude_filenames = [Path(file).name for file in exclude_filenames]
         log_files = [
-            log_file for log_file in log_files if str(log_file) not in exclude_filenames
+            log_file for log_file in log_files if log_file.name not in exclude_filenames
         ]
 
     log_files = list(log_files)
