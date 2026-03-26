@@ -148,7 +148,7 @@ def _filter_log_files(log_files, subjects, exclude_filenames):
     log_files = list(log_files)
     if not log_files:
         LGR.warning(
-            "No log files selected, check if ``src_dir`` or ``subjects`` are accuracte."
+            "No log files selected, check if ``src_dir`` or ``subjects`` are accurate."
         )
 
     return log_files
