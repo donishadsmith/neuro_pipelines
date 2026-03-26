@@ -170,7 +170,7 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
     try:
         load_nifti(dst_file)
     except ImageFileError:
-        LGR.critical(
+        LGR.warning(
             "Deleting the following nifti file from the temporary directory since "
             f"Nibabel cannot work out file type: {nifti_file}",
             exc_info=True,
@@ -181,7 +181,7 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
     try:
         _is_raw_nifti(dst_file)
     except ValueError:
-        LGR.critical(
+        LGR.warning(
             "Deleting the following nifti file from the temporary directory "
             f"since it is likely not a raw image: {nifti_file}",
             exc_info=True,
@@ -191,7 +191,7 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
 
     participant_id = nifti_file.parent.name.split("_")[0]
     if nifti_file.name.split("_")[0] != participant_id:
-        LGR.critical(
+        LGR.warning(
             "Deleting the following nifti file from the temporary directory "
             "since it is nested in a source directory with a different subject "
             f"id ({participant_id}): {nifti_file}"
@@ -203,7 +203,7 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
         try:
             compress_image(dst_file, dst_file.parent, remove_src_file=True)
         except OSError:
-            LGR.critical(
+            LGR.warning(
                 f"An OSError occured while compressing the following file: {dst_file}. "
                 "Removing file from the temporary directory."
             )
@@ -225,7 +225,7 @@ def _copy_data_to_temp_dir(
     subject_folders = _filter_subjects(subject_folders, subjects)
     subject_folders = _filter_source_folders(subject_folders, exclude_src_folder_names)
     if not subject_folders:
-        LGR.critical(
+        LGR.warning(
             f"After filtering, no folders can be converted from the following directory: {src_dir}"
         )
         sys.exit(1)
@@ -233,7 +233,7 @@ def _copy_data_to_temp_dir(
     for subject_folder in subject_folders:
         date_str = subject_folder.name.split("_")[-1]
         if not is_valid_date(date_str, "%y%m%d") or len(date_str) != 6:
-            LGR.critical(
+            LGR.warning(
                 f"The following folder does not have the '%y%m%d' date format: {subject_folder}. "
                 "Dates are sorted and should be standardized across all folders."
             )

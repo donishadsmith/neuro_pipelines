@@ -41,23 +41,23 @@ def create_nuisance_regressor_file(
 
     rank = np.linalg.matrix_rank(data)
     if rank < data.shape[1]:
-        LGR.critical(f"Regressor matrix is rank deficient: {rank}")
+        LGR.warning(f"Regressor matrix is rank deficient: {rank}")
 
         data, regressor_positions = remove_collinear_columns(data, regressor_positions)
-        LGR.critical(f"New regressor names and positions: {regressor_positions}")
+        LGR.warning(f"New regressor names and positions: {regressor_positions}")
 
     # To stop errors and warnings
     drop_columns = np.where(np.var(data, axis=0) == 0)[0].tolist()
     if drop_columns:
         col_names = [get_col_name(indx, regressor_positions) for indx in drop_columns]
 
-        LGR.critical(f"The following have constant variance: {col_names}")
+        LGR.warning(f"The following have constant variance: {col_names}")
 
         data, regressor_positions = get_new_matrix_and_names(
             drop_columns, data, regressor_positions
         )
 
-        LGR.critical(f"New regressor names and positions: {regressor_positions}")
+        LGR.warning(f"New regressor names and positions: {regressor_positions}")
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)

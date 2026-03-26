@@ -870,7 +870,7 @@ def main(
     faltung_penalty_syntax,
 ):
     if task not in VALID_TASK_NAMES[cohort]:
-        LGR.critical(
+        LGR.warning(
             f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
         )
         sys.exit(status=1)
@@ -881,7 +881,7 @@ def main(
         subject=subject, task=task, target="session", return_type="id"
     )
     if not sessions:
-        LGR.critical(f"No sessions for {subject} for {task}.")
+        LGR.warning(f"No sessions for {subject} for {task}.")
         sys.exit(status=1)
 
     for session in sessions:
@@ -989,14 +989,14 @@ def main(
         kept = censor_mask[n_dummy_scans:]
         n_censored = np.sum(kept == 0)
         percent_censored = n_censored / kept.size
-        LGR.critical(
+        LGR.warning(
             f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
             f"proportion of steady state volumes removed at an fd threshold > {fd_threshold} mm: "
             f" {percent_censored}"
         )
 
         if percent_censored > exclusion_criteria:
-            LGR.critical(
+            LGR.warning(
                 f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
                 "run excluded because the percent censored is greater than the "
                 f"exclusion criteria: {exclusion_criteria}"

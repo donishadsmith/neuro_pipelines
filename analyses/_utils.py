@@ -9,7 +9,6 @@ from nilearn.image import new_img_like, resample_to_img
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
 from nifti2bids.metadata import needs_resampling
-from nifti2bids.io import replace_ext
 
 LGR = setup_logger(__name__)
 
@@ -48,8 +47,35 @@ TASK_CONTRASTS = {
 
 CONTRAST_CODES = {
     "kids": ("0", "5", "10", "5_vs_0", "10_vs_0", "10_vs_5", "mean"),
-    "adults": ("mph", "placebo", "mph_vs_placebo", "mean"),
+    "adults": ("mph", "placebo", "mph_vs_placebo", "15_vs_10", "mean"),
 }
+
+BETWEEN_GROUP_DOSE_CODES = {
+    "adults": {"15_vs_10": "dosemg"},
+}
+
+
+def is_between_group_dose_code(second_level_glt_code, cohort):
+    """
+    The between contrast is only for the adult cohort. For the kids cohort,
+    the design is purely within, every subject receives the 0, 5, and 10 mg,
+    randomized for each visit. The adult cohort came for two visits, all adults
+    received placebo; however, half the adults received 10 mg mph and the other
+    half 15 mg mph. To assess dose dependent differences, each adult's mph
+    data is subtracted from their placebo, to identify the BOLD differences
+    that can be reasonably attributed to mph, then the difference maps
+    are subjected to a between group analysis. This is not done for the kids
+    because the placebo (0 mg), cancels in the contrast (e.g. for each kid
+    [10 - placebo] - [5 - placebo])
+    """
+    if cohort != "adults":
+        return False
+
+    return second_level_glt_code in BETWEEN_GROUP_DOSE_CODES.get(cohort, {})
+
+
+def get_between_group_column(second_level_glt_code, cohort):
+    return BETWEEN_GROUP_DOSE_CODES.get(cohort, {}).get(second_level_glt_code)
 
 
 def get_first_level_gltsym_codes(cohort, task, analysis_type, caller):
@@ -261,13 +287,7 @@ def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correcti
     # Forward direction (e.g., 5_vs_0)
     try:
         positive_tstat_file = Path(f"{output_prefix}_vox_tstat_c1.nii.gz")
-        if not positive_tstat_file.exists():
-            positive_tstat_file = replace_ext(positive_tstat_file, ".nii")
-
-        positive_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c1.nii.gz")
-        if not positive_pval_file.exists():
-            positive_pval_file = replace_ext(positive_pval_file, ".nii")
-
+        positive_pval_file = Path(f"{output_prefix}_tfce_tstat_cfwep_c1.nii.gz")
         positive_tstat_img = nib.load(positive_tstat_file)
         positive_sig_mask = (
             nib.load(positive_pval_file).get_fdata() > logp_threshold
@@ -276,13 +296,7 @@ def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correcti
 
         # Reverse direction (e.g., 0_vs_5)
         negative_tstat_file = Path(f"{output_prefix}_vox_tstat_c2.nii.gz")
-        if not negative_tstat_file.exists():
-            negative_tstat_file = replace_ext(negative_tstat_file, ".nii")
-
-        negative_pval_file = Path(f"{output_prefix}_tfce_tstat_fwep_c2.nii.gz")
-        if not negative_pval_file.exists():
-            negative_pval_file = replace_ext(negative_pval_file, ".nii")
-
+        negative_pval_file = Path(f"{output_prefix}_tfce_tstat_cfwep_c2.nii.gz")
         negative_tstat_img = nib.load(negative_tstat_file)
         negative_sig_mask = (
             nib.load(negative_pval_file).get_fdata() > logp_threshold
@@ -315,6 +329,9 @@ def get_nontarget_dose(second_level_glt_code, cohort):
     if second_level_glt_code == "mean":
         return None
 
+    if is_between_group_dose_code(second_level_glt_code, cohort):
+        return ["placebo"]
+
     doses = {"kids": {"0", "5", "10"}, "adults": {"mph", "placebo"}}
 
     return list(doses[cohort].difference(second_level_glt_code.split("_vs_")))
@@ -346,5 +363,5 @@ def drop_dose_rows(data_table, dose_list, only_paired_data=False):
     return data_table
 
 
-def get_interpretation_labels(second_level_glt_code):
+def get_group_labels(second_level_glt_code):
     return second_level_glt_code.split("_vs_")

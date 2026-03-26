@@ -1,6 +1,7 @@
 import argparse, shutil, subprocess, sys
 from dataclasses import dataclass, field
 from functools import lru_cache
+from math import comb
 from pathlib import Path
 
 import bids, nibabel as nib, numpy as np, pandas as pd
@@ -9,6 +10,7 @@ from nilearn.image import resample_to_img
 
 from nifti2bids.bids import get_entity_value
 from nifti2bids.logging import setup_logger
+from nifti2bids.io import compress_image
 from nifti2bids.qc import get_n_censored_volumes
 
 from _denoising import remove_collinear_columns
@@ -18,7 +20,9 @@ from _utils import (
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
     get_nontarget_dose,
-    get_interpretation_labels,
+    get_group_labels,
+    is_between_group_dose_code,
+    get_between_group_column,
     estimate_noise_smoothness,
     perform_cluster_simulation,
     threshold_palm_output,
@@ -257,7 +261,7 @@ def _get_cmd_args():
 @dataclass
 class DataContainer:
     columns_to_ignore: list[str] = field(
-        default_factory=lambda: ["Subj", "session_id", "InputFile", "dose"],
+        default_factory=lambda: ["Subj", "session_id", "InputFile", "dose", "dosemg"],
     )
     excluded_regressors: list = field(default_factory=list)
     categorical_regressors: set = field(
@@ -311,6 +315,7 @@ class DataContainer:
                 f"{self.deprioritized_regressors_order}"
             )
         else:
+            excluded_covariates = excluded_covariates.split(" ")
             self.excluded_regressors.extend(excluded_covariates)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
@@ -410,9 +415,13 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     # AFNI 26 requires first column to be named "Subj"
     data_table = data_table.rename(columns={"participant_id": "Subj"})
 
-    for col in ["acq_time", "dose_mg"]:
+    for col in ["acq_time"]:
         if col in data_table.columns:
             data_table = data_table.drop(col, axis=1)
+
+    if "dose_mg" in data_table.columns:
+        data_table = data_table.rename(columns={"dose_mg": "dosemg"})
+        data_table["dosemg"] = data_table["dosemg"].astype(int).astype(str)
 
     column_names = (
         ["Subj", "dose"]
@@ -633,6 +642,26 @@ def prioritize_regressors(design_matrix, datacontainer):
     return design_matrix
 
 
+def get_col_from_data_table(data_table, datacontainer, col_type):
+    if col_type == "categorical":
+        cols = [
+            col
+            for col in data_table.columns
+            if col in datacontainer.categorical_regressors
+            and col
+            not in datacontainer.excluded_regressors + datacontainer.columns_to_ignore
+        ]
+    else:
+        cols = [
+            col
+            for col in data_table.columns
+            if col
+            not in datacontainer.non_continuous_cols + datacontainer.excluded_regressors
+        ]
+
+    return cols
+
+
 def create_design_matrix(
     glt_data_table,
     datacontainer,
@@ -640,22 +669,12 @@ def create_design_matrix(
     average_within_subjects=False,
     second_level_glt_code=None,
 ):
-    categorical_cols = [
-        col
-        for col in glt_data_table.columns
-        if col in datacontainer.categorical_regressors
-        and col
-        not in datacontainer.excluded_regressors + datacontainer.columns_to_ignore
-    ]
-
-    continuous_cols = [
-        col
-        for col in glt_data_table.columns
-        if col
-        not in datacontainer.non_continuous_cols
-        + datacontainer.excluded_regressors
-        + categorical_cols
-    ]
+    categorical_cols = get_col_from_data_table(
+        glt_data_table, datacontainer, col_type="categorical"
+    )
+    continuous_cols = get_col_from_data_table(
+        glt_data_table, datacontainer, col_type="continuous"
+    )
 
     for col in categorical_cols:
         glt_data_table[col] = glt_data_table[col].astype(str)
@@ -693,8 +712,8 @@ def create_design_matrix(
     # the reference group
     for col in categorical_cols:
         dummies = pd.get_dummies(
-            glt_data_table[col], prefix=col, drop_first=True
-        ).astype(int)
+            glt_data_table[col], prefix=col, drop_first=True, dtype=int
+        )
         design_components.update(
             {col: mean_center(dummies[col].to_numpy()) for col in dummies.columns}
         )
@@ -717,12 +736,12 @@ def create_design_matrix(
         intercept = [1] * (glt_data_table.shape[0])
         design_matrix.insert(0, "intercept", intercept)
     else:
-        first_label, _ = get_interpretation_labels(second_level_glt_code)
+        first_label, _ = get_group_labels(second_level_glt_code)
         dose_codes = np.where(glt_data_table["dose"].astype(str) == first_label, 1, -1)
         design_matrix.insert(0, "dose", dose_codes)
         subject_regressors = pd.get_dummies(
-            glt_data_table["Subj"], prefix="", prefix_sep=""
-        ).astype(int)
+            glt_data_table["Subj"], prefix="", prefix_sep="", dtype=int
+        )
         design_matrix = pd.concat(
             [
                 design_matrix.reset_index(drop=True),
@@ -760,7 +779,7 @@ def write_contrast_direction_file(
     contrast_direction_file = output_dir / f"{prefix}_desc-contrast_direction.txt"
 
     if "_vs_" in second_level_glt_code:
-        first_label, second_label = get_interpretation_labels(second_level_glt_code)
+        first_label, second_label = get_group_labels(second_level_glt_code)
         positive_label = f"{first_label} > {second_label}"
         negative_label = f"{second_label} > {first_label}"
     else:
@@ -844,9 +863,7 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    for col in datacontainer.constant_regressors:
-        if col in glt_data_table.columns:
-            glt_data_table = glt_data_table.drop(col, axis=1)
+    glt_data_table = drop_constant_regressors(datacontainer, glt_data_table)
 
     eb_data = glt_data_table["Subj"].factorize()[0] + 1
     np.savetxt(matrices_filenames_dict["eb_file"], eb_data, delimiter=",", fmt="%d")
@@ -875,15 +892,31 @@ def create_comparison_matrices(
     return matrices_filenames_dict
 
 
-def compute_n_permutation(glt_data_table):
-    n_subjects = len(glt_data_table["Subj"].unique())
-    max_permutation = 2**n_subjects
-    LGR.info(f"Maximum permutations possible: {max_permutation}")
-
+def set_permutations(max_permutation):
     n_permutations = min(max_permutation, 10000)
+
     LGR.info(f"Setting number of permutations to: {n_permutations}")
 
     return n_permutations
+
+
+def compute_n_permutation(glt_data_table):
+    n_subjects = len(glt_data_table["Subj"].unique())
+    max_permutation = 2**n_subjects
+    LGR.info(f"Maximum permutations possible = {max_permutation}")
+
+    return set_permutations(max_permutation)
+
+
+def compute_n_permutation_between_group(glt_data_table, cohort, second_level_glt_code):
+    group_column = get_between_group_column(second_level_glt_code, cohort)
+    first_label, _ = get_group_labels(second_level_glt_code)
+    n1 = int((glt_data_table[group_column].astype(str) == first_label).sum())
+    n2 = len(glt_data_table) - n1
+    max_permutation = comb(n1 + n2, n1)
+    LGR.info(f"Between-group permutations: ({n1}+{n2})-choose-{n1} = {max_permutation}")
+
+    return set_permutations(max_permutation)
 
 
 def create_concatenated_image(
@@ -896,8 +929,6 @@ def create_concatenated_image(
     first_level_glt_label,
     second_level_glt_code,
 ):
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     prefix = f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
     concatenated_filename = output_dir / f"{prefix}_desc-group_concatenated.nii.gz"
     if concatenated_filename.exists():
@@ -956,6 +987,258 @@ def create_concatenated_image(
     return concatenated_filename
 
 
+def create_difference_maps(
+    data_table,
+    output_dir,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+    afni_img_path=None,
+    fsl_img_path=None,
+    use_native_fsl=False,
+):
+    difference_dir = output_dir / "difference"
+    difference_dir.mkdir(parents=True, exist_ok=True)
+
+    diff_rows = []
+    for subject, group in data_table.groupby("Subj"):
+        mph_rows = group[group["dose"].astype(str) == "mph"]
+        placebo_rows = group[group["dose"].astype(str) == "placebo"]
+
+        if mph_rows.empty or placebo_rows.empty:
+            LGR.warning(f"Subject {subject} missing mph or placebo visit, skipping.")
+            continue
+
+        mph_file = mph_rows["InputFile"].values[0]
+        placebo_file = placebo_rows["InputFile"].values[0]
+
+        prefix = (
+            f"task-{task}_{entity_key}-{first_level_glt_label}"
+            f"_gltcode-{second_level_glt_code}"
+        )
+        diff_filename = difference_dir / f"{subject}_{prefix}_desc-difference.nii.gz"
+
+        if afni_img_path:
+            cmd = (
+                f"apptainer exec -B /projects:/projects {afni_img_path} 3dcalc "
+                f"-a {mph_file} -b {placebo_file} "
+                f"-expr 'a-b' -prefix {diff_filename} -overwrite"
+            )
+        else:
+            fsl_maths_call = (
+                "fslmaths"
+                if use_native_fsl
+                else f"apptainer exec -B /projects:/projects {fsl_img_path} fslmaths"
+            )
+            cmd = f"{fsl_maths_call} {mph_file} -sub {placebo_file} {diff_filename}"
+
+        LGR.info(f"Creating difference map for {subject}: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+
+        # Take the mph row as the template (has dosemg) and update InputFile
+        row = mph_rows.iloc[0].copy()
+        row["InputFile"] = str(diff_filename)
+        diff_rows.append(row)
+
+    diff_table = pd.DataFrame(diff_rows).reset_index(drop=True)
+    LGR.info(f"Created {len(diff_table)} difference maps for {second_level_glt_code}")
+
+    diff_table.to_csv(
+        output_dir / f"difference_table_gltcode-{second_level_glt_code}.tsv",
+        sep="\t",
+        index=None,
+    )
+
+    return diff_table
+
+
+def drop_constant_regressors(datacontainer, glt_data_table):
+    for col in datacontainer.constant_regressors:
+        if col in glt_data_table.columns:
+            glt_data_table = glt_data_table.drop(col, axis=1)
+
+    return glt_data_table
+
+
+def create_between_group_matrices(
+    glt_data_table,
+    datacontainer,
+    output_dir,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+    cohort,
+):
+    matrices_filenames_dict = generate_matrices_filenames(
+        output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
+    )
+    matrices_filenames_dict["eb_file"] = None
+
+    group_column = get_between_group_column(second_level_glt_code, cohort)
+    first_label, second_label = get_group_labels(second_level_glt_code)
+
+    glt_data_table = drop_constant_regressors(datacontainer, glt_data_table)
+
+    group1_mask = (
+        (glt_data_table[group_column].astype(str) == first_label).astype(int).to_numpy()
+    )
+    group2_mask = (
+        (glt_data_table[group_column].astype(str) == second_label)
+        .astype(int)
+        .to_numpy()
+    )
+
+    design_components = {"Group1": group1_mask, "Group2": group2_mask}
+
+    # Add covariates (continuous only, mean centered across all subjects)
+    mean_center = lambda arr: arr - arr.mean()
+    continuous_cols = get_col_from_data_table(
+        glt_data_table, datacontainer, col_type="continuous"
+    )
+    for col in continuous_cols:
+        design_components[col] = mean_center(glt_data_table[col].to_numpy())
+
+    design_matrix = pd.DataFrame(design_components)
+    design_matrix = prioritize_regressors(design_matrix, datacontainer)
+
+    design_matrix.to_csv(
+        matrices_filenames_dict["design_matrix_file"],
+        sep=",",
+        header=False,
+        index=False,
+    )
+    create_header_file(design_matrix, matrices_filenames_dict["header_file"])
+
+    # Contrast: [1 -1 0...] for Group1 > Group2, [-1 1 0...] for Group2 > Group1
+    n_cols = design_matrix.shape[1]
+    vector_pos = np.zeros(n_cols)
+    vector_pos[0] = 1
+    vector_pos[1] = -1
+    vector_neg = vector_pos * -1
+
+    np.savetxt(
+        matrices_filenames_dict["contrast_matrix_file"],
+        np.array([vector_pos, vector_neg]),
+        delimiter=",",
+        fmt="%.4f",
+    )
+    write_contrast_direction_file(
+        output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
+    )
+
+    return matrices_filenames_dict
+
+
+def create_covariates_file_for_3dttest(
+    glt_data_table,
+    datacontainer,
+    output_dir,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+):
+
+    categorical_cols = get_col_from_data_table(
+        glt_data_table, datacontainer, col_type="categorical"
+    )
+    covariates_cols = (
+        get_col_from_data_table(glt_data_table, datacontainer, col_type="continuous")
+        + categorical_cols
+    )
+
+    if not covariates_cols:
+        return None
+
+    prefix = (
+        f"task-{task}_{entity_key}-{first_level_glt_label}"
+        f"_gltcode-{second_level_glt_code}"
+    )
+    covariates_file = output_dir / f"{prefix}_desc-covariates.txt"
+
+    cov_table = glt_data_table[["Subj"] + covariates_cols].copy()
+
+    if categorical_cols:
+        cov_table = pd.get_dummies(
+            cov_table, columns=categorical_cols, drop_first=True, dtype=int
+        )
+
+    if cov_table.shape[1] < 2:
+        return None
+
+    cov_table["Subj"] = cov_table["Subj"].str.removeprefix("sub-")
+
+    cov_table.to_csv(covariates_file, sep="\t", index=False)
+
+    return covariates_file
+
+
+def perform_3dttest(
+    output_dir,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+    glt_data_table,
+    group_mask_filename,
+    afni_img_path,
+    cohort,
+    covariates_file=None,
+):
+    """
+    Run 3dttest++ for between-group comparison on difference maps, only ever used for the difference maps.
+    """
+    output_filename = (
+        output_dir / f"task-{task}_{entity_key}-{first_level_glt_label}"
+        f"_gltcode-{second_level_glt_code}_desc-parametric_stats.nii.gz"
+    )
+    if output_filename.exists():
+        output_filename.unlink()
+
+    residual_filename = Path(str(output_filename).replace("_stats", "_residuals"))
+    if residual_filename.exists():
+        residual_filename.unlink()
+
+    group_column = get_between_group_column(second_level_glt_code, cohort)
+    first_label, second_label = get_group_labels(second_level_glt_code)
+
+    # Build -setA and -setB strings
+    set_a_rows = glt_data_table[glt_data_table[group_column] == first_label]
+    set_b_rows = glt_data_table[glt_data_table[group_column] == second_label]
+
+    set_a_str = " ".join(
+        f"{row['Subj'].removeprefix('sub-')} {row['InputFile']}"
+        for _, row in set_a_rows.iterrows()
+    )
+    set_b_str = " ".join(
+        f"{row['Subj'].removeprefix('sub-')} {row['InputFile']}"
+        for _, row in set_b_rows.iterrows()
+    )
+
+    covariates_str = (
+        f"-covariates {covariates_file} -center SAME" if covariates_file else ""
+    )
+
+    cmd = (
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dttest++ "
+        f"-setA {first_label} {set_a_str} "
+        f"-setB {second_label} {set_b_str} "
+        f"-mask {group_mask_filename} "
+        f"-prefix {output_filename} "
+        f"-resid {residual_filename} "
+        "-toz "
+        "-no1sam "
+        f"{covariates_str}"
+    )
+
+    LGR.info(f"Running 3dttest++: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+    return residual_filename
+
+
 def perform_palm(
     concatenated_filename,
     group_mask_filename,
@@ -967,6 +1250,7 @@ def perform_palm(
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
+    is_between_group,
     n_permutations,
     tfce_H,
     tfce_E,
@@ -1026,9 +1310,10 @@ def perform_palm(
         f"-o {output_prefix}"
     )
 
-    palm_flags += (
-        f" -eb {eb_file} -ee -within" if "_vs_" in second_level_glt_code else " -ise"
-    )
+    if "_vs_" in second_level_glt_code and eb_file:
+        palm_flags += f" -eb {eb_file} -ee -within"
+    else:
+        palm_flags += " -ise" if not is_between_group else " -ee"
 
     if use_native_palm:
         palm_dir = Path(shutil.which("palm")).parent
@@ -1166,10 +1451,10 @@ def main(
 
         if method == "parametric":
             if not afni_img_path:
-                LGR.critical("`afni_img_path` is required when method is parametric.")
+                LGR.warning("`afni_img_path` is required when method is parametric.")
                 sys.exit(1)
 
-            LGR.critical(
+            LGR.warning(
                 f"Using {len(data_table['InputFile'].tolist())} files "
                 f"from {len(data_table['Subj'].unique())} subjects for analysis "
             )
@@ -1219,13 +1504,76 @@ def main(
                 acf_parameters_filename,
                 first_level_glt_label,
             )
+
+            # Run between-group codes (e.g., 15_vs_10) using 3dttest++
+            between_group_codes = [
+                code
+                for code in get_second_level_glt_codes(cohort)
+                if is_between_group_dose_code(code, cohort)
+            ]
+            for second_level_glt_code in between_group_codes:
+                LGR.info(
+                    f"Running between-group parametric analysis for: {second_level_glt_code}"
+                )
+                diff_output_dir = dst_dir / "second_level_outputs" / "parametric"
+                diff_output_dir.mkdir(parents=True, exist_ok=True)
+
+                diff_data_table = create_difference_maps(
+                    data_table,
+                    diff_output_dir,
+                    task,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                    afni_img_path=afni_img_path,
+                )
+                if diff_data_table is None or diff_data_table.empty:
+                    LGR.warning(
+                        f"No difference maps created for {second_level_glt_code}"
+                    )
+                    continue
+
+                covariates_file = create_covariates_file_for_3dttest(
+                    diff_data_table,
+                    datacontainer,
+                    diff_output_dir,
+                    task,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                )
+                between_group_residual = perform_3dttest(
+                    diff_output_dir,
+                    task,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                    diff_data_table,
+                    group_mask_filename,
+                    afni_img_path,
+                    cohort,
+                    covariates_file,
+                )
+                bg_acf = estimate_noise_smoothness(
+                    dst_dir,
+                    afni_img_path,
+                    group_mask_filename,
+                    between_group_residual,
+                    first_level_glt_label,
+                )
+                perform_cluster_simulation(
+                    afni_img_path,
+                    group_mask_filename,
+                    bg_acf,
+                    first_level_glt_label,
+                )
         else:
             # Nonparametric (PALM)
             use_native_palm = shutil.which("palm") is not None
             use_native_fsl = shutil.which("fslmerge") is not None
 
             if not fsl_img_path and not (use_native_palm or use_native_fsl):
-                LGR.critical(
+                LGR.warning(
                     "`fsl_img_path` is required when method is nonparametric "
                     "and palm and `fslmerge` are not in path."
                 )
@@ -1236,23 +1584,43 @@ def main(
             for second_level_glt_code in get_second_level_glt_codes(cohort):
                 LGR.info(f"Processing the following glt code: {second_level_glt_code}")
 
-                vs_in_code = "_vs_" in second_level_glt_code
-                glt_data_table = drop_dose_rows(
-                    data_table,
-                    get_nontarget_dose(second_level_glt_code, cohort),
-                    vs_in_code,
+                is_between_group = is_between_group_dose_code(
+                    second_level_glt_code, cohort
                 )
-                glt_data_table = drop_constant_columns(glt_data_table)
-
-                if glt_data_table.empty:
-                    LGR.info(
-                        f"Skipping the following second level glt code: {second_level_glt_code}"
+                if not is_between_group:
+                    vs_in_code = "_vs_" in second_level_glt_code
+                    glt_data_table = drop_dose_rows(
+                        data_table,
+                        get_nontarget_dose(second_level_glt_code, cohort),
+                        only_paired_data=vs_in_code,
                     )
-                    continue
+                    glt_data_table = drop_constant_columns(glt_data_table)
+                    if glt_data_table.empty:
+                        LGR.info(
+                            f"Skipping the following second level glt code: {second_level_glt_code}"
+                        )
+                        continue
+                else:
+                    # For between-group codes, create difference maps first
+                    glt_data_table = create_difference_maps(
+                        data_table,
+                        output_dir,
+                        task,
+                        entity_key,
+                        first_level_glt_label,
+                        second_level_glt_code,
+                        fsl_img_path=fsl_img_path,
+                        use_native_fsl=use_native_fsl,
+                    )
+                    if glt_data_table is None or glt_data_table.empty:
+                        LGR.warning(
+                            f"No difference maps created for {second_level_glt_code}"
+                        )
+                        continue
 
-                LGR.critical(
-                    f"Using {len(data_table['InputFile'].tolist())} files "
-                    f"from {len(data_table['Subj'].unique())} subjects for analysis "
+                LGR.warning(
+                    f"Using {len(glt_data_table['InputFile'].tolist())} files "
+                    f"from {len(glt_data_table['Subj'].unique())} subjects for analysis "
                     f"using {second_level_glt_code}"
                 )
                 LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
@@ -1265,29 +1633,53 @@ def main(
                     data_table["InputFile"].tolist(),
                     gm_probseg_img_path,
                     gm_mask_threshold,
+                    apriori_img_path,
                     method,
                     entity_key,
                     first_level_glt_label,
                     second_level_glt_code,
                 )
 
-                matrix_creation_func = (
-                    create_comparison_matrices if vs_in_code else create_mean_matrices
-                )
-                matrices_output_dict = matrix_creation_func(
-                    glt_data_table,
-                    datacontainer,
-                    output_dir,
-                    task,
-                    entity_key,
-                    first_level_glt_label,
-                    second_level_glt_code,
-                )
-                max_permutations = (
-                    compute_n_permutation(glt_data_table)
-                    if n_permutations == "auto"
-                    else n_permutations
-                )
+                if is_between_group:
+                    matrix_creation_func = create_between_group_matrices
+                    matrices_output_dict = matrix_creation_func(
+                        glt_data_table,
+                        datacontainer,
+                        output_dir,
+                        task,
+                        entity_key,
+                        first_level_glt_label,
+                        second_level_glt_code,
+                        cohort,
+                    )
+                    max_permutations = (
+                        compute_n_permutation_between_group(
+                            glt_data_table, cohort, second_level_glt_code
+                        )
+                        if n_permutations == "auto"
+                        else n_permutations
+                    )
+                else:
+                    matrix_creation_func = (
+                        create_comparison_matrices
+                        if vs_in_code
+                        else create_mean_matrices
+                    )
+                    matrices_output_dict = matrix_creation_func(
+                        glt_data_table,
+                        datacontainer,
+                        output_dir,
+                        task,
+                        entity_key,
+                        first_level_glt_label,
+                        second_level_glt_code,
+                    )
+                    max_permutations = (
+                        compute_n_permutation(glt_data_table)
+                        if n_permutations == "auto"
+                        else n_permutations
+                    )
+
                 concatenated_filename = create_concatenated_image(
                     output_dir,
                     glt_data_table,
@@ -1309,12 +1701,18 @@ def main(
                     entity_key,
                     first_level_glt_label,
                     second_level_glt_code,
+                    is_between_group,
                     max_permutations,
                     tfce_H,
                     tfce_E,
                     tfce_C,
                     use_native_palm,
                 )
+                for img in Path(output_prefix).parent.glob("*.nii"):
+                    compress_image(
+                        img, dst_dir=Path(output_prefix).parent, remove_src_file=True
+                    )
+
                 threshold_palm_output(
                     output_prefix,
                     second_level_glt_code,

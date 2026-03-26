@@ -110,7 +110,7 @@ def _get_subject_visits(
         subjects_visits_date_fmt=subjects_visits_date_fmt,
     )
     if not visit_dates or all(not pd.notna(date) for date in visit_dates):
-        LGR.critical(f"Subject {participant_id} has no visit dates.")
+        LGR.warning(f"Subject {participant_id} has no visit dates.")
 
         return None
 
@@ -119,7 +119,7 @@ def _get_subject_visits(
         is_valid_date(visit_date, subjects_visits_date_fmt)
         for visit_date in check_dates
     ):
-        LGR.critical(
+        LGR.warning(
             f"Visit dates will be ignored for subject {participant_id} because "
             f"not all dates have a consistent format: {check_dates}."
         )
@@ -184,7 +184,7 @@ def _combine_session_data(
             if date not in scan_dates
         }
         if missing_dates:
-            LGR.critical(
+            LGR.warning(
                 "The following dates are missing from the subject_visits_file "
                 f"for subject {participant_id} and will be used as the session id if a source "
                 f"folder has these dates: {missing_dates.keys()}"

@@ -163,7 +163,7 @@ def _copy_event_files(src_dir, temp_dir, cohort, task, minimum_file_size):
     for event_file in src_dir.glob("*"):
         minimum_file_size = _get_minimum_file_size(cohort, task, minimum_file_size)
         if os.path.getsize(event_file) < minimum_file_size:
-            LGR.critical(
+            LGR.warning(
                 f"The following file is smaller than {minimum_file_size} bytes "
                 f"and will not be copied to the temporary directory: {event_file}."
             )
@@ -192,7 +192,7 @@ def _get_subjects_visits(subject_id, subjects_visits_df, subjects_visits_date_fm
     if not visit_dates or all(
         isinstance(date, float) and np.isnan(date) for date in visit_dates
     ):
-        LGR.critical(f"Subject {subject_id} has no visit dates.")
+        LGR.warning(f"Subject {subject_id} has no visit dates.")
         return None
 
     check_dates = [
@@ -200,7 +200,7 @@ def _get_subjects_visits(subject_id, subjects_visits_df, subjects_visits_date_fm
     ]
 
     if not check_dates:
-        LGR.critical(f"No visit dates will be ignored for subject {subject_id}.")
+        LGR.warning(f"No visit dates will be ignored for subject {subject_id}.")
         return None
 
     if not all(
@@ -283,7 +283,7 @@ def map_date_to_session(
         date_in_map = False
 
     if not date_in_map:
-        LGR.critical(
+        LGR.warning(
             f"Subject {subject_id} does not have the following date: {curr_log_date}. "
             "The date will be used as the session label."
         )

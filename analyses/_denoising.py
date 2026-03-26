@@ -140,7 +140,7 @@ def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999
                 col2 = get_col_name(j, regressor_positions)
                 drop_columns.append(j)
 
-                LGR.critical(
+                LGR.warning(
                     f"Columns {col1} and {col2} are collinear ({r}), dropping {col2}."
                 )
 

@@ -44,7 +44,7 @@ def _infer_file_identity(temp_dir: Path, cohort: Literal["kids", "adults"]) -> N
                 ):
                     desc = "mprage32"
                 else:
-                    LGR.critical(
+                    LGR.warning(
                         f"Voxel sizes out of bounds ({min_thresh} mm, {max_thresh} mm). "
                         f"Actual voxels sizes are {voxel_sizes} for the following file: {nifti_file}. "
                         "Check original file in the source directory since the temp file will be deleted "

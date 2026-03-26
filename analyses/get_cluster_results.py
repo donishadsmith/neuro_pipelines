@@ -15,8 +15,9 @@ from nifti2bids.parsers import _is_float
 from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
-    get_interpretation_labels,
+    get_group_labels,
     get_second_level_glt_codes,
+    is_between_group_dose_code,
     resample_seed_img,
 )
 
@@ -140,24 +141,43 @@ def p_to_z(p_value, two_sided=True):
 def get_zscore_map_and_mask(
     analysis_dir,
     afni_img_path,
+    cohort,
     task,
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
 ):
-    stats_filename = next(
-        analysis_dir.rglob(
-            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
+    is_between_group = is_between_group_dose_code(second_level_glt_code, cohort)
+    if is_between_group:
+        stats_filename = next(
+            analysis_dir.rglob(
+                f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-parametric_stats.nii.gz"
+            )
         )
-    )
+    else:
+        stats_filename = next(
+            analysis_dir.rglob(
+                f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
+            )
+        )
+
+    if not stats_filename:
+        return None, None
+
     zcore_map_filename = str(stats_filename).replace(
         "_desc-parametric_stats",
         f"_gltcode-{second_level_glt_code}_desc-parametric_z_map",
     )
 
+    index_name = (
+        f"{second_level_glt_code} Z"
+        if not is_between_group
+        else f"{second_level_glt_code.replace('_vs_', '-')}_Zscr"
+    )
+
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
-        f"{stats_filename}'[{second_level_glt_code} Z]' "
+        f"{stats_filename}'[{index_name}]' "
         f"-prefix {zcore_map_filename} "
         "-overwrite"
     )
@@ -166,7 +186,7 @@ def get_zscore_map_and_mask(
     try:
         subprocess.run(cmd, shell=True, check=True)
     except Exception:
-        LGR.critical(f"The following command failed: {cmd}", exc_info=True)
+        LGR.warning(f"The following command failed: {cmd}", exc_info=True)
 
     group_mask_filename = next(
         analysis_dir.rglob(
@@ -291,7 +311,7 @@ def identify_clusters(
             clusters_table.loc[mask_pos, "Interpretation"] = positive_interpretation
             clusters_table.loc[mask_neg, "Interpretation"] = negative_interpretation
         else:
-            first_label, second_label = get_interpretation_labels(second_level_glt_code)
+            first_label, second_label = get_group_labels(second_level_glt_code)
 
             clusters_table.loc[mask_pos, "Interpretation"] = (
                 f"{positive_interpretation}: {first_label}{suffix} > {second_label}{suffix}"
@@ -388,7 +408,7 @@ def plot_thresholded_img(
             f"GROUP: Within {second_level_glt_code}{suffix}"
         )
     else:
-        first_label, second_label = get_interpretation_labels(second_level_glt_code)
+        first_label, second_label = get_group_labels(second_level_glt_code)
         first_group = f"{first_label}{suffix}"
         second_group = f"{second_label}{suffix}"
         title = (
@@ -445,7 +465,6 @@ def create_seed_masks(
         coord = truncated_clusters_table.loc[index, ["X", "Y", "Z"]].to_list()
 
         # https://neurostars.org/t/create-a-10mm-sphere-roi-mask-around-a-given-coordinate/28853/3
-
         _, A = nifti_spheres_masker.apply_mask_and_get_affinity(
             seeds=[tuple(coord)],
             niimg=None,
@@ -517,20 +536,21 @@ def main(
 
         if method == "parametric":
             if not afni_img_path:
-                LGR.critical("afni_img_path is required when method is parametric.")
+                LGR.warning("afni_img_path is required when method is parametric.")
                 sys.exit(1)
 
             zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
                 analysis_dir,
                 afni_img_path,
+                cohort,
                 task,
                 entity_key,
                 first_level_glt_label,
                 second_level_glt_code,
             )
-            if not zcore_map_filename.exists():
+            if not zcore_map_filename:
                 LGR.warning(
-                    f"Skipping the following glt code due to file not existing: {second_level_glt_code}"
+                    f"Skipping the following glt code due to stats file not existing: {second_level_glt_code}"
                 )
                 continue
 
@@ -561,7 +581,7 @@ def main(
                     )
                 )
             except Exception:
-                LGR.critical(
+                LGR.warning(
                     f"Skipping {second_level_glt_code}: no thresholded file found"
                 )
                 continue

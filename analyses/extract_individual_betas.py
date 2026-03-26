@@ -14,6 +14,7 @@ from _utils import (
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
     get_nontarget_dose,
+    is_between_group_dose_code,
     resample_seed_img,
 )
 
@@ -236,9 +237,13 @@ def add_info_to_data_table(
 
 
 def get_subject_beta_filenames(
-    data_table, first_level_glt_label, beta_name, parent_path=None
+    data_table,
+    first_level_glt_label,
+    beta_name,
+    input_file_column="InputFile",
+    parent_path=None,
 ):
-    subject_beta_filenames = data_table["InputFile"].tolist()
+    subject_beta_filenames = data_table[input_file_column].tolist()
 
     if first_level_glt_label == beta_name:
         return subject_beta_filenames
@@ -283,6 +288,44 @@ def compute_average_betas(
     return average_betas
 
 
+def build_between_group_data_table(
+    analysis_dir,
+    data_table,
+    task,
+    entity_key,
+    first_level_glt_label,
+    second_level_glt_code,
+):
+    prefix = (
+        f"task-{task}_{entity_key}-{first_level_glt_label}"
+        f"_gltcode-{second_level_glt_code}"
+    )
+    diff_map_files = sorted(
+        list(analysis_dir.rglob(f"*{prefix}_desc-difference.nii.gz"))
+    )
+
+    if not diff_map_files:
+        LGR.warning(
+            f"No difference maps found for {second_level_glt_code} in {analysis_dir}"
+        )
+        return None
+
+    # Build subject -> diff map mapping
+    diff_map_dict = {}
+    for diff_file in diff_map_files:
+        sub_id = get_entity_value(diff_file.name, "sub")
+        if sub_id:
+            diff_map_dict[f"sub-{sub_id}"] = str(diff_file)
+
+    mph_rows["OriginalInputFile"] = mph_rows["InputFile"]
+    mph_rows = data_table[data_table["dose"].astype(str) == "mph"].copy()
+    mph_rows = mph_rows[mph_rows["Subj"].isin(diff_map_dict.keys())].copy()
+    mph_rows["InputFile"] = mph_rows["Subj"].map(diff_map_dict)
+    mph_rows = mph_rows[mph_rows["Subj"].isin(diff_map_dict.keys())]
+
+    return mph_rows.reset_index(drop=True)
+
+
 def main(
     analysis_dir,
     dst_dir,
@@ -317,7 +360,7 @@ def main(
         )
         data_table_file = next(analysis_dir.rglob(filename))
         if not data_table_file:
-            LGR.critical(
+            LGR.warning(
                 f"The following data table could not be found in {analysis_dir}: {filename}"
             )
             continue
@@ -345,18 +388,42 @@ def main(
                 )
                 continue
 
-            truncated_df = drop_dose_rows(
-                data_table, get_nontarget_dose(second_level_glt_code, cohort)
-            )
-            beta_names = get_beta_names(first_level_glt_label)
+            is_between_group = is_between_group_dose_code(second_level_glt_code, cohort)
+            if is_between_group:
+                truncated_df = build_between_group_data_table(
+                    analysis_dir,
+                    data_table,
+                    task,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code,
+                )
+                if truncated_df is None or truncated_df.empty:
+                    LGR.warning(
+                        f"No between-group data table for {second_level_glt_code}"
+                    )
+                    continue
+
+                beta_names = [first_level_glt_label]
+            else:
+                truncated_df = drop_dose_rows(
+                    data_table, get_nontarget_dose(second_level_glt_code, cohort)
+                )
+                beta_names = get_beta_names(first_level_glt_label)
+
             for beta_name in beta_names:
                 add_condition_entity_key = beta_name != first_level_glt_label
                 subject_beta_filenames = get_subject_beta_filenames(
-                    truncated_df, first_level_glt_label, beta_name
+                    truncated_df,
+                    first_level_glt_label,
+                    beta_name,
+                    input_file_column=(
+                        "InputFile" if not is_between_group else "OriginalInputFile"
+                    ),
                 )
 
                 if not subject_beta_filenames:
-                    LGR.critical(f"Skipping tabular data for {beta_name}.")
+                    LGR.warning(f"Skipping tabular data for {beta_name}.")
                     continue
 
                 for cluster_mask_filename in cluster_mask_filenames:
@@ -388,7 +455,12 @@ def main(
                             beta_coefficient_df,
                             first_level_glt_label,
                             glm_beta_name,
-                            glm_dir,
+                            input_file_column=(
+                                "InputFile"
+                                if not is_between_group
+                                else "OriginalInputFile"
+                            ),
+                            parent_path=glm_dir,
                         )
 
                         beta_coefficient_df[f"glm_individual_cluster_beta"] = (
