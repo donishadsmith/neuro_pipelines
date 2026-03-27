@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
+    get_between_group_code,
     estimate_noise_smoothness,
     perform_cluster_simulation,
 )
@@ -60,21 +61,21 @@ def main(analysis_dir, dst_dir, afni_img_path, cohort, task, analysis_type):
 
     LGR.info(f"TASK: {task}")
 
-    first_level_gltlabels = get_first_level_gltsym_codes(
+    first_level_glt_labels = get_first_level_gltsym_codes(
         cohort, task, analysis_type, caller="compute_cluster_correction"
     )
-    for first_level_gltlabel in first_level_gltlabels:
-        entity_key = get_contrast_entity_key(first_level_gltlabel)
-        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_gltlabel}")
+    for first_level_glt_label in first_level_glt_labels:
+        entity_key = get_contrast_entity_key(first_level_glt_label)
+        LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_glt_label}")
 
         group_mask_filename = next(
             analysis_dir.rglob(
-                f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-group_mask.nii.gz"
+                f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_group_mask.nii.gz"
             )
         )
         residual_filename = next(
             analysis_dir.rglob(
-                f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-parametric_residuals.nii.gz"
+                f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_residuals.nii.gz"
             )
         )
 
@@ -83,15 +84,43 @@ def main(analysis_dir, dst_dir, afni_img_path, cohort, task, analysis_type):
             afni_img_path,
             group_mask_filename,
             residual_filename,
-            first_level_gltlabel,
+            first_level_glt_label,
         )
 
         perform_cluster_simulation(
             afni_img_path,
             group_mask_filename,
             acf_parameters_filename,
-            first_level_gltlabel,
+            first_level_glt_label,
         )
+
+        if cohort == "adults":
+            between_group_code = get_between_group_code(cohort)
+            group_mask_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{between_group_code}_desc-parametric_group_mask.nii.gz"
+                )
+            )
+            residual_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}__gltcode-{between_group_code}_desc-parametric_residuals.nii.gz"
+                )
+            )
+
+            acf_parameters_filename = estimate_noise_smoothness(
+                dst_dir,
+                afni_img_path,
+                group_mask_filename,
+                residual_filename,
+                first_level_glt_label,
+            )
+
+            perform_cluster_simulation(
+                afni_img_path,
+                group_mask_filename,
+                acf_parameters_filename,
+                first_level_glt_label,
+            )
 
 
 if __name__ == "__main__":

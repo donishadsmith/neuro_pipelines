@@ -155,7 +155,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--excluded_covariates",
         dest="excluded_covariates",
-        default=["race", "ethnicity"],
+        default=["all"],
         required=False,
         nargs="*",
         type=str,
@@ -470,16 +470,15 @@ def create_group_mask(
         group_mask_filename = (
             dst_dir
             / "group_masks"
-            / method
-            / f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-group_mask.nii.gz"
+            / f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-{method}_group_mask.nii.gz"
         )
     else:
         group_mask_filename = (
             dst_dir
             / "group_masks"
-            / method
-            / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-group_mask.nii.gz"
+            / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-{method}_group_mask.nii.gz"
         )
+
     group_mask_filename.parent.mkdir(parents=True, exist_ok=True)
 
     subject_mask_files = []
@@ -487,15 +486,18 @@ def create_group_mask(
         sub_id = get_entity_value(filtered_beta_file, "sub")
         ses_id = get_entity_value(filtered_beta_file, "ses")
 
-        mask_files = layout.get(
+        kwargs = dict(
             scope="derivatives",
             subject=sub_id,
-            session=ses_id,
             task=task,
             suffix="mask",
             extension="nii.gz",
             return_type="file",
         )
+        if ses_id:
+            kwargs.update({"session": ses_id})
+
+        mask_files = layout.get(**kwargs)
 
         mask_files = [mask_file for mask_file in mask_files if space in str(mask_file)]
         subject_mask_files.extend(mask_files)
@@ -991,6 +993,7 @@ def create_difference_maps(
     data_table,
     output_dir,
     task,
+    method,
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
@@ -1014,10 +1017,13 @@ def create_difference_maps(
         placebo_file = placebo_rows["InputFile"].values[0]
 
         prefix = (
-            f"task-{task}_{entity_key}-{first_level_glt_label}"
+            f"{subject}_task-{task}_{entity_key}-{first_level_glt_label}"
             f"_gltcode-{second_level_glt_code}"
         )
-        diff_filename = difference_dir / f"{subject}_{prefix}_desc-difference.nii.gz"
+
+        diff_filename = (
+            difference_dir / f"{prefix}_desc-{method}_difference_betas.nii.gz"
+        )
 
         if afni_img_path:
             cmd = (
@@ -1045,7 +1051,8 @@ def create_difference_maps(
     LGR.info(f"Created {len(diff_table)} difference maps for {second_level_glt_code}")
 
     diff_table.to_csv(
-        output_dir / f"difference_table_gltcode-{second_level_glt_code}.tsv",
+        output_dir
+        / f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-{method}_difference_data_table.tsv",
         sep="\t",
         index=None,
     )
@@ -1248,7 +1255,6 @@ def perform_3dttest(
         f"-prefix {output_filename} "
         f"-resid {residual_filename} "
         "-toz "
-        "-no1sam "
         f"{covariates_str}"
     )
 
@@ -1541,6 +1547,7 @@ def main(
                     data_table,
                     diff_output_dir,
                     task,
+                    method,
                     entity_key,
                     first_level_glt_label,
                     second_level_glt_code,
@@ -1551,6 +1558,23 @@ def main(
                         f"No difference maps created for {second_level_glt_code}"
                     )
                     continue
+
+                LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
+                group_mask_filename = create_group_mask(
+                    dst_dir,
+                    get_layout(bids_dir, deriv_dir),
+                    task,
+                    space,
+                    group_mask_threshold,
+                    diff_data_table["InputFile"].tolist(),
+                    gm_probseg_img_path,
+                    gm_mask_threshold,
+                    apriori_img_path,
+                    method,
+                    entity_key,
+                    first_level_glt_label,
+                    second_level_glt_code=second_level_glt_code,
+                )
 
                 covariates_file = create_covariates_file_for_3dttest(
                     diff_data_table,

@@ -202,7 +202,10 @@ def main(
         cohort, task, analysis_type, caller="identify_cluster_regions"
     )
     first_level_glt_label_list = list(
-        itertools.product(first_level_glt_label, get_second_level_glt_codes(cohort))
+        itertools.product(
+            first_level_glt_label,
+            get_second_level_glt_codes(cohort, add_dose_mg_groups=(cohort == "adults")),
+        )
     )
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
         entity_key = get_contrast_entity_key(first_level_glt_label)

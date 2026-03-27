@@ -15,6 +15,7 @@ from _utils import (
     get_second_level_glt_codes,
     get_nontarget_dose,
     is_between_group_dose_code,
+    get_between_group_code,
     resample_seed_img,
 )
 
@@ -25,7 +26,7 @@ def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description=(
             "Extract the average beta for each cluster at "
-            "the individual level for downstream analysis."
+            "the individual level for downstream analysis. Paper: https://www.nature.com/articles/nn.2303"
         )
     )
     parser.add_argument(
@@ -240,10 +241,9 @@ def get_subject_beta_filenames(
     data_table,
     first_level_glt_label,
     beta_name,
-    input_file_column="InputFile",
     parent_path=None,
 ):
-    subject_beta_filenames = data_table[input_file_column].tolist()
+    subject_beta_filenames = data_table["InputFile"].tolist()
 
     if first_level_glt_label == beta_name:
         return subject_beta_filenames
@@ -292,6 +292,7 @@ def build_between_group_data_table(
     analysis_dir,
     data_table,
     task,
+    method,
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
@@ -301,7 +302,7 @@ def build_between_group_data_table(
         f"_gltcode-{second_level_glt_code}"
     )
     diff_map_files = sorted(
-        list(analysis_dir.rglob(f"*{prefix}_desc-difference.nii.gz"))
+        list(analysis_dir.rglob(f"*{prefix}_desc-{method}_difference_betas.nii.gz"))
     )
 
     if not diff_map_files:
@@ -317,7 +318,6 @@ def build_between_group_data_table(
         if sub_id:
             diff_map_dict[f"sub-{sub_id}"] = str(diff_file)
 
-    mph_rows["OriginalInputFile"] = mph_rows["InputFile"]
     mph_rows = data_table[data_table["dose"].astype(str) == "mph"].copy()
     mph_rows = mph_rows[mph_rows["Subj"].isin(diff_map_dict.keys())].copy()
     mph_rows["InputFile"] = mph_rows["Subj"].map(diff_map_dict)
@@ -370,7 +370,9 @@ def main(
         if cohort == "kids":
             data_table["dose"] = data_table["dose"].astype(int)
 
-        for second_level_glt_code in get_second_level_glt_codes(cohort):
+        for second_level_glt_code in get_second_level_glt_codes(
+            cohort, add_dose_mg_groups=(cohort == "adults")
+        ):
             LGR.info(
                 f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: "
                 f"{first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
@@ -389,7 +391,11 @@ def main(
                 continue
 
             is_between_group = is_between_group_dose_code(second_level_glt_code, cohort)
-            if is_between_group:
+            use_between_logic = (
+                is_between_group
+                or second_level_glt_code in get_between_group_code(cohort)
+            )
+            if use_between_logic:
                 truncated_df = build_between_group_data_table(
                     analysis_dir,
                     data_table,
@@ -404,6 +410,8 @@ def main(
                     )
                     continue
 
+                # between group will use difference maps for computation, these difference maps are only computed at the second level
+                # and is only computed for first_level_glt_label not all labels returned by `get_beta_names`
                 beta_names = [first_level_glt_label]
             else:
                 truncated_df = drop_dose_rows(
@@ -417,9 +425,6 @@ def main(
                     truncated_df,
                     first_level_glt_label,
                     beta_name,
-                    input_file_column=(
-                        "InputFile" if not is_between_group else "OriginalInputFile"
-                    ),
                 )
 
                 if not subject_beta_filenames:
@@ -455,11 +460,6 @@ def main(
                             beta_coefficient_df,
                             first_level_glt_label,
                             glm_beta_name,
-                            input_file_column=(
-                                "InputFile"
-                                if not is_between_group
-                                else "OriginalInputFile"
-                            ),
                             parent_path=glm_dir,
                         )
 

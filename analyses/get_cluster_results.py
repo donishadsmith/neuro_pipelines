@@ -18,6 +18,8 @@ from _utils import (
     get_group_labels,
     get_second_level_glt_codes,
     is_between_group_dose_code,
+    in_between_group_code,
+    get_between_group_code,
     resample_seed_img,
 )
 
@@ -148,20 +150,32 @@ def get_zscore_map_and_mask(
     second_level_glt_code,
 ):
     is_between_group = is_between_group_dose_code(second_level_glt_code, cohort)
-    if is_between_group:
-        stats_filename = next(
-            analysis_dir.rglob(
-                f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}_desc-parametric_stats.nii.gz"
+    try:
+        if is_between_group or in_between_group_code(second_level_glt_code, cohort):
+            between_group_code = get_between_group_code(cohort)
+            stats_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{between_group_code}_desc-parametric_stats.nii.gz"
+                )
             )
-        )
-    else:
-        stats_filename = next(
-            analysis_dir.rglob(
-                f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
+            group_mask_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{between_group_code}_desc-parametric_group_mask.nii.gz"
+                )
             )
-        )
-
-    if not stats_filename:
+        else:
+            stats_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
+                )
+            )
+            group_mask_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_group_mask.nii.gz"
+                )
+            )
+    except StopIteration:
+        LGR.error("Stats or group mask files could not be obtained", exc_info=True)
         return None, None
 
     zcore_map_filename = str(stats_filename).replace(
@@ -171,7 +185,9 @@ def get_zscore_map_and_mask(
 
     index_name = (
         f"{second_level_glt_code} Z"
-        if not is_between_group
+        if not (
+            is_between_group or in_between_group_code(second_level_glt_code, cohort)
+        )
         else f"{second_level_glt_code.replace('_vs_', '-')}_Zscr"
     )
 
@@ -187,12 +203,6 @@ def get_zscore_map_and_mask(
         subprocess.run(cmd, shell=True, check=True)
     except Exception:
         LGR.warning(f"The following command failed: {cmd}", exc_info=True)
-
-    group_mask_filename = next(
-        analysis_dir.rglob(
-            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-group_mask.nii.gz"
-        )
-    )
 
     return Path(zcore_map_filename), group_mask_filename
 
@@ -525,7 +535,10 @@ def main(
         cohort, task, analysis_type, caller="get_cluster_results"
     )
     first_level_glt_label_list = list(
-        itertools.product(first_level_glt_labels, get_second_level_glt_codes(cohort))
+        itertools.product(
+            first_level_glt_labels,
+            get_second_level_glt_codes(cohort, add_dose_mg_groups=(cohort == "adults")),
+        )
     )
 
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
@@ -550,7 +563,7 @@ def main(
             )
             if not zcore_map_filename:
                 LGR.warning(
-                    f"Skipping the following glt code due to stats file not existing: {second_level_glt_code}"
+                    f"Skipping the following glt code due to stats or group mask file not existing: {second_level_glt_code}"
                 )
                 continue
 

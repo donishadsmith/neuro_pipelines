@@ -55,6 +55,10 @@ BETWEEN_GROUP_DOSE_CODES = {
 }
 
 
+def get_between_group_code(cohort):
+    return list(BETWEEN_GROUP_DOSE_CODES.get(cohort))[0]
+
+
 def is_between_group_dose_code(second_level_glt_code, cohort):
     """
     The between contrast is only for the adult cohort. For the kids cohort,
@@ -74,6 +78,13 @@ def is_between_group_dose_code(second_level_glt_code, cohort):
     return second_level_glt_code in BETWEEN_GROUP_DOSE_CODES.get(cohort, {})
 
 
+def in_between_group_code(second_level_glt_code, cohort):
+    if cohort != "adults":
+        return False
+
+    return second_level_glt_code in list(BETWEEN_GROUP_DOSE_CODES.get(cohort, ""))[0]
+
+
 def get_between_group_column(second_level_glt_code, cohort):
     return BETWEEN_GROUP_DOSE_CODES.get(cohort, {}).get(second_level_glt_code)
 
@@ -90,7 +101,11 @@ def get_first_level_gltsym_codes(cohort, task, analysis_type, caller):
     )
 
 
-def get_second_level_glt_codes(cohort):
+def get_second_level_glt_codes(cohort, add_dose_mg_groups=False):
+    if cohort == "adults" and add_dose_mg_groups:
+        codes = list(CONTRAST_CODES[cohort]) + ["10", "15"]
+        return codes
+
     return CONTRAST_CODES[cohort]
 
 
