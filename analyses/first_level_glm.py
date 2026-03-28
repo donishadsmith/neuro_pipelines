@@ -1,3 +1,16 @@
+"""
+Denoising papers:
+    - https://pmc.ncbi.nlm.nih.gov/articles/PMC9506314/
+    - https://pmc.ncbi.nlm.nih.gov/articles/PMC10619396/
+
+- Aggressive denoising strategies can also remove task-signal, strategy should depend on 
+clinical population, type of analysis being done (activation vs connectivity, where in some cases
+connectivity may require more aggressive denoising to ensure that correlation is not due to
+shared nuisance variance), characteristics of data (numerous high-motion participants or 
+mostly low-motion participants), and whether strategies such as strict scrubbing (FD < 0.2) will
+remove a significant amount of frames resulting in either suboptimal estimated beta coefficients
+or too little retainerd participants. There is no optimal denoising strategy for all datasets.
+"""
 import argparse, json, sys
 from pathlib import Path
 
@@ -83,7 +96,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--n_motion_parameters",
         dest="n_motion_parameters",
-        default=12,
+        default=6,
         type=int,
         choices=[6, 12, 18, 24],
         required=False,

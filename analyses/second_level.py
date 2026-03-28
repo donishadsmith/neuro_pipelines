@@ -104,7 +104,11 @@ def _get_cmd_args():
             "cluster-based inference relies on spatially contiguous voxels, it is possible for clusters with the highest "
             "voxel statistical value to be in an apriori region and spread to non-apriori regions. This can result in the cluster  "
             "being deemed insignificant since the cluster extent can be reduced significantly. Recommend the apriori mask to be "
-            "large regions (e.g., networks). Mask should approximately be in the same space as template."
+            "large regions (e.g., networks). Tradeoff is increased sensitivity to clusters in mask via the "
+            "small volume correction approach - 3dclustsim will perform simulations in the mask and output a smaller k threshold "
+            "required for significance while still controlling for false positives "
+            "(https://www.biologicalpsychiatryjournal.com/article/S0006-3223(25)01251-X/fulltext). Mask should approximately be in "
+            "the same space as template."
         ),
     )
     parser.add_argument("--task", dest="task", required=True, help="Name of the task.")
@@ -155,7 +159,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--excluded_covariates",
         dest="excluded_covariates",
-        default=["all"],
+        default=["age", "sex", "race", "ethnicity"],
         required=False,
         nargs="*",
         type=str,

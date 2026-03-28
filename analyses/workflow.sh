@@ -65,7 +65,7 @@ export FILTER_CORRECT_TRIALS=false                       # Filter event-related 
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export EXCLUDED_COVARIATES="all"                        # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all
+export EXCLUDED_COVARIATES="age sex race ethnicity"     # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all covariates. Note, only number of censored volumes varies within person
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
 export EXCLUDE_NIFTI_FILE=""                            # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
