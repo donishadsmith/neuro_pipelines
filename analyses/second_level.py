@@ -486,18 +486,15 @@ def create_group_mask(
         sub_id = get_entity_value(filtered_beta_file, "sub")
         ses_id = get_entity_value(filtered_beta_file, "ses")
 
-        kwargs = dict(
+        mask_files = layout.get(
             scope="derivatives",
             subject=sub_id,
+            session=ses_id,
             task=task,
             suffix="mask",
             extension="nii.gz",
             return_type="file",
         )
-        if ses_id:
-            kwargs.update({"session": ses_id})
-
-        mask_files = layout.get(**kwargs)
 
         mask_files = [mask_file for mask_file in mask_files if space in str(mask_file)]
         subject_mask_files.extend(mask_files)
@@ -1016,8 +1013,9 @@ def create_difference_maps(
         mph_file = mph_rows["InputFile"].values[0]
         placebo_file = placebo_rows["InputFile"].values[0]
 
+        session = get_entity_value(mph_file, "ses")
         prefix = (
-            f"{subject}_task-{task}_{entity_key}-{first_level_glt_label}"
+            f"{subject}_ses-{session}_task-{task}_{entity_key}-{first_level_glt_label}"
             f"_gltcode-{second_level_glt_code}"
         )
 
@@ -1649,6 +1647,7 @@ def main(
                         data_table,
                         output_dir,
                         task,
+                        method,
                         entity_key,
                         first_level_glt_label,
                         second_level_glt_code,
