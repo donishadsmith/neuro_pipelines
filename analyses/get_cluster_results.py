@@ -438,7 +438,7 @@ def plot_thresholded_img(
             / "stat_plots"
             / method
             / (
-                f"task-{task}_{entity_key}-{first_level_code}_gltcode-{second_level_glt_code}"
+                f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
                 f"_displaymode-{mode}_desc-{method}_cluster_plot.png"
             )
         )
