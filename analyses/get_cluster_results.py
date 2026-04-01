@@ -324,10 +324,10 @@ def identify_clusters(
             first_label, second_label = get_group_labels(second_level_glt_code)
 
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"{positive_interpretation}: {first_label}{suffix} > {second_label}{suffix}"
+                f"{first_label}{suffix} > {second_label}{suffix}"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"{positive_interpretation}: {second_label}{suffix} > {first_label}{suffix}"
+                f"{second_label}{suffix} > {first_label}{suffix}"
             )
 
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
