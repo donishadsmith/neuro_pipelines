@@ -3,7 +3,6 @@ from pathlib import Path
 
 from nifti2bids.logging import setup_logger
 
-
 LGR = setup_logger(__name__)
 
 

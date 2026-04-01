@@ -63,11 +63,11 @@ After:
 
 Denoising papers:
     - https://pmc.ncbi.nlm.nih.gov/articles/PMC7978116/
-    
-- Aggressive denoising strategies can also remove task-signal, strategy should depend on 
+
+- Aggressive denoising strategies can also remove task-signal, strategy should depend on
 clinical population, type of analysis being done (activation vs connectivity, where in some cases
 connectivity may require more aggressive denoising to ensure that correlation is not due to
-shared nuisance variance), characteristics of data (numerous high-motion participants or 
+shared nuisance variance), characteristics of data (numerous high-motion participants or
 mostly low-motion participants), and whether strategies such as strict scrubbing (FD < 0.2) will
 remove a significant amount of frames resulting in either suboptimal estimated beta coefficients
 or too little retainerd participants. There is no optimal denoising strategy for all datasets.
@@ -590,26 +590,21 @@ def create_dynamic_deconvolve_gPPI_cmd(
             "errors.1D",
         ]
     else:
-        prefix = task.removesuffix("gng")
         labels_dict = {
             "stims": (
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
-                + f"{prefix}_go ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} "
-                + f"{prefix}_nogo ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_{prefix}_go ",
-                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_{prefix}_nogo ",
+                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_go ",
+                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_nogo ",
                 "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
             ),
             "gltsyms": (
-                f"-gltsym 'SYM: +1*PPI_{prefix}_nogo -1*PPI_{prefix}_go' "
-                + "-glt_label {label} "
-                + f"PPI_{prefix}_nogo_vs_PPI_{prefix}_go ",
+                f"-gltsym 'SYM: +1*PPI_nogo -1*PPI_go' -glt_label {label} PPI_nogo_vs_PPI_go ",
             ),
         }
 
-        files = [f"{prefix}_go.1D", f"{prefix}_nogo.1D", "errors.1D"]
+        files = [f"go.1D", f"nogo.1D", "errors.1D"]
 
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 

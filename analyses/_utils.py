@@ -40,8 +40,8 @@ TASK_CONTRASTS = {
             "incongruent_vs_congruent",
             "nogo_vs_neutral",
         ),
-        "simplegng": ("simple_nogo_vs_simple_go",),
-        "complexgng": ("complex_nogo_vs_complex_go",),
+        "simplegng": ("nogo_vs_go",),
+        "complexgng": ("nogo_vs_go",),
     },
 }
 
