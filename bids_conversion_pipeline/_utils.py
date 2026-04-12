@@ -5,8 +5,8 @@ from typing import Optional
 
 import pandas as pd
 
-from nifti2bids.bids import create_participant_tsv
-from nifti2bids.logging import setup_logger
+from bidsaid.bids import create_participant_tsv
+from bidsaid.logging import setup_logger
 
 from _exceptions import SubjectsVisitsFileError
 

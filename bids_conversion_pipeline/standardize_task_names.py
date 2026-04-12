@@ -2,9 +2,9 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from nifti2bids.io import regex_glob, get_nifti_header
-from nifti2bids.metadata import is_3d_img, infer_task_from_image
-from nifti2bids.logging import setup_logger
+from bidsaid.io import regex_glob, get_nifti_header
+from bidsaid.metadata import is_3d_img, infer_task_from_image
+from bidsaid.logging import setup_logger
 
 LGR = setup_logger(__name__)
 

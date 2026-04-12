@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nifti2bids.bids import get_entity_value
+from bidsaid.bids import get_entity_value
 
 
 def _get_cmd_args():

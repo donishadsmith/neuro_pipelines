@@ -3,7 +3,7 @@ import subprocess
 
 import numpy as np
 
-from nifti2bids.logging import setup_logger
+from bidsaid.logging import setup_logger
 
 LGR = setup_logger(__name__)
 

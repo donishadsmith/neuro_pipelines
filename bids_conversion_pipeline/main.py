@@ -4,10 +4,10 @@ from typing import Literal, Optional
 
 from nibabel.filebasedimages import ImageFileError
 
-from nifti2bids._decorators import check_nifti
-from nifti2bids.io import _copy_file, load_nifti, compress_image, regex_glob
-from nifti2bids.logging import setup_logger
-from nifti2bids.metadata import is_valid_date
+from bidsaid._decorators import check_nifti
+from bidsaid.io import _copy_file, load_nifti, compress_image, regex_glob
+from bidsaid.logging import setup_logger
+from bidsaid.metadata import is_valid_date
 
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline

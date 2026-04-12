@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 from pandas.api.types import is_string_dtype
 
-from nifti2bids.logging import setup_logger
+from bidsaid.logging import setup_logger
 
 from _utils import _create_or_append_participants_tsv
 

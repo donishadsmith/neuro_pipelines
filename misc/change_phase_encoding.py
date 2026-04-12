@@ -2,7 +2,7 @@ import argparse, json
 
 from bids import BIDSLayout
 
-from nifti2bids.metadata import get_image_orientation, direction_to_voxel_axis
+from bidsaid.metadata import get_image_orientation, direction_to_voxel_axis
 
 
 def _get_cmd_args():

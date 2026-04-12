@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np, pandas as pd
 
-from nifti2bids.logging import setup_logger
+from bidsaid.logging import setup_logger
 
 from _denoising import get_col_name, get_new_matrix_and_names, remove_collinear_columns
 

@@ -1,8 +1,8 @@
 import argparse, shutil, traceback
 from pathlib import Path
 
-from nifti2bids.bids import get_entity_value
-from nifti2bids.logging import setup_logger
+from bidsaid.bids import get_entity_value
+from bidsaid.logging import setup_logger
 
 LGR = setup_logger(__name__)
 

@@ -6,9 +6,9 @@ import shutil, subprocess
 import nibabel as nib, numpy as np
 from nilearn.image import new_img_like, resample_to_img
 
-from nifti2bids.bids import get_entity_value
-from nifti2bids.logging import setup_logger
-from nifti2bids.metadata import needs_resampling
+from bidsaid.bids import get_entity_value
+from bidsaid.logging import setup_logger
+from bidsaid.metadata import needs_resampling
 
 LGR = setup_logger(__name__)
 

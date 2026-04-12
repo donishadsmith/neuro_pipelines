@@ -80,10 +80,10 @@ import nibabel as nib, numpy as np, matplotlib.pyplot as plt
 
 import bids, numpy as np, pandas as pd
 
-from nifti2bids._helpers import iterable_to_str
-from nifti2bids.logging import setup_logger
-from nifti2bids.metadata import get_tr, get_n_volumes
-from nifti2bids.qc import (
+from bidsaid._helpers import iterable_to_str
+from bidsaid.logging import setup_logger
+from bidsaid.metadata import get_tr, get_n_volumes
+from bidsaid.qc import (
     compute_n_dummy_scans,
     create_censor_mask,
 )

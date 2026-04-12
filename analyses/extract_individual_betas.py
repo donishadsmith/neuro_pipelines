@@ -3,8 +3,8 @@ from pathlib import Path
 
 import nibabel as nib, numpy as np, pandas as pd
 
-from nifti2bids.bids import get_entity_value
-from nifti2bids.logging import setup_logger
+from bidsaid.bids import get_entity_value
+from bidsaid.logging import setup_logger
 
 from _utils import (
     drop_dose_rows,

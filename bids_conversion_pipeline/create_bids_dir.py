@@ -5,14 +5,14 @@ from typing import Literal, Optional
 
 import pandas as pd
 
-from nifti2bids.io import regex_glob
-from nifti2bids.bids import (
+from bidsaid.io import regex_glob
+from bidsaid.bids import (
     create_bids_file,
     create_dataset_description,
     save_dataset_description,
 )
-from nifti2bids.metadata import is_valid_date
-from nifti2bids.logging import setup_logger
+from bidsaid.metadata import is_valid_date
+from bidsaid.logging import setup_logger
 
 from _utils import (
     _create_or_append_participants_tsv,

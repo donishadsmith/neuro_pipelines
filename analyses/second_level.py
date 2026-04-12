@@ -8,10 +8,10 @@ import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
 from nilearn.image import resample_to_img
 
-from nifti2bids.bids import get_entity_value
-from nifti2bids.logging import setup_logger
-from nifti2bids.io import compress_image
-from nifti2bids.qc import get_n_censored_volumes
+from bidsaid.bids import get_entity_value
+from bidsaid.logging import setup_logger
+from bidsaid.io import compress_image
+from bidsaid.qc import get_n_censored_volumes
 
 from _denoising import remove_collinear_columns
 from _utils import (

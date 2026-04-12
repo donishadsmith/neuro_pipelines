@@ -2,9 +2,9 @@ import copy, json
 from pathlib import Path
 from typing import Literal
 
-import nifti2bids.metadata as bids_meta
-from nifti2bids.io import regex_glob
-from nifti2bids.bids import get_entity_value
+import bidsaid.metadata as bids_meta
+from bidsaid.io import regex_glob
+from bidsaid.bids import get_entity_value
 
 # https://bids-specification.readthedocs.io/en/stable/modality-specific-files/magnetic-resonance-imaging-data.html
 # Note: Metadata obtained from the Philips Exam Cards

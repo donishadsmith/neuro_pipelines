@@ -4,21 +4,21 @@ from datetime import datetime
 
 import numpy as np, pandas as pd
 
-from nifti2bids.parsers import (
+from bidsaid.parsers import (
     load_presentation_log,
     load_eprime_log,
     convert_edat3_to_text,
     get_presentation_log_date,
 )
-from nifti2bids.bids import (
+from bidsaid.bids import (
     PresentationBlockExtractor,
     PresentationEventExtractor,
     EPrimeBlockExtractor,
     add_instruction_timing,
 )
-from nifti2bids.io import _copy_file
-from nifti2bids.logging import setup_logger
-from nifti2bids.metadata import is_valid_date
+from bidsaid.io import _copy_file
+from bidsaid.logging import setup_logger
+from bidsaid.metadata import is_valid_date
 
 LGR = setup_logger(__name__)
 

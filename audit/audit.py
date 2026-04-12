@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from nifti2bids.audit import BIDSAuditor
+from bidsaid.audit import BIDSAuditor
 
 
 def _get_cmd_args():

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nifti2bids.logging import setup_logger
+from bidsaid.logging import setup_logger
 
 from _utils import (
     get_contrast_entity_key,

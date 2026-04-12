@@ -17,9 +17,9 @@ from pathlib import Path
 
 import bids, numpy as np, pandas as pd
 
-from nifti2bids._helpers import iterable_to_str
-from nifti2bids.logging import setup_logger
-from nifti2bids.qc import compute_n_dummy_scans, create_censor_mask
+from bidsaid._helpers import iterable_to_str
+from bidsaid.logging import setup_logger
+from bidsaid.qc import compute_n_dummy_scans, create_censor_mask
 
 from _denoising import (
     get_acompcor_component_names,

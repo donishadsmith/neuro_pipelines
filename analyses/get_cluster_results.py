@@ -9,8 +9,8 @@ from nilearn.plotting import plot_stat_map, plot_roi
 from nilearn.reporting import get_clusters_table
 from scipy.stats import norm
 
-from nifti2bids.logging import setup_logger
-from nifti2bids.parsers import _is_float
+from bidsaid.logging import setup_logger
+from bidsaid.parsers import _is_float
 
 from _utils import (
     get_contrast_entity_key,

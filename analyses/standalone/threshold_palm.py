@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from nifti2bids.logging import setup_logger
+from bidsaid.logging import setup_logger
 from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
