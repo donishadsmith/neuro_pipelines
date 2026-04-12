@@ -3,7 +3,7 @@ from pathlib import Path
 
 import nibabel as nib, numpy as np, pandas as pd
 
-from bidsaid.bids import get_entity_value
+from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
 from _utils import (

@@ -4,7 +4,7 @@ from typing import Literal
 
 import bidsaid.metadata as bids_meta
 from bidsaid.io import regex_glob
-from bidsaid.bids import get_entity_value
+from bidsaid.files import get_entity_value
 
 # https://bids-specification.readthedocs.io/en/stable/modality-specific-files/magnetic-resonance-imaging-data.html
 # Note: Metadata obtained from the Philips Exam Cards

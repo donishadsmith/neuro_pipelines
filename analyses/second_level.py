@@ -8,7 +8,7 @@ import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
 from nilearn.image import resample_to_img
 
-from bidsaid.bids import get_entity_value
+from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 from bidsaid.io import compress_image
 from bidsaid.qc import get_n_censored_volumes

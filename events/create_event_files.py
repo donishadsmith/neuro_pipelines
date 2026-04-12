@@ -10,7 +10,7 @@ from bidsaid.parsers import (
     convert_edat3_to_text,
     get_presentation_log_date,
 )
-from bidsaid.bids import (
+from bidsaid.events import (
     PresentationBlockExtractor,
     PresentationEventExtractor,
     EPrimeBlockExtractor,

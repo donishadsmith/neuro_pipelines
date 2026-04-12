@@ -6,7 +6,7 @@ from typing import Literal, Optional
 import pandas as pd
 
 from bidsaid.io import regex_glob
-from bidsaid.bids import (
+from bidsaid.files import (
     create_bids_file,
     create_dataset_description,
     save_dataset_description,

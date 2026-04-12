@@ -6,7 +6,7 @@ import shutil, subprocess
 import nibabel as nib, numpy as np
 from nilearn.image import new_img_like, resample_to_img
 
-from bidsaid.bids import get_entity_value
+from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 from bidsaid.metadata import needs_resampling
 

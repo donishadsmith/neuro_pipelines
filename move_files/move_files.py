@@ -1,7 +1,7 @@
 import argparse, shutil, traceback
 from pathlib import Path
 
-from bidsaid.bids import get_entity_value
+from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
 LGR = setup_logger(__name__)
