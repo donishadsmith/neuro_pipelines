@@ -18,7 +18,7 @@ from bidsaid.events import (
 )
 from bidsaid.io import _copy_file
 from bidsaid.logging import setup_logger
-from bidsaid.metadata import is_valid_date
+from bidsaid.path_utils import is_valid_date
 
 LGR = setup_logger(__name__)
 

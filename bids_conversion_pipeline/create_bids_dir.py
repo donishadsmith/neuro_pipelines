@@ -11,7 +11,7 @@ from bidsaid.files import (
     create_dataset_description,
     save_dataset_description,
 )
-from bidsaid.metadata import is_valid_date
+from bidsaid.path_utils import is_valid_date
 from bidsaid.logging import setup_logger
 
 from _utils import (

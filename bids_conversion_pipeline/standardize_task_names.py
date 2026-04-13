@@ -3,8 +3,9 @@ from pathlib import Path
 from typing import Literal
 
 from bidsaid.io import regex_glob, get_nifti_header
-from bidsaid.metadata import is_3d_img, infer_task_from_image
 from bidsaid.logging import setup_logger
+from bidsaid.metadata import is_3d_img, infer_task_from_image
+from bidsaid.path_utils import get_file_acquisition_order, sort_by_acquisition_order
 
 LGR = setup_logger(__name__)
 
@@ -32,7 +33,16 @@ def _infer_file_identity(temp_dir: Path, cohort: Literal["kids", "adults"]) -> N
     """
     nifti_files = regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True)
     for nifti_file in nifti_files:
-        if not _pattern_found(_TASK_NAMES_PATTERNS[cohort], nifti_file.name):
+        if "nogo" in nifti_file.name:
+            base_name = nifti_file.name.split("nogo")[0] + "gng"
+            base_name = (
+                f"{base_name}_11_1.nii.gz"
+                if "simplegng" in base_name
+                else f"{base_name}_12_1.nii.gz"
+            )
+            new_filename = nifti_file.parent / base_name
+            nifti_file.rename(new_filename)
+        elif not _pattern_found(_TASK_NAMES_PATTERNS[cohort], nifti_file.name):
             if is_3d_img(nifti_file):
                 # Safety identity check based on voxel sizes for near isotropic mprage32
                 # Note: Protocol doesn't collect fmaps
@@ -61,12 +71,8 @@ def _infer_file_identity(temp_dir: Path, cohort: Literal["kids", "adults"]) -> N
             # MTLE comes before the MTLR hence the acquisition number is important
             # Same for go-nogo, there are two versions with the same number of volumes for the adult data
             if desc.startswith("mtl") or desc.endswith("gng"):
-                # There are cases where there is only a single number followed by
-                # extension hence the _\d+ is optional
-                pattern = r"_(\d+)(?:_\d+)?\.nii\.gz$"
-                # Can be _{acquisition_number}_1.nii.gz or _{acquisition_number}.nii.gz
-                match_str = re.search(pattern, nifti_file.name).group(0)
-                desc += match_str
+                match_str = get_file_acquisition_order(nifti_file.name)
+                desc += f"_{match_str}.nii.gz"
 
                 # Get the name before the acquisition number
                 prefix_filename = str(nifti_file).split(match_str)[0]
@@ -74,6 +80,10 @@ def _infer_file_identity(temp_dir: Path, cohort: Literal["kids", "adults"]) -> N
             else:
                 new_filename = f"{str(nifti_file).split('.nii.gz')[0]}_{desc}.nii.gz"
 
+            new_filename = new_filename.replace("__", "_")
+            nifti_file.rename(new_filename)
+        elif any(x in nifti_file.name.lower() for x in ["mtle", "mtlr"]):
+            new_filename = nifti_file.parent / nifti_file.name.lower()
             nifti_file.rename(new_filename)
 
 
@@ -100,27 +110,7 @@ def _differentiate_filenames(
             for nifti_file in nifti_files
             if _pattern_found(_get_pattern(task), nifti_file.name)
         ]
-
-        # Cant sort due to lexicographical sorting which makes 10 preceed 9.
-        # Solution: create a list of tuples where the first element is the acquisition
-        # number extracted using regex and the second element is the path
-        # Then the sorting of tuples is done on the acquisition numbers
-
-        # Note an alternative could be sorting based on modified or created time;
-        # however; this may not be as reliable on Unix vs Windows
-
-        # There are cases where there is only a single number followed by
-        # extension hence the _\d+ is optional
-        pattern = r"_(\d+)(?:_\d+)?\.nii\.gz$"
-        nii_tuple_list = sorted(
-            [
-                (int(re.search(pattern, str(nifti_file)).group(1)), nifti_file)
-                for nifti_file in nifti_files
-            ]
-        )
-
-        for index, nii_tuple in enumerate(nii_tuple_list):
-            _, nifti_file = nii_tuple
+        for index, nifti_file in enumerate(sort_by_acquisition_order(nifti_files)):
             task_name = task_order_dict[index]
             new_nifti_filename = nifti_file.parent / nifti_file.name.lower().replace(
                 _get_replace_name(nifti_file, task), task_name
@@ -130,7 +120,7 @@ def _differentiate_filenames(
 
 def _get_pattern(task: Literal["mtl", "gng", "nback"]):
     return {
-        "mtl": "(mtl(_neu)?)",
+        "mtl": "(mtl(?!e|r)(_neu)?)",
         "gng": "((simple.*(repeat.*)?)?gng)",
         "nback": "(n([_-])?back)",
     }[task]
