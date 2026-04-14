@@ -121,13 +121,13 @@ def _differentiate_filenames(
 def _get_pattern(task: Literal["mtl", "gng", "nback"]):
     return {
         "mtl": "(mtl(?!e|r)(_neu)?)",
-        "gng": "((simple.*(repeat.*)?)?gng)",
+        "gng": "(((simple.*)?(repeat.*)?)?gng)",
         "nback": "(n([_-])?back)",
     }[task]
 
 
 def _get_replace_name(nifti_file: Path, task: Literal["mtl", "gng", "nback"]):
-    return re.search(_get_pattern(task), nifti_file.name.lower()).group(1)
+    return re.search(_get_pattern(task), nifti_file.name.lower()).group(0)
 
 
 def _differentiate_mtl_filenames(temp_dir: Path) -> None:
