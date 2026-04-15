@@ -294,10 +294,10 @@ def create_dynamic_deconvolve_glm_cmd(timing_dir, nuisance_regressors_file, task
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
             ),
-            "gltsyms": (f"-gltsym 'SYM: +1*nogo -1*go' -glt_label {label} nogo_vs_go",),
+            "gltsyms": ("-gltsym 'SYM: +1*nogo -1*go' -glt_label {label} nogo_vs_go",),
         }
 
-        files = [f"go.1D", f"nogo.1D", "errors.1D"]
+        files = ["go.1D", "nogo.1D", "errors.1D"]
 
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 

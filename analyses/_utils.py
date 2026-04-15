@@ -30,15 +30,21 @@ TASK_CONTRASTS = {
         "flanker": (
             "incongruent_vs_congruent",
             "nogo_vs_neutral",
+            "nogo",
+            "incongruent",
+            "congruent"
         ),
     },
     "adults": {
         "nback": ("2-back_vs_0-back",),
-        "mtle": ("aversive_encoding_vs_neutral_encoding",),
-        "mtlr": ("aversive_retrieval_vs_neutral_retrieval",),
+        "mtle": ("aversive_encoding_vs_neutral_encoding", "neutral_encoding",),
+        "mtlr": ("aversive_retrieval_vs_neutral_retrieval", "neutral_retrieval",),
         "flanker": (
             "incongruent_vs_congruent",
             "nogo_vs_neutral",
+            "nogo",
+            "incongruent",
+            "congruent"
         ),
         "simplegng": ("nogo_vs_go",),
         "complexgng": ("nogo_vs_go",),

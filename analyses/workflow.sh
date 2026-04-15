@@ -136,13 +136,10 @@ fi
 
 [ ${#SUBJECTS_IDS[@]} -eq 0 ] && N_SUBJECTS=$(( $NUM_SUBJECTS -1 )) || N_SUBJECTS=$(( ${#SUBJECTS_IDS[@]} -1 ))
 
-SINGLE_GLT_LABEL_TASKS=("mtle" "mtlr" "princess" "simplegng" "complexgng")
 for CURRENT_TASK in "${TASKS[@]}"; do
     export TASK=$CURRENT_TASK
 
-    if printf "%s\n" "${SINGLE_GLT_LABEL_TASKS[@]}" | grep -qx "$CURRENT_TASK" || [[ $CURRENT_TASK == "nback" && $COHORT == "adults" ]]; then
-        FIRST_LEVEL_GLT_LABELS=("placeholder")
-    elif [[ $CURRENT_TASK == "nback" ]]; then
+    if [[ $CURRENT_TASK == "nback"  && $COHORT == "kids" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
             FIRST_LEVEL_GLT_LABELS=("1-back_vs_center" "2-back_vs_center" "2-back_vs_1-back")
         else
@@ -150,10 +147,19 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         fi
     elif [[ $CURRENT_TASK == "flanker" ]]; then
         if [[ $ANALYSIS_TYPE == "glm" ]]; then
-            FIRST_LEVEL_GLT_LABELS=("incongruent_vs_congruent" "nogo_vs_neutral")
+            FIRST_LEVEL_GLT_LABELS=("incongruent_vs_congruent" "nogo_vs_neutral" "nogo" "incongruent" "congruent")
         else
-            FIRST_LEVEL_GLT_LABELS=("PPI_incongruent_vs_PPI_congruent" "PPI_nogo_vs_PPI_neutral")
+            FIRST_LEVEL_GLT_LABELS=("PPI_incongruent_vs_PPI_congruent" "PPI_nogo_vs_PPI_neutral" "PPI_nogo" "PPI_incongruent" "PPI_congruent")
         fi
+    elif [[ ($CURRENT_TASK == "mtle" || $CURRENT_TASK == "mtlr") && $COHORT == "adults" ]]; then
+        if [[ $CURRENT_TASK == "mtle" ]]; then
+            [[ $ANALYSIS_TYPE == "glm" ]] && FIRST_LEVEL_GLT_LABELS=("aversive_encoding_vs_neutral_encoding" "neutral_encoding") || FIRST_LEVEL_GLT_LABELS=("PPI_aversive_encoding_vs_PPI_neutral_encoding" "PPI_neutral_encoding")
+            
+        else
+            [[ $ANALYSIS_TYPE == "glm" ]] && FIRST_LEVEL_GLT_LABELS=("aversive_retrieval_vs_neutral_retrieval" "neutral_retrieval") || FIRST_LEVEL_GLT_LABELS=("PPI_aversive_retrieval_vs_PPI_neutral_retrieval" "PPI_neutral_retrieval") 
+        fi
+    else
+        FIRST_LEVEL_GLT_LABELS=("placeholder")
     fi
 
     JOB_ID_1=""
@@ -182,7 +188,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =======================================================
     if [ $RUN_SECOND_LEVEL = true ]; then
         for LABEL in ${FIRST_LEVEL_GLT_LABELS[@]}; do
-            [[ $LABEL != "placeholder" ]] && export FIRST_LEVEL_GLT_LABEL=$LABEL && TEXT_STR="FOR $LABEL" || export FIRST_LEVEL_GLT_LABEL="" && TEXT_STR=""
+            [[ $LABEL != "placeholder" ]] && { export FIRST_LEVEL_GLT_LABEL=$LABEL; TEXT_STR="FOR $LABEL"; } || { export FIRST_LEVEL_GLT_LABEL=""; TEXT_STR=""; }
 
             [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_1" || DEPENDENCY_STR=""
             JOB_ID_2=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)

@@ -595,16 +595,16 @@ def create_dynamic_deconvolve_gPPI_cmd(
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_go ",
-                "-stim_file {ppi_file} -stim_label {label} " + f"PPI_nogo ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_go ",
+                "-stim_file {ppi_file} -stim_label {label} PPI_nogo ",
                 "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
             ),
             "gltsyms": (
-                f"-gltsym 'SYM: +1*PPI_nogo -1*PPI_go' -glt_label {label} PPI_nogo_vs_PPI_go ",
+                "-gltsym 'SYM: +1*PPI_nogo -1*PPI_go' -glt_label {label} PPI_nogo_vs_PPI_go ",
             ),
         }
 
-        files = [f"go.1D", f"nogo.1D", "errors.1D"]
+        files = ["go.1D", "nogo.1D", "errors.1D"]
 
     empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
 
