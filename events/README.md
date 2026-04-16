@@ -1,39 +1,48 @@
-# Creating Events
+# Creating Event Files
 
-To create event file, in your create event files, run the following in your preferred terminal:
+## Command Line Interface (CLI)
 
-```bash
-pip install nifti2bids[all]
-```
+### Basic Usage
 
 ```bash
-python create_event_files.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --task nback
+python cli.py --src_dir /path/to/log/files --temp_dir /path/to/temp/dir --dst_dir /path/to/output/dir --task nback
 ```
 
-To run with specific subjects:
+### Restricting to Specific Subjects
 
 ```bash
-python create_event_files.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --task nback --subjects 101 102
+python cli.py --src_dir /path/to/log/files --temp_dir /path/to/temp/dir --dst_dir /path/to/output/dir --task nback --subjects 101 102
 ```
 
-For help:
+### Using a Subjects Visits File
+
+When sessions are missing, a subjects visits file ensures that dates are mapped to the correct session IDs. Pass the file with `--subjects_visits_file` and specify the date format with `--subjects_visits_date_fmt`:
 
 ```bash
-python create_event_files.py --help
+python cli.py --src_dir /path/to/log/files --temp_dir /path/to/temp/dir --dst_dir /path/to/output/dir --task nback --subjects 101 102 --subjects_visits_file /path/to/visits.csv --subjects_visits_date_fmt %m/%d/%Y
 ```
 
-## Subjects Visits File
-When entire sessions are missing, to ensure the dates are mapped to the correct session ID, pass ``--subjects_sessions_file``:
+The file must contain `participant_id` and `date` columns. List all visit dates in chronological order per subject and use `NaN` for missing sessions:
+
+| participant_id | date       |
+|----------------|------------|
+| 101            | 01/02/2022 |
+| 101            | NaN        |
+| 101            | 03/02/2022 |
+| 102            | 01/02/2024 |
+
+### Full Help
 
 ```bash
-python create_event_files.py --src_dir /path/to/src/dir --temp_dir /path/to/temp/dir --bids_dir /path/to/bids/dir --delete_temp_dir True --task nback --subjects 101 102 --subjects_visits_date_fmt %m/%d/%Y --src_data_date_fmt %Y%m%d
+python cli.py --help
 ```
 
-Ensure each participant ID in the file has all of their dates or NaN for missing dates:
+## Streamlit Graphical User Interface (GUI)
 
-| subject | date       |
-|---------|------------|
-| 101     | 01/02/2022 |
-| 101     | NaN        |
-| 101     | 03/02/2022 |
-| 102     | 01/02/2024 |
+For a point-and-click interface, launch the Streamlit app:
+
+```bash
+streamlit run app.py
+```
+
+![image](assets/bids_events_app.png)

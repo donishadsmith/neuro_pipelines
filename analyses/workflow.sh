@@ -154,9 +154,9 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     elif [[ ($CURRENT_TASK == "mtle" || $CURRENT_TASK == "mtlr") && $COHORT == "adults" ]]; then
         if [[ $CURRENT_TASK == "mtle" ]]; then
             [[ $ANALYSIS_TYPE == "glm" ]] && FIRST_LEVEL_GLT_LABELS=("aversive_encoding_vs_neutral_encoding" "neutral_encoding") || FIRST_LEVEL_GLT_LABELS=("PPI_aversive_encoding_vs_PPI_neutral_encoding" "PPI_neutral_encoding")
-            
+
         else
-            [[ $ANALYSIS_TYPE == "glm" ]] && FIRST_LEVEL_GLT_LABELS=("aversive_retrieval_vs_neutral_retrieval" "neutral_retrieval") || FIRST_LEVEL_GLT_LABELS=("PPI_aversive_retrieval_vs_PPI_neutral_retrieval" "PPI_neutral_retrieval") 
+            [[ $ANALYSIS_TYPE == "glm" ]] && FIRST_LEVEL_GLT_LABELS=("aversive_retrieval_vs_neutral_retrieval" "neutral_retrieval") || FIRST_LEVEL_GLT_LABELS=("PPI_aversive_retrieval_vs_PPI_neutral_retrieval" "PPI_neutral_retrieval")
         fi
     else
         FIRST_LEVEL_GLT_LABELS=("placeholder")
