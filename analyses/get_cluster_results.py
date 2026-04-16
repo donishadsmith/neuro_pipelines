@@ -395,7 +395,7 @@ def plot_thresholded_img(
     second_level_glt_code,
     method,
 ):
-    kwargs = {"stat_map_img": thresholded_img}
+    kwargs = {"stat_map_img": thresholded_img, "draw_cross": False}
     if template_img_path:
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
@@ -501,7 +501,7 @@ def create_seed_masks(
 
         nib.save(sphere_mask, sphere_filename)
 
-        display = plot_roi(sphere_filename, bg_img=template_img_path)
+        display = plot_roi(sphere_filename, bg_img=template_img_path, draw_cross=False)
 
         plot_filename = plot_parent_path / sphere_filename.name.replace(
             ".nii.gz", ".png"
