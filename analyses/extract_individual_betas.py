@@ -126,6 +126,7 @@ def save_tabular_data(
     method,
     cluster_mask_filename,
     first_level_glt_label,
+    second_level_glt_code,
     beta_name,
     add_condition_entity_key,
     save_excel_version,
@@ -134,6 +135,7 @@ def save_tabular_data(
         dst_dir
         / "individual_betas_files"
         / method
+        / second_level_glt_code
         / cluster_mask_filename.name.replace(
             "cluster_mask.nii.gz", "individual_betas.csv"
         )
@@ -522,6 +524,7 @@ def main(
                         method,
                         cluster_mask_filename,
                         first_level_glt_label,
+                        second_level_glt_code,
                         beta_name,
                         add_condition_entity_key,
                         save_excel_version,
