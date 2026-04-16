@@ -140,7 +140,6 @@ if st.button("Run Pipeline"):
         st.error("Please select a source directory before running.")
     elif not st.session_state.subjects_visits_file:
         st.error("Please upload a subjects visits file before running.")
-
     else:
         with st.spinner("Processing..."):
             dst_dir = run_pipeline(**kwargs)
