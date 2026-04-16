@@ -136,6 +136,7 @@ def save_tabular_data(
         / "individual_betas_files"
         / method
         / second_level_glt_code
+        / first_level_glt_label
         / cluster_mask_filename.name.replace(
             "cluster_mask.nii.gz", "individual_betas.csv"
         )
