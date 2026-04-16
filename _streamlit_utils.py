@@ -10,6 +10,7 @@ def _select_content(content):
         folder = filedialog.askdirectory(master=window)
     else:
         folder = filedialog.askopenfilename(master=window)
+
     window.destroy()
 
     return folder

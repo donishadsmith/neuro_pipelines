@@ -92,11 +92,7 @@ python cli/bids_conversion_cli.py \
 For a point-and-click interface, launch the Streamlit app:
 
 ```bash
-streamlit run app.py
+streamlit run bids_app.py
 ```
 
 The app provides pages for each pipeline step: BIDS Conversion, Participants TSV, and Add Dosages.
-
-![image](assets/bids_conversion_app.png)
-![image](assets/participants_tsv_app.png)
-![image](assets/add_dosages_app.png)

@@ -1,23 +1,16 @@
-import streamlit as st, tkinter as tk
-from tkinter import filedialog
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "connors"))
+
+import streamlit as st
+
+from _streamlit_utils import _select_content
 
 from get_connors_score import run_pipeline
 
 st.title("Connors 4 Score Extraction App")
-
-
-def _select_content(content):
-    window = tk.Tk()
-    window.withdraw()
-    window.wm_attributes("-topmost", 1)
-    if content == "directory":
-        folder = filedialog.askdirectory(master=window)
-    else:
-        folder = filedialog.askopenfilename(master=window)
-    window.destroy()
-
-    return folder
-
 
 st.markdown("**Required Arguments**")
 

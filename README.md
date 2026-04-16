@@ -43,6 +43,13 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+#### Run Streamlit App Hub
+```bash
+streamlit run streamlit_app_hub.py
+```
+
+![image](assets/hub.png)
+
 ### HPC (Conda)
 
 ```bash

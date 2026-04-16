@@ -1,25 +1,16 @@
+import sys
 from pathlib import Path
 
-import streamlit as st, tkinter as tk
-from tkinter import filedialog
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "events"))
+
+import streamlit as st
 
 from create_event_files import run_pipeline
 
+from _streamlit_utils import _select_content
+
 st.title("BIDS Events File App")
-
-
-def _select_content(content):
-    window = tk.Tk()
-    window.withdraw()
-    window.wm_attributes("-topmost", 1)
-    if content == "directory":
-        folder = filedialog.askdirectory(master=window)
-    else:
-        folder = filedialog.askopenfilename(master=window)
-    window.destroy()
-
-    return folder
-
 
 st.markdown("**Required Arguments**")
 
