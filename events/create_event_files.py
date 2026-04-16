@@ -356,7 +356,6 @@ def _create_gng_events_files(
     exclude_filenames,
 ):
     task_name = "SimpleRepeatGNG" if task == "simplegng" else "RepeatSimpleGNG"
-    prefix = "simple" if task == "simplegng" else "complex"
     log_files = _filter_log_files(
         temp_dir.glob(f"*{task_name}*.log"), subjects, exclude_filenames
     )
@@ -423,10 +422,6 @@ def _create_gng_events_files(
             ] = "Nogo"
 
         event_df["trial_type"] = event_df["trial_type"].apply(lambda x: x.lower())
-        event_df["trial_type"] = event_df["trial_type"].replace(
-            {"go": f"{prefix}_go", "nogo": f"{prefix}_nogo"}
-        )
-
         event_df["trial_type_accuracy"] = (
             event_df["trial_type"].astype(str) + "_" + event_df["accuracy"].astype(str)
         )
