@@ -12,7 +12,9 @@ st.title("Participants TSV")
 
 st.markdown("**Required Arguments**")
 
-if st.button("Browse for BIDS directory"):
+if st.button(
+    "Browse for BIDS directory", help="Directory containing the BIDS-compliant dataset."
+):
     folder = _select_content("directory")
     if folder:
         st.session_state.bids_dir = folder

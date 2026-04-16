@@ -23,7 +23,10 @@ def _select_content(content):
 
 st.markdown("**Required Arguments**")
 
-if st.button("Browse for source directory"):
+if st.button(
+    "Browse for source directory",
+    help="Directory containing the log files for the specified task.",
+):
     folder = _select_content("directory")
     if folder:
         st.session_state.src_dir = folder
@@ -49,7 +52,8 @@ if st.button(
     help=(
         "A CSV or Excel file mapping subjects to visit dates and dosages. "
         "Must contain 'participant_id', 'date', and 'dose' columns. "
-        "List dates in chronological order per subject and use NaN for missing sessions."
+        "List dates in chronological order per subject and use NaN for missing sessions. "
+        "Do not include unwanted subject dates in order to skip them."
     ),
 ):
     file = _select_content("file")
