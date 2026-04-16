@@ -109,7 +109,8 @@ def _get_cmd_args() -> argparse.ArgumentParser:
             "Path to a CSV or Excel file mapping subjects to visit dates. "
             "Must contain 'participant_id' and 'date' columns. "
             "Dates should be listed in chronological order per subject. "
-            "Use NaN for missing sessions. Include a 'dose' column to add dosages to the sessions TSV."
+            "Use NaN for missing sessions. Include a 'dose' column to add dosages to the sessions TSV. "
+            "Do not include unwanted subject dates in order to skip them."
         ),
     )
     parser.add_argument(
