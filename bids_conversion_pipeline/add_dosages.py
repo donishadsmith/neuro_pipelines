@@ -1,6 +1,5 @@
 """Standalone function when BIDS directory is created and sessions TSV file exists"""
 
-import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -9,7 +8,7 @@ import pandas as pd
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
-from _utils import (
+from _bids_conversion_utils import (
     _check_subjects_visits_file,
     _extract_subjects_visits_data,
     _standardize_dates,
@@ -19,52 +18,7 @@ from _utils import (
 LGR = setup_logger(__name__)
 
 
-def _get_cmd_args() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Add dosage information to a sessions TSV file."
-    )
-    parser.add_argument(
-        "--bids_dir", dest="bids_dir", required=True, help="The BIDS directory."
-    )
-    parser.add_argument(
-        "--subjects",
-        dest="subjects",
-        required=False,
-        nargs="+",
-        default=None,
-        help="The subject IDs in the 'src_dir' to convert to BIDS.",
-    )
-    parser.add_argument(
-        "--subjects_visits_file",
-        dest="subjects_visits_file",
-        required=True,
-        help=(
-            "A text file, where the 'participant_id' contaims the subject ID and the "
-            "'date' column is the date of visit. Using this parameter is recommended "
-            "when data is missing. Ensure all dates have a consistent format. "
-            "**All subject visit dates should be listed.** If a 'dose' column is included, "
-            "then dosages will be included in the sessions TSV file."
-        ),
-    )
-    parser.add_argument(
-        "--subjects_visits_date_fmt",
-        dest="subjects_visits_date_fmt",
-        required=False,
-        default=r"%m/%d/%Y",
-        help=("The format of the date in ``subjects_visits_file``."),
-    )
-    parser.add_argument(
-        "--sessions_tsv_date_fmt",
-        dest="sessions_tsv_date_fmt",
-        required=False,
-        default=r"%y%m%d",
-        help=("The format of the date in the sessions TSV files."),
-    )
-
-    return parser
-
-
-def add_dosages_to_sessions_tsv(
+def run_pipeline(
     bids_dir: str,
     subjects_visits_file: str | Path,
     subjects: list[str],
@@ -128,8 +82,3 @@ def add_dosages_to_sessions_tsv(
             sessions_tsv_df.at[row_id, "dose"] = dose
 
         sessions_tsv_df.to_csv(sessions_tsv_file, sep="\t", index=False)
-
-
-if __name__ == "__main__":
-    args = _get_cmd_args().parse_args()
-    add_dosages_to_sessions_tsv(**vars(args))

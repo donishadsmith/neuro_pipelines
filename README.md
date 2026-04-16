@@ -1,37 +1,49 @@
-Neuroimaging pipelines tailored for specific tasks and scan protocols for a multi-session, pharmacological fMRI study.
+# Neuro Pipelines
 
-**Requires >=Python3.10**
+Neuroimaging pipelines tailored for specific tasks and scan protocols in a multi-session, pharmacological fMRI study.
 
-Files related to:
-- Converting dataset to BIDS format
-- Creating event (timing) files
-- Preprocessing data
-- Performing first level and second level analyses (GLM and gPPI)
-- Additional miscellaneous files
+**Requires Python 3.10+**
 
-To get the required packages on local workstation. In your preferred terminal:
+## Available Tools
+
+- BIDS conversion
+- Event (timing) file creation
+- Preprocessing
+- First and second level analyses (GLM and gPPI)
+- Miscellaneous utilities
+
+## Installation
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/donishadsmith/neuro_pipelines
 cd neuro_pipelines
+```
+
+### Local Workstation
+
+Install packages directly:
+
+```bash
 pip install -r requirements.txt
 ```
 
-To use a virtual environment on your local workstation:
+Or use a virtual environment:
 
 ```bash
 python -m venv venv
 
-# For Linux
+# Linux
 source venv/bin/activate
 
-# For Windows
+# Windows
 venv\Scripts\activate
 
 pip install -r requirements.txt
 ```
 
-To create a virtual environment on the HPC:
+### HPC (Conda)
 
 ```bash
 conda create -n venv python=3.10

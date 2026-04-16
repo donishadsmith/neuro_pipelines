@@ -1,4 +1,3 @@
-import argparse
 from pathlib import Path
 
 import pandas as pd
@@ -6,35 +5,9 @@ from pandas.api.types import is_string_dtype
 
 from bidsaid.logging import setup_logger
 
-from _utils import _create_or_append_participants_tsv
+from _bids_conversion_utils import _create_or_append_participants_tsv
 
 LGR = setup_logger(__name__)
-
-
-def _get_cmd_args():
-    parser = argparse.ArgumentParser(
-        description="Create or append participants TSV in BIDS directory."
-    )
-    parser.add_argument(
-        "--bids_dir", dest="bids_dir", required=True, help="The BIDS directory."
-    )
-    parser.add_argument(
-        "--demographics_file",
-        dest="demographics_file",
-        required=False,
-        default=None,
-        help="A demographics file, subject IDs should be in a column names `participant_id`.",
-    )
-    parser.add_argument(
-        "--covariates_to_add",
-        dest="covariates_to_add",
-        required=False,
-        default=None,
-        nargs="+",
-        help="Names of the covariates from the demographics file.",
-    )
-
-    return parser
 
 
 def _get_demographic_df(demographics_file):
@@ -90,7 +63,7 @@ def _check_new_categories(participant_df, covariate, covariate_values):
             )
 
 
-def main(bids_dir, demographics_file, covariates_to_add) -> None:
+def run_pipeline(bids_dir, demographics_file, covariates_to_add) -> None:
     if demographics_file and not covariates_to_add:
         raise ValueError(
             "`covariates_to_add` must be specified when `demographics_file` is used."
@@ -136,8 +109,3 @@ def main(bids_dir, demographics_file, covariates_to_add) -> None:
 
     participant_df.columns = [col.lower() for col in participant_df.columns]
     participant_df.to_csv(bids_dir / "participants.tsv", sep="\t", index=None)
-
-
-if __name__ == "__main__":
-    args = _get_cmd_args().parse_args()
-    main(**vars(args))

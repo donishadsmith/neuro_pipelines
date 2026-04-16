@@ -1,4 +1,4 @@
-import argparse, os, re, shutil, tempfile
+import os, re, shutil, tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -22,95 +22,6 @@ from bidsaid.path_utils import is_valid_date
 
 LGR = setup_logger(__name__)
 
-
-def _get_cmd_args():
-    parser = argparse.ArgumentParser(description="Create BIDs compliant events files.")
-    parser.add_argument(
-        "--src_dir",
-        dest="src_dir",
-        required=True,
-        help="Path to directory containing neurobehavioral log data.",
-    )
-    parser.add_argument(
-        "--dst_dir",
-        dest="dst_dir",
-        required=True,
-        help="Path to destination directory to output event files to.",
-    )
-    parser.add_argument(
-        "--temp_dir",
-        dest="temp_dir",
-        required=True,
-        help="Path to a temporary directory to use.",
-    )
-    parser.add_argument(
-        "--cohort",
-        dest="cohort",
-        required=False,
-        default="kids",
-        choices=["kids", "adults"],
-        help="Name of cohort.",
-    )
-    parser.add_argument(
-        "--task",
-        dest="task",
-        required=True,
-        help="The name of the task (i.e., 'nback', 'flanker', 'mtle', 'mtlr', 'princess')",
-    )
-    parser.add_argument(
-        "--subjects",
-        dest="subjects",
-        required=False,
-        default=None,
-        nargs="+",
-        help="The ID of the subject without 'sub-'.",
-    )
-    parser.add_argument(
-        "--minimum_file_size",
-        dest="minimum_file_size",
-        required=False,
-        default=None,
-        help="The minimum file size in bytes to ignore error files.",
-    )
-    # Extracting the file creation or modification date is not reliable across OS platforms and due to copying
-    parser.add_argument(
-        "--subjects_visits_file",
-        dest="subjects_visits_file",
-        required=False,
-        default=True,
-        type=str,
-        help=(
-            "A text file, where the 'subject_id' contains the subject ID and the "
-            "'date' column is the date of visit. Ensure all dates have a consistent format. "
-            "**All subject visit dates should be listed in order.** "
-            "**Can exclude dates listed in ``exclude_src_folder_names`` but its not mandatory**."
-        ),
-    )
-    # This must be supplied for reliability, parsing dates works for the subject folder names
-    # but is too unpredictable for the event file names
-    parser.add_argument(
-        "--subjects_visits_date_fmt",
-        dest="subjects_visits_date_fmt",
-        required=False,
-        default=r"%#m/%#d/%Y",
-        help=(
-            "The format of the date in the ``subjects_visits_file`` file."
-            "**If using an Excel file, the date format may change to '%Y-%m-%d' "
-            "even if using the '%#m/%#d/%Y' format."
-        ),
-    )
-    parser.add_argument(
-        "--exclude_filenames",
-        dest="exclude_filenames",
-        required=False,
-        default=None,
-        nargs="+",
-        help="Exclude specific filenames (i.e., 101_nback.txt)",
-    )
-
-    return parser
-
-
 FILE_SIZE_MINIMUM_KB = {
     "kids": {"flanker": 40, "mtle": 5, "mtlr": 5, "princess": 50, "nback": 40},
     "adults": {
@@ -127,7 +38,28 @@ FILE_SIZE_MINIMUM_KB = {
 class SubjectsVisitsFileError(Exception):
     """Exception for issues with the subjects sessions file."""
 
-    pass
+
+def _resolve_directories(dst_dir, temp_dir):
+    if not dst_dir:
+        dst_dir = Path().home() / "BIDS_Events"
+    else:
+        dst_dir = Path(dst_dir)
+
+    if not dst_dir.exists():
+        dst_dir.mkdir()
+
+    use_tempfile = bool(temp_dir)
+    temp_dir = temp_dir or tempfile.TemporaryDirectory().name
+    temp_dir = Path(temp_dir)
+    if not temp_dir.exists():
+        temp_dir.mkdir()
+    elif temp_dir.exists() and not use_tempfile:
+        raise FileExistsError(
+            "The temporary directory exists; either choose another name or "
+            f"delete the following directory: {temp_dir}"
+        )
+
+    return dst_dir, temp_dir
 
 
 def _filter_log_files(log_files, subjects, exclude_filenames):
@@ -860,10 +792,11 @@ EVENTS_FUNC = {
 }
 
 
-def main(
+def run_pipeline(
     src_dir,
     dst_dir,
     temp_dir,
+    delete_temp_dir,
     task,
     cohort,
     subjects,
@@ -881,13 +814,7 @@ def main(
         _check_subjects_visits_file(subjects_visits_file)
 
     src_dir = Path(src_dir)
-    dst_dir = Path(dst_dir)
-    if not dst_dir.exists():
-        dst_dir.mkdir()
-
-    temp_dir = Path(temp_dir)
-    if not temp_dir.exists():
-        temp_dir.mkdir()
+    dst_dir, temp_dir = _resolve_directories(dst_dir, temp_dir)
 
     if subjects:
         subjects = _strip_entity(subjects)
@@ -910,10 +837,7 @@ def main(
         _copy_event_files(src_dir, temp_dir, cohort, task, minimum_file_size)
         EVENTS_FUNC[cohort][task](**kwargs)
     finally:
-        shutil.rmtree(temp_dir)
+        if delete_temp_dir:
+            shutil.rmtree(temp_dir)
 
-
-if __name__ == "__main__":
-    cmd_args = _get_cmd_args()
-    args = cmd_args.parse_args()
-    main(**vars(args))
+    return dst_dir

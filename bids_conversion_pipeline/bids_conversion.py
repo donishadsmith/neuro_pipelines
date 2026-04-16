@@ -1,4 +1,4 @@
-import argparse, tempfile, shutil, sys
+import tempfile, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -12,141 +12,32 @@ from bidsaid.path_utils import is_valid_date
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
-from _utils import _check_subjects_visits_file, _strip_entity
+from _bids_conversion_utils import _check_subjects_visits_file, _strip_entity
 
 LGR = setup_logger(__name__)
 
 
-def _get_cmd_args() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Pipeline to convert dataset to BIDS.")
-    parser.add_argument(
-        "--src_dir",
-        dest="src_dir",
-        required=True,
-        help=(
-            "Source directory containing original data where NIfTI files "
-            "are stored in folders with the following format {participant_id}_{date}."
-        ),
-    )
-    parser.add_argument(
-        "--temp_dir",
-        dest="temp_dir",
-        required=False,
-        default=None,
-        help="Temporary directory to store intermediate content in.",
-    )
-    parser.add_argument(
-        "--bids_dir", dest="bids_dir", required=True, help="The BIDS directory."
-    )
-    parser.add_argument(
-        "--subjects",
-        dest="subjects",
-        required=False,
-        nargs="+",
-        default=None,
-        help="The subject IDs in the 'src_dir' to convert to BIDS.",
-    )
-    parser.add_argument(
-        "--exclude_src_folder_names",
-        dest="exclude_src_folder_names",
-        required=False,
-        nargs="+",
-        default=None,
-        help="Names of the source folders to exclude (i.e., 101_1111).",
-    )
-    parser.add_argument(
-        "--exclude_nifti_filenames",
-        dest="exclude_nifti_filenames",
-        required=False,
-        nargs="+",
-        default=None,
-        help="Names of the NIfTI filenames to exclude (i.e., 101_4444.nii).",
-    )
-    parser.add_argument(
-        "--delete_temp_dir",
-        dest="delete_temp_dir",
-        required=False,
-        default=True,
-        type=_convert_to_bool,
-        help="Deletes the temporary directory.",
-    )
-    parser.add_argument(
-        "--cohort",
-        dest="cohort",
-        required=False,
-        default="kids",
-        choices=["kids", "adults"],
-        help="The cohort if dataset is 'mph' (i.e., kids and adult).",
-    )
-    parser.add_argument(
-        "--create_dataset_metadata",
-        dest="create_dataset_metadata",
-        required=False,
-        default=False,
-        type=_convert_to_bool,
-        help=(
-            "Creates the participant TSV and the dataset description JSON. "
-            "If a TSV file is already present in ``bids_dir``, appends the new subject IDs to it. "
-            "Also skips the dataset description JSON if detected in ``bids_dir``."
-            "**Keep false if running pipeline in parallel to prevent race condition issues.**"
-        ),
-    )
-    parser.add_argument(
-        "--add_sessions_tsv",
-        dest="add_sessions_tsv",
-        required=False,
-        default=False,
-        type=_convert_to_bool,
-        help=(
-            "Add basic sessions TSV file containing the session "
-            "and scan date in BIDS folder for each subject. "
-        ),
-    )
-    # Extracting the file creation or modification date may not be very reliable
-    parser.add_argument(
-        "--subjects_visits_file",
-        dest="subjects_visits_file",
-        required=True,
-        type=str,
-        help=(
-            "A text file, where the 'participant_id' contaims the subject ID and the "
-            "'date' column is the date of visit. Ensure all dates have a consistent format. "
-            "**All subject visit dates should be listed AND dates should be in order from earliest to latest.** "
-            "**Can exclude dates listed in ``exclude_src_folder_names`` but its not mandatory**."
-            "If a 'dose' column is included, then dosages will be included in the sessions TSV file."
-        ),
-    )
-    parser.add_argument(
-        "--subjects_visits_date_fmt",
-        dest="subjects_visits_date_fmt",
-        required=False,
-        default=r"%m/%d/%Y",
-        help=(
-            "The format of the date in the ``subjects_visits_file`` file."
-            "**If using an Excel file, the date format may change to '%Y-%m-%d' "
-            "even if using the '%m/%d/%Y' format."
-        ),
-    )
-    parser.add_argument(
-        "--src_data_date_fmt",
-        dest="src_data_date_fmt",
-        required=False,
-        default=r"%y%m%d",
-        help=(
-            "The format of the dates in the filenames that are in the source directory."
-        ),
-    )
-
-    return parser
-
-
-def _convert_to_bool(arg: bool | str) -> bool:
-    if str(arg).lower() == "true":
-        return True
-    elif str(arg).lower() == "false":
-        return False
+def _resolve_directories(bids_dir, temp_dir):
+    if not bids_dir:
+        bids_dir = Path().home() / "BIDS_Dataset"
     else:
-        raise ValueError("For booleans only True and False are valid.")
+        bids_dir = Path(bids_dir)
+
+    if not bids_dir.exists():
+        bids_dir.mkdir()
+
+    use_tempfile = bool(temp_dir)
+    temp_dir = temp_dir or tempfile.TemporaryDirectory().name
+    temp_dir = Path(temp_dir)
+    if not temp_dir.exists():
+        temp_dir.mkdir()
+    elif temp_dir.exists() and not use_tempfile:
+        raise FileExistsError(
+            "The temporary directory exists; either choose another name or "
+            f"delete the following directory: {temp_dir}"
+        )
+
+    return bids_dir, temp_dir
 
 
 def _filter_subjects(
@@ -265,7 +156,7 @@ def _copy_data_to_temp_dir(
             _copy_nifti_files(nifti_file, temp_dir)
 
 
-def main(
+def run_pipeline(
     src_dir: str,
     temp_dir: str,
     bids_dir: str,
@@ -279,25 +170,14 @@ def main(
     subjects_visits_file: str,
     subjects_visits_date_fmt: str,
     src_data_date_fmt: str,
-) -> None:
+) -> Path:
     try:
         if (cohort := cohort.lower()) not in ["kids", "adults"]:
             raise ValueError("'--cohort' must be 'kids' or 'adults'.")
 
         _check_subjects_visits_file(subjects_visits_file, dose_column_required=False)
 
-        # Create temporary directory with compressed files
-        temp_dir = temp_dir or tempfile.TemporaryDirectory().name
-        temp_dir: Path = Path(temp_dir)
-        if not temp_dir.exists():
-            temp_dir.mkdir()
-        else:
-            raise FileExistsError(
-                "The temporary directory exists; either choose another name or "
-                f"delete the following directory: {temp_dir}"
-            )
-
-        bids_dir = Path(bids_dir)
+        bids_dir, temp_dir = _resolve_directories(bids_dir, temp_dir)
 
         if subjects:
             subjects = _strip_entity(subjects)
@@ -332,7 +212,4 @@ def main(
         if delete_temp_dir and (isinstance(temp_dir, Path) and temp_dir.exists()):
             shutil.rmtree(temp_dir)
 
-
-if __name__ == "__main__":
-    args = _get_cmd_args().parse_args()
-    main(**vars(args))
+    return bids_dir
