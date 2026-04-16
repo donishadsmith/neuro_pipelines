@@ -290,7 +290,7 @@ def create_dynamic_deconvolve_glm_cmd(timing_dir, nuisance_regressors_file, task
     else:
         labels_dict = {
             "stims": (
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go "
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
             ),
