@@ -450,10 +450,7 @@ def main(
                         analysis_type=analysis_type,
                     )
 
-                    if "_vs_" in beta_name:
-                        continue
-
-                    if analysis_type == "gPPI" and glm_dir:
+                    if "_vs_" not in beta_name and analysis_type == "gPPI" and glm_dir:
                         glm_beta_name = beta_name.removeprefix("PPI_")
 
                         glm_subject_beta_filenames = get_subject_beta_filenames(
