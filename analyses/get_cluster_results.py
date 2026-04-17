@@ -426,7 +426,7 @@ def plot_thresholded_img(
             f"GROUP CONTRAST: {first_group} > {second_group}"
         )
 
-    for mode in ["ortho", "x", "y", "z"]:
+    for mode in ["ortho", "x", "y", "z", "mosaic"]:
         display = plot_stat_map(**kwargs, display_mode=mode)
 
         display.title(title, bgcolor="black", color="white", size=10)
