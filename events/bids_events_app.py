@@ -19,10 +19,10 @@ st.markdown("""
 **% is a placeholder prefix and must be included when inputing the date format for the subject visits CSV**
 **(copy and paste the relevant format after ->).**
 
-- 2025-01-02 -> %Y-%m-%d\n
-- 01/02/2025 -> %m/%d/%Y or %#m/%#d/%Y\n
-- 01/02/25 -> %m/%d/%y\n
-- 20250102 -> %y%m%d\n
+- 2025-01-02 -> %Y-%m-%d
+- 01/02/2025 -> %m/%d/%Y or %#m/%#d/%Y
+- 01/02/25 -> %m/%d/%y
+- 20250102 -> %y%m%d
 
 **If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**\n
 
