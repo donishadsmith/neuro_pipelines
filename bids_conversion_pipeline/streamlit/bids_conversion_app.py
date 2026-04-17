@@ -2,7 +2,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline")
+)
 
 import streamlit as st
 
@@ -55,12 +57,14 @@ subjects_visits_date_fmt = st.text_input(
         "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
     ),
 )
+subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
 
 src_data_date_fmt = st.text_input(
     "Date format in the source folder names",
     r"%y%m%d",
     help="The date format used in the source directory folder names (e.g., %y%m%d).",
 )
+src_data_date_fmt = src_data_date_fmt.strip()
 
 st.markdown("**Optional Arguments**")
 

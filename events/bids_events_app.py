@@ -62,6 +62,7 @@ subjects_visits_date_fmt = st.text_input(
         "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
     ),
 )
+subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
 
 st.markdown("**Optional Arguments**")
 

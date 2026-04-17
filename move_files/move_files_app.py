@@ -31,7 +31,7 @@ if st.session_state.get("src_dir"):
     st.success(f"Source: {st.session_state.src_dir}")
 
 if st.button(
-    "Browse for source directory",
+    "Browse for BIDS directory",
     help="The BIDS directory to move the BIDS-compliant to.",
 ):
     folder = _select_content("directory")
@@ -43,7 +43,7 @@ if st.session_state.get("bids_dir"):
 
 kwargs = {
     "src_dir": st.session_state.get("src_dir"),
-    "bids_dir": st.session_state.get("bids_dir")
+    "bids_dir": st.session_state.get("bids_dir"),
 }
 
 if st.button("Run Pipeline"):
@@ -57,5 +57,5 @@ if st.button("Run Pipeline"):
 
         st.success(
             "Files moved to thier respective subject subdirectories "
-            f"at the following BIDS parent directory: {st.session_state.get("bids_dir")}"
+            f"at the following BIDS parent directory: {st.session_state.get('bids_dir')}"
         )

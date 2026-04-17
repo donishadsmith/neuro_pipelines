@@ -49,12 +49,14 @@ subjects_visits_date_fmt = st.text_input(
     r"%m/%d/%Y",
     help="The date format used in the subjects visits file (e.g., %m/%d/%Y).",
 )
+subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
 
 sessions_tsv_date_fmt = st.text_input(
     "Date format in the sessions TSV files",
     r"%y%m%d",
     help="The date format used in existing sessions TSV files (e.g., %y%m%d).",
 )
+sessions_tsv_date_fmt = sessions_tsv_date_fmt.strip()
 
 st.markdown("**Optional Arguments**")
 
