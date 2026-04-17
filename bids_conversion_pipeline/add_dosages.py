@@ -29,7 +29,7 @@ def run_pipeline(
         subjects_visits_file, dose_column_required=True, return_df=True
     )
     subjects_visits_df["date"] = _standardize_dates(
-        subjects_visits_df["date"], subjects_visits_date_fmt
+        subjects_visits_df["date"].tolist(), subjects_visits_date_fmt
     )
 
     sessions_tsv_list = Path(bids_dir).rglob("*sessions.tsv")

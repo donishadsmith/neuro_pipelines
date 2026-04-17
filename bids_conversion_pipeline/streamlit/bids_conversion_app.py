@@ -57,14 +57,14 @@ subjects_visits_date_fmt = st.text_input(
         "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
     ),
 )
-subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
+subjects_visits_date_fmt = rf"{subjects_visits_date_fmt.strip()}"
 
 src_data_date_fmt = st.text_input(
     "Date format in the source folder names",
     r"%y%m%d",
     help="The date format used in the source directory folder names (e.g., %y%m%d).",
 )
-src_data_date_fmt = src_data_date_fmt.strip()
+src_data_date_fmt = rf"{src_data_date_fmt.strip()}"
 
 st.markdown("**Optional Arguments**")
 

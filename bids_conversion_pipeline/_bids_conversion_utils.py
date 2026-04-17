@@ -57,6 +57,7 @@ def _create_or_append_participants_tsv(
 
 
 def _standardize_dates(dates: list[str | int | float], fmt: str) -> list[str | float]:
+    dates = [str(x).strip().split(" ")[0] for x in dates]
     convert_date = lambda date: (
         datetime.strptime(str(date), fmt).strftime(fmt)
         if not str(date).lower() == "nan"  # Check for the NaN case

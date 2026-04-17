@@ -43,20 +43,22 @@ if st.button(
 if st.session_state.get("subjects_visits_file"):
     st.success(f"Visits File: {st.session_state.subjects_visits_file}")
 
-
 subjects_visits_date_fmt = st.text_input(
     "Date format in the subjects visits file",
     r"%m/%d/%Y",
-    help="The date format used in the subjects visits file (e.g., %m/%d/%Y).",
+    help=(
+        "The date format used in the subjects visits file (e.g., %m/%d/%Y). "
+        "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
+    ),
 )
-subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
+subjects_visits_date_fmt = rf"{subjects_visits_date_fmt.strip()}"
 
 sessions_tsv_date_fmt = st.text_input(
     "Date format in the sessions TSV files",
     r"%y%m%d",
     help="The date format used in existing sessions TSV files (e.g., %y%m%d).",
 )
-sessions_tsv_date_fmt = sessions_tsv_date_fmt.strip()
+sessions_tsv_date_fmt = rf"{sessions_tsv_date_fmt.strip()}"
 
 st.markdown("**Optional Arguments**")
 

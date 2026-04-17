@@ -43,14 +43,17 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="subjects_visits_date_fmt",
         required=False,
         default=r"%m/%d/%Y",
-        help="Date format used in the subjects visits file (e.g., %%m/%%d/%%Y).",
+        help=(
+            "Date format used in the subjects visits file (e.g., %m/%d/%Y). "
+            "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
+        ),
     )
     parser.add_argument(
         "--sessions_tsv_date_fmt",
         dest="sessions_tsv_date_fmt",
         required=False,
         default=r"%y%m%d",
-        help="Date format used in the sessions TSV files (e.g., %%y%%m%%d).",
+        help="Date format used in the sessions TSV files (e.g., %y%m%d).",
     )
 
     return parser

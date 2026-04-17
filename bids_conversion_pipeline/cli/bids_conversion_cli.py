@@ -119,8 +119,8 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         required=False,
         default=r"%m/%d/%Y",
         help=(
-            "Date format used in the subjects visits file (e.g., %%m/%%d/%%Y). "
-            "Note: Excel files may convert dates to %%Y-%%m-%%d regardless of the original format."
+            "Date format used in the subjects visits file (e.g., %m/%d/%Y). "
+            "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
         ),
     )
     parser.add_argument(
@@ -128,7 +128,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="src_data_date_fmt",
         required=False,
         default=r"%y%m%d",
-        help="Date format used in the source directory folder names (e.g., %%y%%m%%d).",
+        help="Date format used in the source directory folder names (e.g., %y%m%d).",
     )
 
     return parser
