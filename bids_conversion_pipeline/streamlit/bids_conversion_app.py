@@ -11,7 +11,24 @@ import streamlit as st
 from bids_conversion import run_pipeline
 from _streamlit_utils import _select_content
 
-st.title("BIDS Conversion")
+st.title("NIfti to BIDS Dataset Conversion")
+
+st.markdown("""**Note:**\n
+- Run 'Participants TSV Pipeline' and 'Add Dosages Pipeline' after conversion.\n
+- If the BIDS directory has a participants TSV file, it will not be overwritten, the new subjects will be appended.\n
+
+**Date Format Cheatsheet:**\n
+
+**% is a placeholder prefix and must be included when inputing the date format for the subject visits CSV or the source**
+**directory folders (copy and paste the relevant format after ->)**
+
+- 2025-01-02 -> %Y-%m-%d\n
+- 01/02/2025 -> %m/%d/%Y or %#m/%#d/%Y\n
+- 01/02/25 -> %m/%d/%y\n
+- 20250102 -> %y%m%d\n
+
+**If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**
+""")
 
 st.markdown("**Required Arguments**")
 

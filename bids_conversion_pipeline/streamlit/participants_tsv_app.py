@@ -2,7 +2,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline")
+)
 
 import streamlit as st
 
@@ -10,6 +12,13 @@ from participants_tsv import run_pipeline
 from _streamlit_utils import _select_content
 
 st.title("Participants TSV")
+
+st.markdown("""**Note:**\n
+- If the BIDS directory has a participants TSV file, it will not be overwritten, the new subjects will be appended.\n
+- If a participants TSV file exists in another directory (i.e., HPC) copy to the BIDS directory so that new subjects and demographic data can be appended.\n
+
+**If the participants TSV file exists on the HPC transfer it to your local workstation via Globus and transfer it back to the directory after it's updated.**
+""")
 
 st.markdown("**Required Arguments**")
 
