@@ -144,7 +144,7 @@ def save_tabular_data(
     data_filename.parent.mkdir(parents=True, exist_ok=True)
 
     if add_condition_entity_key:
-        data_filename = str(data_filename).replace(
+        data_filename = data_filename.parent / data_filename.name.replace(
             first_level_glt_label, f"{first_level_glt_label}_condition-{beta_name}"
         )
 
@@ -423,7 +423,6 @@ def main(
                 beta_names = get_beta_names(first_level_glt_label)
 
             for beta_name in beta_names:
-                add_condition_entity_key = beta_name != first_level_glt_label
                 subject_beta_filenames = get_subject_beta_filenames(
                     truncated_df,
                     first_level_glt_label,
@@ -519,6 +518,7 @@ def main(
                             columns=["InputFile"]
                         )
 
+                    add_condition_entity_key = beta_name != first_level_glt_label
                     save_tabular_data(
                         beta_coefficient_df,
                         dst_dir,
