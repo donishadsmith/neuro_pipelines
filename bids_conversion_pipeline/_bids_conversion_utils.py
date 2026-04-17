@@ -144,4 +144,8 @@ def _check_subjects_visits_file(
             "must be included."
         )
 
+    subjects_visits_df["participant_id"] = subjects_visits_df["participant_id"].astype(
+        str
+    )
+
     return subjects_visits_df if return_df else None

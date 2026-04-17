@@ -2,7 +2,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline")
+)
 
 import streamlit as st
 
@@ -29,7 +31,9 @@ if st.button(
         "A CSV or Excel file mapping subjects to visit dates and dosages. "
         "Must contain 'participant_id', 'date', and 'dose' columns. "
         "List dates in chronological order per subject and use NaN for missing sessions. "
-        "Do not include unwanted subject dates in order to skip them."
+        "Do not include unwanted subject dates in order to skip them. "
+        "If `dose_mg` (only relevant to adult cohort since the dose column is coded as 'mph' and 'placebo') "
+        "is a column in the file, then that information will be included too."
     ),
 ):
     file = _select_content("file")

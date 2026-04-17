@@ -81,4 +81,31 @@ def run_pipeline(
             row_id = mask.tolist().index(True)
             sessions_tsv_df.at[row_id, "dose"] = dose
 
+        sessions_tsv_df = add_dose_mg(
+            sessions_tsv_file, sessions_tsv_df, subjects_visits_df
+        )
+
         sessions_tsv_df.to_csv(sessions_tsv_file, sep="\t", index=False)
+
+
+def add_dose_mg(sessions_tsv_file, sessions_tsv_df, subjects_visits_df):
+    if not all(
+        col in subjects_visits_df.columns for col in ["participant_id", "dose_mg"]
+    ):
+        return sessions_tsv_df
+
+    subjects_visits_df["participant_id"] = subjects_visits_df["participant_id"].astype(
+        str
+    )
+    subjects_visits_df["dose_mg"] = subjects_visits_df["dose_mg"].astype(int)
+
+    subject = get_entity_value(sessions_tsv_file, "sub")
+    sessions_tsv_df.loc[sessions_tsv_df["dose"] == "placebo", "dose_mg"] = 0
+    non_placebo_dose = subjects_visits_df.loc[
+        (subjects_visits_df["participant_id"] == subject)
+        & (subjects_visits_df["dose_mg"] != 0),
+        "dose_mg",
+    ].values
+    sessions_tsv_df.loc[sessions_tsv_df["dose"] == "mph", "dose_mg"] = non_placebo_dose
+
+    return sessions_tsv_df

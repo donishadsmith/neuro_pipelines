@@ -33,7 +33,9 @@ def _get_cmd_args() -> argparse.ArgumentParser:
             "Must contain 'participant_id', 'date', and 'dose' columns. "
             "Dates should be listed in chronological order per subject. "
             "Use NaN for missing sessions. "
-            "Do not include unwanted subject dates in order to skip them."
+            "Do not include unwanted subject dates in order to skip them. "
+            "If `dose_mg` (only relevant to adult cohort since the dose column is coded as 'mph' and 'placebo') "
+            "is a column in the file, then that information will be included too."
         ),
     )
     parser.add_argument(
