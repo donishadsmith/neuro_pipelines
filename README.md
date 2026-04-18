@@ -4,6 +4,10 @@ Neuroimaging pipelines tailored for specific tasks and scan protocols in a multi
 
 **Requires Python 3.10+**
 
+[Get Python 3.13 on Windows Store](https://www.python.org/downloads/release/python-31313/)
+
+[Get Python 3.13 on Python.org](https://apps.microsoft.com/detail/9PNRBTZXMB4Z?hl=en-us&gl=US&ocid=pdpshare)
+
 ## Available Tools
 
 - BIDS conversion
