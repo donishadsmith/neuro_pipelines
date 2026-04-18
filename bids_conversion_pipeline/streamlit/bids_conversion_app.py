@@ -11,7 +11,7 @@ import streamlit as st
 from bids_conversion import run_pipeline
 from _streamlit_utils import StreamlitLogHandler, _select_content
 
-st.title("NIfti to BIDS Dataset Conversion")
+st.title("NIfTI to BIDS Conversion Pipeline")
 st.divider()
 
 st.markdown("""**Note:**\n
@@ -35,7 +35,7 @@ st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
-    "Browse for source directory",
+    "Browse for raw NIfTI directory",
     help="Directory containing the non-BIDS compliant fMRI data.",
 ):
     folder = _select_content("directory")
@@ -179,7 +179,8 @@ kwargs = {
     "src_data_date_fmt": src_data_date_fmt,
 }
 
-if st.button("Run Pipeline"):
+st.divider()
+if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("src_dir"):
         st.error("Please select a source directory before running.")
     elif not st.session_state.subjects_visits_file:

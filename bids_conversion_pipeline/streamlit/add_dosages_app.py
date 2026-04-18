@@ -11,7 +11,7 @@ import streamlit as st
 from add_dosages import run_pipeline
 from _streamlit_utils import _select_content
 
-st.title("Add Dosages")
+st.title("Add Dosages Pipeline")
 st.divider()
 
 st.markdown("""
@@ -94,7 +94,8 @@ kwargs = {
     "sessions_tsv_date_fmt": sessions_tsv_date_fmt,
 }
 
-if st.button("Run Pipeline"):
+st.divider()
+if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("bids_dir"):
         st.error("Please select a BIDS directory before running.")
     elif not st.session_state.subjects_visits_file:

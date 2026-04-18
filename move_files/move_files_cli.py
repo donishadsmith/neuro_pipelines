@@ -7,8 +7,8 @@ def _get_cmd_args():
         description="Move events or sessions files to BIDS directory."
     )
     parser.add_argument(
-        "--src_dir",
-        dest="src_dir",
+        "--origin_dir",
+        dest="origin_dir",
         required=True,
         help=("Path containing the files. File naming should be BIDS compliant."),
     )

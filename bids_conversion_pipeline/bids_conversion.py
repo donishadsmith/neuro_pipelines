@@ -211,7 +211,7 @@ def run_pipeline(
             src_data_date_fmt,
         )
 
-        LGR.info("Creating JSON sidecars...")
+        LGR.info("Creating JSON ")
         # Pipeline to create JSON sidecars for NIfTI images
         _create_json_sidecar_pipeline(bids_dir, cohort)
     finally:

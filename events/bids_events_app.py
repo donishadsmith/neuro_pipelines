@@ -10,7 +10,7 @@ from create_event_files import run_pipeline
 
 from _streamlit_utils import StreamlitLogHandler, _select_content
 
-st.title("BIDS Events File App")
+st.title("BIDS Events File Pipeline")
 st.divider()
 
 st.markdown("""
@@ -33,7 +33,7 @@ st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
-    "Browse for source directory",
+    "Browse for log directory",
     help="Directory containing the log files for the specified task.",
 ):
     folder = _select_content("directory")
@@ -71,6 +71,9 @@ if st.button(
 
 if st.session_state.get("subjects_visits_file"):
     st.success(f"Visits File: {st.session_state.subjects_visits_file}")
+
+if cohort:
+    fmt = r"%#m/%#d/%Y" if cohort == "kids" else r"%Y-%m-%d"
 
 subjects_visits_date_fmt = st.text_input(
     "Date format in the subjects visits file",
@@ -146,7 +149,8 @@ kwargs = {
     "exclude_filenames": exclude_filenames if exclude_filenames else None,
 }
 
-if st.button("Run Pipeline"):
+st.divider()
+if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("log_dir"):
         st.error("Please select a source directory before running.")
     elif not st.session_state.subjects_visits_file:

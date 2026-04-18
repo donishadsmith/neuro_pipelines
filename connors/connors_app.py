@@ -10,7 +10,7 @@ from _streamlit_utils import _select_content
 
 from get_connors_score import run_pipeline
 
-st.title("Connors 4 Score Extraction App")
+st.title("Connors 4 Score Extraction Pipeline")
 
 st.divider()
 st.markdown("**Required Arguments**")
@@ -52,7 +52,8 @@ kwargs = {
     "subjects": subjects,
 }
 
-if st.button("Run Pipeline"):
+st.divider()
+if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("pdf_dir"):
         st.error("Please select a source directory before running.")
     else:

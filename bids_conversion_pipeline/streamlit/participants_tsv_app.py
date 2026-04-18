@@ -11,7 +11,7 @@ import streamlit as st
 from participants_tsv import run_pipeline
 from _streamlit_utils import _select_content
 
-st.title("Participants TSV")
+st.title("Participants TSV Pipeline")
 st.divider()
 
 st.markdown("""**Note:**\n
@@ -63,7 +63,8 @@ kwargs = {
     "covariates_to_add": covariates_to_add if covariates_to_add else None,
 }
 
-if st.button("Run Pipeline"):
+st.divider()
+if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("bids_dir"):
         st.error("Please select a BIDS directory before running.")
     else:

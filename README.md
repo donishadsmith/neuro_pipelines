@@ -4,9 +4,9 @@ Neuroimaging pipelines tailored for specific tasks and scan protocols in a multi
 
 **Requires Python 3.10+**
 
-[Get Python 3.13 on Windows Store](https://www.python.org/downloads/release/python-31313/)
+[Get Python 3.13 on Windows Store](https://apps.microsoft.com/detail/9PNRBTZXMB4Z?hl=en-us&gl=US&ocid=pdpshare)
 
-[Get Python 3.13 on Python.org](https://apps.microsoft.com/detail/9PNRBTZXMB4Z?hl=en-us&gl=US&ocid=pdpshare)
+[Get Python 3.13 on Python.org](https://www.python.org/downloads/release/python-31313/)
 
 ## Available Tools
 
@@ -48,11 +48,19 @@ pip install -r requirements.txt
 ```
 
 #### Run Streamlit App Hub
-```bash
-streamlit run streamlit_app_hub.py
-```
+Double click on "run_app.bat" (Windows) or "run_app.sh" (Linux/Mac).
 
+or 
+
+In terminal:
+```bash
+streamlit run app.py
+```
+##### Homepage
 ![image](assets/hub.png)
+
+##### NIfTI to BIDS Pipeline Conversion Page
+![image](assets/pipeline1.png)
 
 ### HPC (Conda)
 

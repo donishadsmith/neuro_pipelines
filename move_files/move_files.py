@@ -6,14 +6,14 @@ from bidsaid.logging import setup_logger
 
 LGR = setup_logger(__name__)
 
-def run_pipeline(src_dir, bids_dir):
-    src_dir = Path(src_dir)
+def run_pipeline(origin_dir, bids_dir):
+    origin_dir = Path(origin_dir)
     bids_dir = Path(bids_dir)
 
-    if not src_dir.exists():
-        raise FileExistsError(f"The following directory does not exist: {src_dir}")
+    if not origin_dir.exists():
+        raise FileExistsError(f"The following directory does not exist: {origin_dir}")
 
-    for src_file in src_dir.rglob("*"):
+    for src_file in origin_dir.rglob("*"):
         if not src_file.name.startswith("sub-"):
             continue
 
