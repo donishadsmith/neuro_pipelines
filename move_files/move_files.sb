@@ -12,8 +12,10 @@
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 
-SRC_DIR="$HOME/event_files"
-BIDS_DIR="/projects/bigos_lab/mph-study/kids/dset"
+DATASET="mph-study"
+COHORT="kids"
+SRC_DIR="$HOME/BIDS_Events"
+BIDS_DIR="/projects/bigos_lab/$DATASET/$COHORT/dset"
 
 CMD="${PYTHON} move_files_cli.py --src_dir $SRC_DIR --bids_dir $BIDS_DIR"
 
