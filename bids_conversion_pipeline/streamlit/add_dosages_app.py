@@ -12,6 +12,7 @@ from add_dosages import run_pipeline
 from _streamlit_utils import _select_content
 
 st.title("Add Dosages")
+st.divider()
 
 st.markdown("""
 **Date Format Cheatsheet:**\n
@@ -27,6 +28,7 @@ st.markdown("""
 **If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**
 """)
 
+st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
@@ -74,6 +76,7 @@ sessions_tsv_date_fmt = st.text_input(
 )
 sessions_tsv_date_fmt = rf"{sessions_tsv_date_fmt.strip()}"
 
+st.divider()
 st.markdown("**Optional Arguments**")
 
 subjects = st.text_input(

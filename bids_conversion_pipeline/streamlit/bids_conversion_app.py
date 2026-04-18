@@ -1,4 +1,4 @@
-import sys
+import logging, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -9,9 +9,10 @@ sys.path.insert(
 import streamlit as st
 
 from bids_conversion import run_pipeline
-from _streamlit_utils import _select_content
+from _streamlit_utils import StreamlitLogHandler, _select_content
 
 st.title("NIfti to BIDS Dataset Conversion")
+st.divider()
 
 st.markdown("""**Note:**\n
 - Run 'Participants TSV Pipeline' and 'Add Dosages Pipeline' after conversion.\n
@@ -30,6 +31,7 @@ st.markdown("""**Note:**\n
 **If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**
 """)
 
+st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
@@ -83,6 +85,7 @@ src_data_date_fmt = st.text_input(
 )
 src_data_date_fmt = rf"{src_data_date_fmt.strip()}"
 
+st.divider()
 st.markdown("**Optional Arguments**")
 
 if st.button("Browse for BIDS output directory"):
@@ -182,7 +185,12 @@ if st.button("Run Pipeline"):
     elif not st.session_state.subjects_visits_file:
         st.error("Please upload a subjects visits file before running.")
     else:
-        with st.spinner("Processing..."):
+        with st.status("Running pipeline", expanded=True) as status:
+            handler = StreamlitLogHandler(status)
+            logging.getLogger().addHandler(handler)
+
             bids_dir = run_pipeline(**kwargs)
 
-        st.success(f"BIDS conversion complete. Dataset located at {bids_dir}")
+            logging.getLogger().removeHandler(handler)
+            
+            status.update(label=f"BIDS conversion complete. Dataset located at {bids_dir}", state="complete", expanded=False)

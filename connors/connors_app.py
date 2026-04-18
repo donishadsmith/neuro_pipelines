@@ -12,6 +12,7 @@ from get_connors_score import run_pipeline
 
 st.title("Connors 4 Score Extraction App")
 
+st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
@@ -25,7 +26,8 @@ if st.button(
 if st.session_state.get("pdf_dir"):
     st.success(f"Source: {st.session_state.pdf_dir}")
 
-
+st.divider()
+st.markdown("**Optional Arguments**")
 if st.button(
     "Browse for CSV file",
     help="File path for CSV file containing Conners 4 data. If CSV file exists.",

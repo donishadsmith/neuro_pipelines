@@ -80,7 +80,7 @@ def _filter_log_files(log_files, subjects, exclude_filenames):
     log_files = list(log_files)
     if not log_files:
         LGR.warning(
-            "No log files selected, check if ``src_dir`` or ``subjects`` are accurate."
+            "No log files selected, check if ``log_dir`` or ``subjects`` are accurate."
         )
 
     return log_files
@@ -93,8 +93,8 @@ def _get_minimum_file_size(cohort, task, minimum_file_size):
     return minimum_file_size
 
 
-def _copy_event_files(src_dir, temp_dir, cohort, task, minimum_file_size):
-    for event_file in src_dir.glob("*"):
+def _copy_event_files(log_dir, temp_dir, cohort, task, minimum_file_size):
+    for event_file in log_dir.glob("*"):
         minimum_file_size = _get_minimum_file_size(cohort, task, minimum_file_size)
         if os.path.getsize(event_file) < minimum_file_size:
             LGR.warning(
@@ -788,7 +788,7 @@ EVENTS_FUNC = {
 
 
 def run_pipeline(
-    src_dir,
+    log_dir,
     dst_dir,
     temp_dir,
     delete_temp_dir,
@@ -805,10 +805,11 @@ def run_pipeline(
             f"`task` must be one of the following: {EVENTS_FUNC[cohort].keys()}"
         )
 
-    if subjects_visits_file:
-        _check_subjects_visits_file(subjects_visits_file)
+    LGR.info("Validating subjects visits CSV...")
+    _check_subjects_visits_file(subjects_visits_file)
 
-    src_dir = Path(src_dir)
+    LGR.info("Resolving directories...")
+    log_dir = Path(log_dir)
     dst_dir, temp_dir = _resolve_directories(dst_dir, temp_dir)
 
     if subjects:
@@ -829,7 +830,9 @@ def run_pipeline(
         kwargs.update({"cohort": cohort})
 
     try:
-        _copy_event_files(src_dir, temp_dir, cohort, task, minimum_file_size)
+        LGR.info("Copying data to temporary directory...")
+        _copy_event_files(log_dir, temp_dir, cohort, task, minimum_file_size)
+        LGR.info("Creating BIDS events files...")
         EVENTS_FUNC[cohort][task](**kwargs)
     finally:
         if delete_temp_dir:

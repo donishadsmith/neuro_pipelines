@@ -2,7 +2,7 @@ import streamlit as st
 
 st.title("BIDS Conversion App")
 
-st.markdown("Select a pipeline from the sidebar.")
+st.divider()
 
 st.markdown("**Available Pipelines:**")
 st.page_link(

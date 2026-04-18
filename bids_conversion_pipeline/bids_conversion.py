@@ -175,13 +175,16 @@ def run_pipeline(
         if (cohort := cohort.lower()) not in ["kids", "adults"]:
             raise ValueError("'--cohort' must be 'kids' or 'adults'.")
 
+        LGR.info("Validating subjects visits CSV...")
         _check_subjects_visits_file(subjects_visits_file, dose_column_required=False)
 
+        LGR.info("Resolving directories...")
         bids_dir, temp_dir = _resolve_directories(bids_dir, temp_dir)
 
         if subjects:
             subjects = _strip_entity(subjects)
 
+        LGR.info("Copying data to temporary directory...")
         _copy_data_to_temp_dir(
             Path(src_dir),
             temp_dir,
@@ -191,9 +194,11 @@ def run_pipeline(
         )
 
         # Pipeline to identify un-named NIfTI images and standardize task names
+        LGR.info("Standardizing task names...")
         _standardize_task_pipeline(temp_dir, cohort)
 
         # Pipeline to move files to BIDS directory
+        LGR.info("Generating BIDS directory...")
         _generate_bids_dir_pipeline(
             temp_dir,
             bids_dir,
@@ -206,6 +211,7 @@ def run_pipeline(
             src_data_date_fmt,
         )
 
+        LGR.info("Creating JSON sidecars...")
         # Pipeline to create JSON sidecars for NIfTI images
         _create_json_sidecar_pipeline(bids_dir, cohort)
     finally:

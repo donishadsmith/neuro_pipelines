@@ -1,4 +1,4 @@
-import sys
+import logging, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -8,10 +8,10 @@ import streamlit as st
 
 from create_event_files import run_pipeline
 
-from _streamlit_utils import _select_content
+from _streamlit_utils import StreamlitLogHandler, _select_content
 
 st.title("BIDS Events File App")
-
+st.divider()
 
 st.markdown("""
 **Date Format Cheatsheet:**\n
@@ -29,6 +29,7 @@ st.markdown("""
 **Use the 'Move Files Pipeline' to automatically move events TSV files to thier respective subjects directory within the BIDS directory.**
 """)
 
+st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
@@ -37,10 +38,10 @@ if st.button(
 ):
     folder = _select_content("directory")
     if folder:
-        st.session_state.src_dir = folder
+        st.session_state.log_dir = folder
 
-if st.session_state.get("src_dir"):
-    st.success(f"Source: {st.session_state.src_dir}")
+if st.session_state.get("log_dir"):
+    st.success(f"Source: {st.session_state.log_dir}")
 
 cohort = st.selectbox(
     "Cohort", ("kids", "adults"), help="Determines which tasks are available."
@@ -81,6 +82,7 @@ subjects_visits_date_fmt = st.text_input(
 )
 subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
 
+st.divider()
 st.markdown("**Optional Arguments**")
 
 if st.button("Browse for output directory"):
@@ -120,9 +122,9 @@ delete_temp_dir = st.checkbox(
 )
 
 exclude_filenames = None
-if st.session_state.get("src_dir"):
+if st.session_state.get("log_dir"):
     subfolders = sorted(
-        [x for x in Path(st.session_state.src_dir).glob("*") if x.is_file()]
+        [x for x in Path(st.session_state.log_dir).glob("*") if x.is_file()]
     )
     exclude_filenames = st.multiselect(
         "Files to exclude",
@@ -131,7 +133,7 @@ if st.session_state.get("src_dir"):
     )
 
 kwargs = {
-    "src_dir": st.session_state.get("src_dir"),
+    "log_dir": st.session_state.get("log_dir"),
     "dst_dir": st.session_state.get("dst_dir"),
     "temp_dir": st.session_state.get("temp_dir"),
     "delete_temp_dir": delete_temp_dir,
@@ -145,14 +147,18 @@ kwargs = {
 }
 
 if st.button("Run Pipeline"):
-    if not st.session_state.get("src_dir"):
+    if not st.session_state.get("log_dir"):
         st.error("Please select a source directory before running.")
     elif not st.session_state.subjects_visits_file:
         st.error("Please upload a subjects visits file before running.")
     else:
-        with st.spinner("Processing..."):
+        with st.status("Running pipeline...", expanded=True) as status:
+            handler = StreamlitLogHandler(status)
+            logging.getLogger().addHandler(handler)
+
             dst_dir = run_pipeline(**kwargs)
 
-        st.success(
-            f"Event files for the {task} task ({cohort} cohort) created in: {dst_dir}"
-        )
+            logging.getLogger().removeHandler(handler)
+
+            status.update(label=f"Event files for the {task} task ({cohort} cohort) created in: {dst_dir}", state="complete", expanded=False)
+

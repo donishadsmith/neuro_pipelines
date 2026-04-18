@@ -8,8 +8,8 @@ def _get_cmd_args():
         description="Create BIDS-compliant event files from neurobehavioral log data."
     )
     parser.add_argument(
-        "--src_dir",
-        dest="src_dir",
+        "--log_dir",
+        dest="log_dir",
         required=True,
         help="Directory containing the neurobehavioral log files.",
     )

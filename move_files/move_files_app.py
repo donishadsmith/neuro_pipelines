@@ -11,12 +11,14 @@ from _streamlit_utils import _select_content
 from move_files import run_pipeline
 
 st.title("Move BIDS Event and Sessions Files App")
+st.divider()
 
 st.markdown("""**Notes:**\n
 - Source files must follow BIDS naming conventions (i.e., filenames must start with ``sub-``).
 - Destination subdirectories must already exist - files are skipped if the target directory is not found.
 - If a file with the same name already exists in the destination, it is overwritten.""")
 
+st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(

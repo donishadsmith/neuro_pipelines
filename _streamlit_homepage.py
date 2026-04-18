@@ -2,7 +2,7 @@ import streamlit as st
 
 st.title("\U0001f9e0 Neuro Pipelines App Hub \U0001f9e0")
 
-st.markdown("Select a pipeline below or from the sidebar.")
+st.divider()
 
 st.markdown("**Available Pipelines:**")
 st.page_link(
@@ -31,3 +31,4 @@ st.page_link(
     "connors/connors_app.py",
     label=("6. **Connors 4** - Extract Connors 4 Scores from PDF files."),
 )
+st.divider()
