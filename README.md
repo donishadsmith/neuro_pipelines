@@ -48,7 +48,7 @@ pip install -r requirements.txt
 ```
 
 #### Run Streamlit App Hub
-Double click on "run_app.bat" (Windows) or "run_app.sh" (Linux/Mac).
+Double click on "launch_app.bat" (Windows) or "launch_app.sh" (Linux/Mac).
 
 or 
 
