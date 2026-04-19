@@ -22,7 +22,7 @@ st.divider()
 st.markdown("**Required Arguments**")
 
 if st.button(
-    "Browse for source directory",
+    "Browse for source (NIfTI) directory",
     help="Directory containing BIDS-compliant files.",
 ):
     folder = _select_content("directory")
@@ -30,7 +30,7 @@ if st.button(
         st.session_state.origin_dir = folder
 
 if st.session_state.get("origin_dir"):
-    st.success(f"Source: {st.session_state.origin_dir}")
+    st.success(f"Source (NIfTI) Directory: {st.session_state.origin_dir}")
 
 if st.button(
     "Browse for BIDS directory",
@@ -41,7 +41,7 @@ if st.button(
         st.session_state.bids_dir = folder
 
 if st.session_state.get("bids_dir"):
-    st.success(f"Source: {st.session_state.bids_dir}")
+    st.success(f"BIDS Directory: {st.session_state.bids_dir}")
 
 kwargs = {
     "origin_dir": st.session_state.get("origin_dir"),
@@ -51,7 +51,7 @@ kwargs = {
 st.divider()
 if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("origin_dir"):
-        st.error("Please select a source directory before running.")
+        st.error("Please select a source (NIfTI) directory before running.")
     elif not st.session_state.get("bids_dir"):
         st.error("Please select a BIDS directory before running.")
     else:

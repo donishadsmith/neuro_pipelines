@@ -6,6 +6,7 @@ from bidsaid.logging import setup_logger
 
 LGR = setup_logger(__name__)
 
+
 def run_pipeline(origin_dir, bids_dir):
     origin_dir = Path(origin_dir)
     bids_dir = Path(bids_dir)
@@ -39,5 +40,3 @@ def run_pipeline(origin_dir, bids_dir):
         except Exception as e:
             LGR.fatal(traceback.format_exc())
             raise e
-
-

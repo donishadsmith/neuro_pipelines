@@ -13,10 +13,11 @@ from get_connors_score import run_pipeline
 st.title("Connors 4 Score Extraction Pipeline")
 
 st.divider()
+
 st.markdown("**Required Arguments**")
 
 if st.button(
-    "Browse for source directory",
+    "Browse for source (Connors 4 PDF) directory",
     help="Directory containing the Connors 4 PDF file.",
 ):
     folder = _select_content("directory")
@@ -24,20 +25,20 @@ if st.button(
         st.session_state.pdf_dir = folder
 
 if st.session_state.get("pdf_dir"):
-    st.success(f"Source: {st.session_state.pdf_dir}")
+    st.success(f"Connors 4 Source Directory: {st.session_state.pdf_dir}")
 
 st.divider()
 st.markdown("**Optional Arguments**")
 if st.button(
-    "Browse for CSV file",
-    help="File path for CSV file containing Conners 4 data. If CSV file exists.",
+    "Browse for CSV/Excel file",
+    help="File path for CSV/Excel file containing Conners 4 data. If CSV/Excel file exists.",
 ):
     file = _select_content("file")
     if file:
         st.session_state.csv_file_path = file
 
 if st.session_state.get("csv_file_path"):
-    st.success(f"Source: {st.session_state.csv_file_path}")
+    st.success(f"Connors 4 CSV file: {st.session_state.csv_file_path}")
 
 subjects = st.text_input(
     "Subject IDs",
@@ -55,9 +56,10 @@ kwargs = {
 st.divider()
 if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("pdf_dir"):
-        st.error("Please select a source directory before running.")
+        st.error("Please select a source (Connors 4 PDF) directory before running.")
     else:
-        with st.status("Running pipeline...", expanded=True) as status:
+        status_container = st.empty()
+        with status_container.status("Running pipeline...", expanded=True) as status:
             handler = StreamlitLogHandler(status)
             logging.getLogger().addHandler(handler)
 
@@ -65,6 +67,15 @@ if st.button("Run Pipeline", type="primary"):
 
             logging.getLogger().removeHandler(handler)
 
-            status.update(
-                label=f"Data saved to: {output_path}", state="complete", expanded=False
-            )
+            if output_path:
+                status.update(
+                    label=f"Data saved to: {output_path}",
+                    state="complete",
+                    expanded=False,
+                )
+            else:
+                status.update(
+                    label=f"No PDF files found in: {st.session_state.pdf_dir}",
+                    state="error",
+                    expanded=False,
+                )

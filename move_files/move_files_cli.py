@@ -2,6 +2,7 @@ import argparse
 
 from move_files import run_pipeline
 
+
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description="Move events or sessions files to BIDS directory."
@@ -20,6 +21,7 @@ def _get_cmd_args():
     )
 
     return parser
+
 
 if __name__ == "__main__":
     _get_cmd_args = _get_cmd_args()

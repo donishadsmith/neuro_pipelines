@@ -256,7 +256,9 @@ def _get_cmd_args():
         required=False,
         help=(
             "Prefixes of the filename of the NIfTI images to exclude. "
-            "Should contain a single column named 'nifti_prefix_filename'."
+            "Can list the fill name of the file (no parent directories) to exlude that specific file "
+            "or can include the prefix (i.e., 'sub-101_task-nback_ses-01_space-MNI' or 'sub-101') to exclude all files starting "
+            "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
         ),
     )
 
@@ -346,20 +348,41 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
     )
 
 
+# pd.read_csv(exclude_niftis_file, sep=None, engine="python") fails in cases
+# where there is only one column and row
+def _get_dataframe(filename):
+    try:
+        return pd.read_excel(filename)
+    except:
+        pass
+
+    df = pd.read_csv(filename, sep=None, engine="python")
+    if "nifti_prefix_filename" not in df.columns:
+        # Any separator will work
+        df = pd.read_csv(filename)
+        if "nifti_prefix_filename" not in df.columns:
+            raise Exception(
+                "`exclude_nifti_file` must contain a column named 'nifti_prefix_filename'."
+            )
+
+    return df
+
+
 def exclude_beta_files(beta_files, exclude_niftis_file):
     if not exclude_niftis_file:
         return beta_files
 
-    df = pd.read_csv(exclude_niftis_file, sep=None, engine="python")
-    excluded_niftis_prefixes = [
-        Path(nifti_prefix_filename).name.split("_desc")[0]
-        for nifti_prefix_filename in df["nifti_prefix_filename"].tolist()
-    ]
+    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
+        "nifti_prefix_filename"
+    ].tolist()
 
     return [
         beta_file
         for beta_file in beta_files
-        if Path(beta_file).name.split("_space")[0] not in excluded_niftis_prefixes
+        if not any(
+            Path(beta_file).name.startswith(excluded_niftis_prefix)
+            for excluded_niftis_prefix in excluded_niftis_prefixes
+        )
     ]
 
 

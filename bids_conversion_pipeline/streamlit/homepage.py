@@ -7,7 +7,9 @@ st.divider()
 st.markdown("**Available Pipelines:**")
 st.page_link(
     "bids_conversion_pipeline/streamlit/bids_conversion_app.py",
-    label=("1. **NIfTI to BIDS Conversion** - Convert a source dataset to BIDS format."),
+    label=(
+        "1. **NIfTI to BIDS Conversion** - Convert a source dataset to BIDS format."
+    ),
 )
 st.page_link(
     "bids_conversion_pipeline/streamlit/participants_tsv_app.py",

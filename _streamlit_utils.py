@@ -1,6 +1,7 @@
 import logging, tkinter as tk
 from tkinter import filedialog
 
+
 class StreamlitLogHandler(logging.Handler):
     def __init__(self, status):
         super().__init__()
@@ -10,6 +11,7 @@ class StreamlitLogHandler(logging.Handler):
     def emit(self, record):
         if record.levelno == logging.INFO:
             self.status.write(record.getMessage())
+
 
 def _select_content(content):
     window = tk.Tk()
