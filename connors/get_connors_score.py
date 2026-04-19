@@ -1,11 +1,16 @@
 """Extract data from Conners 4."""
 
-import glob, os, re, shutil
+import re, shutil
+from pathlib import Path
 from typing import Literal, Optional
 from datetime import datetime
 
-import pandas as pd
-from pypdf import PdfReader  # 6.1.1 - 6.1.3
+import pandas as pd, pdfplumber
+from pypdf import PdfReader
+from bidsaid.files import get_entity_value
+from bidsaid.logging import setup_logger
+
+LGR = setup_logger(__name__)
 
 CSV_COLUMN_NAMES = [
     "SN",
@@ -42,7 +47,7 @@ CSV_COLUMN_NAMES = [
     "Prob score %",
 ]
 UNIQUE_DATA_FIELD_NAMES = [
-    "Dysfunction",
+    "Inattention/Executive Dysfunction",
     "Hyperactivity",
     "Impulsivity",
     "Emotional Dysregulation",
@@ -51,42 +56,54 @@ UNIQUE_DATA_FIELD_NAMES = [
     "Schoolwork",
     "Peer Interactions",
     "Family Life",
-    "Symptoms",
+    "ADHD Inattentive Symptoms",
+    "ADHD Hyperactive/Impulsive Symptoms",
     "Total ADHD Symptoms",
-    "Disorder Symptoms",
+    "Oppositional Defiant Disorder Symptoms",
+    "Conduct Disorder Symptoms",
     "ADHD Index",
-    "ADHD Inattentive",
-    "ADHD Hyperactive/Impulsive",
-    "Conduct Disorder",
 ]
 
 
-def get_files(target_dir: str, ext: str) -> list[str]:
+def get_files(target_dir: Path, ext: str) -> list[str]:
     """Gets files with a specific extension."""
-    return glob.glob(os.path.join(target_dir, f"*.{ext}"))
+    return target_dir.glob(f"*.{ext}")
 
 
-def convert_list_to_dict(input_list: list[str]) -> dict[str, None]:
-    "Converts a list to a dictionary where each key is mapped to ``None``."
-    return {key: None for key in input_list}
+def get_non_session_column_index() -> int:
+    for index, element in enumerate(CSV_COLUMN_NAMES):
+        if any(x in element for x in ["T score", "%"]):
+            return index
 
 
-def extract_pdf_text(pdf_file: str, page_number: int) -> list[str]:
-    """Extract text from a single page of a PDF and removes lines with only whitespace."""
-    reader = PdfReader(pdf_file)
-    single_page = reader.pages[page_number].extract_text()
-    stripped_page_list = [
-        line.strip(" ")
-        for line in [line for line in single_page.splitlines() if not line.isspace()]
-    ]
-
-    return stripped_page_list
+def initialization_sessions_dict() -> dict[str, None]:
+    return {key: None for key in CSV_COLUMN_NAMES[: get_non_session_column_index()]}
 
 
-def create_dirs(dir_name: str) -> None:
-    """Checks if directory exists and creates it if it does not exist."""
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
+def extract_pdf_text(
+    pdf_file: str, page_number: int, use_pdfplumber: bool = False
+) -> list[str] | list[list[str]]:
+    """
+    Extract text from a single page of a PDF and removes lines with only whitespace.
+    when using pypdf or a list of list for pdfplumber
+    """
+
+    if use_pdfplumber:
+        with pdfplumber.open(pdf_file) as pdf:
+            page = pdf.pages[page_number]
+            table = page.extract_table()
+
+        return table
+    else:
+        reader = PdfReader(pdf_file)
+        single_page = reader.pages[page_number].extract_text()
+        stripped_page_list = [
+            line.strip(" ")
+            for line in [
+                line for line in single_page.splitlines() if not line.isspace()
+            ]
+        ]
+        return stripped_page_list
 
 
 def determine_rater(single_page_list: list[str]) -> Literal["parent", "child"]:
@@ -122,7 +139,7 @@ def standardize_date(date: str, date_format: str = "%B %d, %Y") -> str:
     return datetime.strptime(date, date_format).date()
 
 
-def standardize_pdf_filenames(pdf_dir: str) -> None:
+def standardize_pdf_filenames(pdf_dir: Path) -> None:
     """
     Cleans PDF filenames.
 
@@ -142,8 +159,8 @@ def standardize_pdf_filenames(pdf_dir: str) -> None:
     -------
     None
     """
-    target_dir = os.path.join(pdf_dir, "reformatted_filenames")
-    create_dirs(target_dir)
+    target_dir = pdf_dir / "reformatted_filenames"
+    target_dir.mkdir(exist_ok=True)
 
     pdf_files = get_files(pdf_dir, "pdf")
     for pdf_file in pdf_files:
@@ -164,15 +181,16 @@ def standardize_pdf_filenames(pdf_dir: str) -> None:
         administration_date = standardize_date(administration_date)
 
         new_filename = f"sub-{sub_id}_date-{administration_date}_rater-{rater}"
-        output_dir = os.path.join(target_dir, rater)
-        create_dirs(output_dir)
+        output_dir = target_dir / rater
+        output_dir.parent.mkdir(exist_ok=True)
 
-        base_pdf_name = os.path.basename(pdf_file)
-        shutil.copyfile(pdf_file, os.path.join(output_dir, base_pdf_name))
-        os.rename(
-            os.path.join(output_dir, base_pdf_name),
-            os.path.join(output_dir, f"{new_filename}.pdf"),
-        )
+        output_file: Path = output_dir / pdf_file.name
+        shutil.copyfile(pdf_file, output_file)
+
+        new_filename = output_file.with_name(f"{new_filename}.pdf")
+        if new_filename.exists():
+            new_filename.unlink()
+            output_file.rename(new_filename)
 
 
 def get_subject_ids(
@@ -194,13 +212,13 @@ def get_subject_ids(
     """
     subjects = subjects or []
     all_subjects_list = [
-        re.search(r"sub-(\d+?)_", os.path.basename(file))[0]
-        .removeprefix("sub-")
-        .removesuffix("_")
-        for file in reformatted_pdf_files
+        get_entity_value(file.name, "sub") for file in reformatted_pdf_files
     ]
 
-    return [subject for subject in all_subjects_list if subject in subjects]
+    if subjects:
+        return [subject for subject in all_subjects_list if subject in subjects]
+    else:
+        return all_subjects_list
 
 
 def get_sessions(subject_id_list: list[str]) -> list[str]:
@@ -230,7 +248,7 @@ def get_sn_visit(subject_id_list: list[str], visit_list: list[str]) -> list[str]
     return sn_visit_list
 
 
-def create_unique_column_dict(columns_names_list: list) -> dict[str, None]:
+def create_unique_column_dict() -> dict[str, None]:
     """
     Converts a list of column names to dictionary containing the unique
     starting names. For instance, "ANX T score" and "ANX %" are reduced
@@ -240,7 +258,7 @@ def create_unique_column_dict(columns_names_list: list) -> dict[str, None]:
     t score, percentile, etc).
     """
     unique_column_names_dict = {}
-    for name in columns_names_list:
+    for name in CSV_COLUMN_NAMES[get_non_session_column_index() :]:
         reduced_name = name.split(" ")[0]
         if reduced_name not in unique_column_names_dict:
             unique_column_names_dict[reduced_name] = None
@@ -248,185 +266,136 @@ def create_unique_column_dict(columns_names_list: list) -> dict[str, None]:
     return unique_column_names_dict
 
 
-def create_column_names_dict(columns_names_list: list) -> dict[str, list]:
+def create_column_names_dict() -> dict[str, list]:
     """
     Converts a list of column names to dictionary of each name mapped to
     an empty list.
     """
     column_names_dict = {}
-    for name in columns_names_list:
+    for name in CSV_COLUMN_NAMES[get_non_session_column_index() :]:
         column_names_dict[name] = []
 
     return column_names_dict
 
 
-def replace_data_field_names(single_page_list: list[str]) -> list[str]:
-    """
-    Replaces lines starting with "Symptoms" with their respective data field.
+def replace_newline_with_space(table: list[list[str]]) -> list[list[str]]:
+    new_table = []
+    for line in table:
+        line = [word.replace("\n", " ") if word else word for word in line]
+        new_table.append(line)
 
-    Conners 4 scores are on the fourth page of the PDF (index 3). When converted
-    to text, "ADHD Inattentive", "ADHD Hyperactive/Impulsive", and "Conduct Disorder"
-    are isolated onto their own lines with the subsequent line starting with
-    "Symptoms" and containing the score information.
-
-    Parameters
-    ----------
-    single_page_list: :obj:`list[str]`
-        A single PDF page represented as a list where each element is a sentence.
-
-    Returns
-    -------
-    list[str]:
-        A single PDF page represented as list where each element is a sentence.
-        If ``single_page_list`` was page 4 of Conners, then the lines starting with
-        "Symptoms" are replaced with their proper data field name (
-        "ADHD Inattentive", "ADHD Hyperactive/Impulsive", or "Conduct Disorder").
-    """
-    single_page_list = [
-        line
-        for line in single_page_list
-        if any(line.startswith(x) for x in UNIQUE_DATA_FIELD_NAMES)
-    ]
-
-    target_field_names = [
-        "ADHD Inattentive",
-        "ADHD Hyperactive/Impulsive",
-        "Conduct Disorder",
-    ]
-    remove_indxs_list = []
-    for indx, line in enumerate(single_page_list):
-        field_name = line.strip(" ")
-        if field_name in target_field_names:
-            if single_page_list[indx + 1].startswith("Symptoms"):
-                single_page_list[indx + 1] = single_page_list[indx + 1].replace(
-                    "Symptoms", field_name
-                )
-                remove_indxs_list.append(indx)
-
-    return [
-        line
-        for indx, line in enumerate(single_page_list)
-        if indx not in remove_indxs_list
-    ]
+    return new_table
 
 
-def filter_list(single_page_list: list[str], data_field_name: str) -> str | None:
-    """
-    Filters ``single_page_list`` to only return the line starting with a specific
-    data field name.
-    """
-    filtered_list = [
-        line for line in single_page_list if line.startswith(data_field_name)
-    ]
+def create_table_column_map(table: list[list[str]]) -> dict[str, int]:
+    for index, line in enumerate(table):
+        # Should be the second list in table but searching for safety
+        for word in line:
+            match = re.search("Raw Score", word) if word else None
+            if match:
+                break
+        else:
+            continue
 
-    return filtered_list if filtered_list else None
+        break
+
+    # Index position -> column name
+    column_names = dict(enumerate(table[index]))
+    filtered_column_names = dict()
+    for key in column_names:
+        if column_names[key]:
+            # Column name -> index position
+            filtered_column_names.update({column_names[key]: key})
+
+    return filtered_column_names
 
 
-def remove_prefix(
-    input_str: str, prefix: str, remove_left_whitespace: bool = True
+def get_target_list(table: list[list[str]], target_name: str) -> list[str, None]:
+    for line in table:
+        for word in line:
+            if word and target_name == word:
+                return line
+
+
+def get_score(
+    table_column_map: dict[str, int], line: list[str, None], score_type: str
 ) -> str:
-    """Removes prefix from a string."""
-    filtered_string = input_str.removeprefix(f"{prefix}")
+    connors_column_field_map = {"T score": "T-score", "%": "90% CI"}
+    connors_field_name = connors_column_field_map[score_type]
+    connors_field_index = table_column_map[connors_field_name]
 
-    return filtered_string.lstrip(" ") if remove_left_whitespace else filtered_string
-
-
-def remove_nondigits(input_str: str) -> str:
-    """Remove all non-digits in a string"""
-    return re.sub(r"\D", "", input_str)
-
-
-def get_score(filtered_str: str, score_type: str) -> float:
-    """Get Conners score from filtered string."""
-    score = filtered_str[3] if score_type == "%" else filtered_str[1]
-    score = remove_nondigits(score)
-
-    return float(score)
+    return line[connors_field_index]
 
 
 def extract_conners_datafields(
     reformatted_pdf_files: str, conners_data_fields_dict: dict[str, str]
 ) -> dict[str, list[float]]:
     """Extracts the ADHD data from the pdf files."""
-    column_names_dict = create_column_names_dict(CSV_COLUMN_NAMES)
+    column_names_dict = create_column_names_dict()
 
     for pdf_file in reformatted_pdf_files:
-        stripped_text_list = replace_data_field_names(
-            extract_pdf_text(pdf_file=pdf_file, page_number=3)
+        table = replace_newline_with_space(
+            extract_pdf_text(pdf_file=pdf_file, page_number=3, use_pdfplumber=True)
         )
+        table_column_map = create_table_column_map(table)
 
         for key in conners_data_fields_dict.keys():
             data_field_name = conners_data_fields_dict[key]
-            if not (
-                filtered_text_list := filter_list(stripped_text_list, data_field_name)
-            ):
-                data_field_name = f"{data_field_name.rstrip(' ')}**"
-                filtered_text_list = filter_list(stripped_text_list, data_field_name)
-
-            filtered_data_list = remove_prefix(
-                filtered_text_list[0], data_field_name
-            ).split(" ")
-
             if key != "Prob":
                 for score_type in ["T score", "%"]:
                     column_names_dict[f"{key} {score_type}"].append(
-                        get_score(filtered_data_list, score_type)
+                        get_score(
+                            table_column_map,
+                            get_target_list(table, data_field_name),
+                            score_type,
+                        )
                     )
             else:
-                column_names_dict["Prob score %"].append(
-                    get_score(filtered_data_list, "Prob")
-                )
+                adhd_index_list = [
+                    x for x in get_target_list(table, "ADHD Index") if x and "%" in x
+                ]
+                column_names_dict["Prob score %"].append(adhd_index_list[0])
 
     return column_names_dict
 
 
 def run_pipeline(
-    pdf_dir: str, csv_file_path: str, subjects: Optional[list[str]] = None
+    pdf_dir: Path, csv_file_path: str, subjects: Optional[list[str]] = None
 ) -> None:
     """Main function to reformat filenames and extract Conners data."""
-    pdf_dir = rf"{pdf_dir}"
+    pdf_dir = Path(pdf_dir)
+
+    LGR.info("Standardizing PDF filenames...")
     standardize_pdf_filenames(pdf_dir)
 
     reformatted_pdf_files = sorted(
-        get_files(os.path.join(pdf_dir, "reformatted_filenames", "child"), "pdf")
+        get_files(pdf_dir / "reformatted_filenames" / "child", "pdf")
     )
 
-    data_fields_dict = convert_list_to_dict(CSV_COLUMN_NAMES)
+    data_fields_dict = initialization_sessions_dict()
     data_fields_dict["SN"] = get_subject_ids(reformatted_pdf_files, subjects)
     data_fields_dict["Visit"] = get_sessions(data_fields_dict["SN"])
     data_fields_dict["Snvisit"] = get_sn_visit(
         data_fields_dict["SN"], data_fields_dict["Visit"]
     )
 
-    conners_data_fields_dict = create_unique_column_dict(CSV_COLUMN_NAMES)
-    for key in list(conners_data_fields_dict.keys()):
-        if key in ["SN", "Visit", "Snvisit"]:
-            del conners_data_fields_dict[key]
-
-    stripped_text_list = extract_pdf_text(
-        pdf_file=reformatted_pdf_files[0], page_number=3
+    conners_data_fields_dict = dict(
+        zip(create_unique_column_dict(), UNIQUE_DATA_FIELD_NAMES)
     )
-    stripped_text_list = replace_data_field_names(stripped_text_list)
 
-    extracted_data_fields_list = []
-    for line in stripped_text_list:
-        extracted_data_fields_list.append(re.search(r"^(\D*)", line)[0])
-
-    for key, item in zip(conners_data_fields_dict.keys(), extracted_data_fields_list):
-        conners_data_fields_dict[key] = item
-
-    extracted_conners_data_dict = extract_conners_datafields(
+    LGR.info("Extracting Connors data...")
+    extracted_conners_data_dict = data_fields_dict | extract_conners_datafields(
         reformatted_pdf_files, conners_data_fields_dict
     )
 
-    for key in ["SN", "Visit", "Snvisit"]:
-        extracted_conners_data_dict[key] = data_fields_dict[key]
-
     file_name = (
-        os.path.join(pdf_dir, "reformatted_filenames", "conners_data.csv")
+        pdf_dir / "reformatted_filenames" / "conners_data.csv"
         if csv_file_path is None
         else csv_file_path
     )
 
     df = pd.DataFrame(extracted_conners_data_dict)
-    df.to_csv(file_name, sep=",", index=False)
+    # Fix for dash encoding issue
+    df.to_csv(file_name, sep=",", encoding="utf-8-sig", index=False)
+
+    return file_name

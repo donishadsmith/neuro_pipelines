@@ -1,4 +1,4 @@
-import sys
+import logging, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "connors"))
 
 import streamlit as st
 
-from _streamlit_utils import _select_content
+from _streamlit_utils import StreamlitLogHandler, _select_content
 
 from get_connors_score import run_pipeline
 
@@ -57,10 +57,14 @@ if st.button("Run Pipeline", type="primary"):
     if not st.session_state.get("pdf_dir"):
         st.error("Please select a source directory before running.")
     else:
-        with st.spinner("Processing..."):
-            dst_dir = run_pipeline(**kwargs)
+        with st.status("Running pipeline...", expanded=True) as status:
+            handler = StreamlitLogHandler(status)
+            logging.getLogger().addHandler(handler)
 
-        output_path = st.session_state.get("csv_file_path") or st.session_state.get(
-            "pdf_dir"
-        )
-        st.success(f"Data saved to: {output_path}")
+            output_path = run_pipeline(**kwargs)
+
+            logging.getLogger().removeHandler(handler)
+
+            status.update(
+                label=f"Data saved to: {output_path}", state="complete", expanded=False
+            )
