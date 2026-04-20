@@ -508,7 +508,11 @@ def _create_nback_eprime_events_files(
                 offset_column_name="StimDisplay.OffsetTime"
             )
             events["trial_type"] = extractor.extract_trial_types()
-            events["accuracy"] = extractor.extract_mean_accuracies()
+            events["accuracy"] = extractor.extract_mean_accuracies(
+                subject_response_column="StimDisplay.RESP",
+                correct_response_column="StimDisplay.CRESP",
+                response_required_only=True,
+            )
             events["reaction_time"] = extractor.extract_mean_reaction_times(
                 "StimDisplay.RTTime"
             )
@@ -749,7 +753,10 @@ def _create_princess_events_files(
                 for trial_type in extractor.extract_trial_types()
             ]
             events["block_cue"] = extractor.extract_trial_types()
-            events["accuracy"] = extractor.extract_mean_accuracies()
+            events["accuracy"] = extractor.extract_mean_accuracies(
+                subject_response_column="dagnacht.RESP",
+                correct_response_column="dagnacht.CRESP",
+            )
             events["reaction_time"] = extractor.extract_mean_reaction_times(
                 "dagnacht.RT"
             )
