@@ -39,9 +39,11 @@ class SubjectsVisitsFileError(Exception):
     """Exception for issues with the subjects sessions file."""
 
 
-def _resolve_directories(dst_dir, temp_dir):
+def _resolve_directories(dst_dir, temp_dir, caller):
     if not dst_dir:
-        dst_dir = Path().home() / "BIDS_Events"
+        dst_dir = Path().home() / (
+            "BIDS_Events" if caller == "BIDS Events" else "Behavioral_Data"
+        )
     else:
         dst_dir = Path(dst_dir)
 
@@ -282,6 +284,7 @@ def _create_flanker_events_files(
                 "false alarm": "incorrect",
             }
         )
+        events["reaction_time"] = extractor.extract_reaction_times()
         event_df = pd.DataFrame(events)
 
         # Specific accuracy case for miss
@@ -377,6 +380,7 @@ def _create_gng_events_files(
         events["duration"] = extractor.extract_durations()
         events["trial_type"] = extractor.extract_trial_types()
         events["response"] = extractor.extract_responses()
+        events["reaction_time"] = extractor.extract_reaction_times()
 
         if task == "simplegng":
             events["accuracy"] = extractor.extract_accuracies(
@@ -478,7 +482,11 @@ def _create_nback_eprime_events_files(
                 onset_column_name="StimDisplay.OnsetTime",
                 procedure_column_name="Procedure[Block]",
                 block_cue_names=("1-back", "center", "2-back"),
-                convert_to_seconds=["StimDisplay.OnsetTime", "StimDisplay.OffsetTime"],
+                convert_to_seconds=[
+                    "StimDisplay.OnsetTime",
+                    "StimDisplay.OffsetTime",
+                    "StimDisplay.RTTime",
+                ],
                 rest_block_codes="Rest",
                 quit_code="Quit",
                 rest_code_frequency="variable",
@@ -500,6 +508,13 @@ def _create_nback_eprime_events_files(
                 offset_column_name="StimDisplay.OffsetTime"
             )
             events["trial_type"] = extractor.extract_trial_types()
+            events["accuracy"] = extractor.extract_mean_accuracies()
+            events["reaction_time"] = extractor.extract_mean_reaction_times(
+                "StimDisplay.RTTime"
+            )
+            events["response_count"] = extractor.extract_response_counts(
+                "StimDisplay.RTTime"
+            )
             event_df = pd.DataFrame(events)
 
             event_df["duration"] = event_df["duration"].apply(
@@ -550,6 +565,11 @@ def _create_nback_presentation_events_files(
         events["onset"] = extractor.extract_onsets()
         events["duration"] = extractor.extract_durations()
         events["trial_type"] = extractor.extract_trial_types()
+        events["accuracy"] = extractor.extract_mean_accuracies(
+            {"hit": 1, "miss": 0, "other": float("nan"), "incorrect": 0, "correct": 1}
+        )
+        events["reaction_time"] = extractor.extract_mean_reaction_times()
+        events["response_count"] = extractor.extract_response_counts()
 
         event_df = pd.DataFrame(events)
         event_df["trial_type"] = event_df["trial_type"].replace(
@@ -611,6 +631,11 @@ def _create_mtl_events_files(
         durations[-1] = durations[-1] if durations[-1] != 0 else 20.0
         events["duration"] = durations
         events["trial_type"] = extractor.extract_trial_types()
+        events["accuracy"] = extractor.extract_mean_accuracies(
+            {"hit": 1, "miss": 0, "other": float("nan"), "incorrect": 0, "correct": 1}
+        )
+        events["reaction_time"] = extractor.extract_mean_reaction_times()
+        events["response_count"] = extractor.extract_response_counts()
 
         event_df = pd.DataFrame(events)
         event_df["trial_type"] = event_df["trial_type"].replace(
@@ -695,6 +720,7 @@ def _create_princess_events_files(
                     "dagnacht.OnsetTime",
                     "eind.OnsetTime",
                     "feedback.OffsetTime",
+                    "dagnacht.RT",
                 ],
                 split_cue_as_instruction=False,
             )
@@ -723,6 +749,11 @@ def _create_princess_events_files(
                 for trial_type in extractor.extract_trial_types()
             ]
             events["block_cue"] = extractor.extract_trial_types()
+            events["accuracy"] = extractor.extract_mean_accuracies()
+            events["reaction_time"] = extractor.extract_mean_reaction_times(
+                "dagnacht.RT"
+            )
+            events["response_count"] = extractor.extract_response_counts("dagnacht.RT")
 
             event_df = pd.DataFrame(events)
             # For some subjects, the recorded timing at the end may be about 1 second out of bounds
@@ -799,6 +830,7 @@ def run_pipeline(
     subjects_visits_file,
     subjects_visits_date_fmt,
     exclude_filenames,
+    caller,
 ):
     if task not in EVENTS_FUNC[cohort]:
         raise ValueError(
@@ -810,7 +842,7 @@ def run_pipeline(
 
     LGR.info("Resolving directories...")
     log_dir = Path(log_dir)
-    dst_dir, temp_dir = _resolve_directories(dst_dir, temp_dir)
+    dst_dir, temp_dir = _resolve_directories(dst_dir, temp_dir, caller)
 
     if subjects:
         subjects = _strip_entity(subjects)

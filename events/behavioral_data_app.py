@@ -6,6 +6,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "events"))
 
 from _events_utils import _app
 
-from create_event_files import run_pipeline
+from get_behavioral_data import run_pipeline
 
-_app(caller="BIDS Events", pipeline=run_pipeline)
+_app(caller="Behavioral Data", pipeline=run_pipeline)

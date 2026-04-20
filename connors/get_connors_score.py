@@ -1,6 +1,6 @@
 """Extract data from Conners 4."""
 
-import re, shutil
+import re, shutil, unicodedata
 from pathlib import Path
 from typing import Literal, Optional
 from datetime import datetime
@@ -16,6 +16,7 @@ CSV_COLUMN_NAMES = [
     "SN",
     "Visit",
     "Snvisit",
+    "Rater",
     "INA/EDF T score",
     "INA/EDF %",
     "HYP T score",
@@ -65,9 +66,9 @@ UNIQUE_DATA_FIELD_NAMES = [
 ]
 
 
-def get_files(target_dir: Path, ext: str) -> list[str]:
+def get_files(target_dir: Path, pattern: str) -> list[str]:
     """Gets files with a specific extension."""
-    return target_dir.glob(f"*.{ext}")
+    return target_dir.glob(pattern)
 
 
 def get_non_session_column_index() -> int:
@@ -160,9 +161,9 @@ def standardize_pdf_filenames(pdf_dir: Path) -> None:
     None
     """
     target_dir = pdf_dir / "reformatted_filenames"
-    target_dir.mkdir(exist_ok=True)
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-    pdf_files = get_files(pdf_dir, "pdf")
+    pdf_files = get_files(pdf_dir, "*.pdf")
     for pdf_file in pdf_files:
         stripped_page_list = extract_pdf_text(pdf_file, 0)
         rater = determine_rater(stripped_page_list)
@@ -182,7 +183,7 @@ def standardize_pdf_filenames(pdf_dir: Path) -> None:
 
         new_filename = f"sub-{sub_id}_date-{administration_date}_rater-{rater}"
         output_dir = target_dir / rater
-        output_dir.parent.mkdir(exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         output_file: Path = output_dir / pdf_file.name
         shutil.copyfile(pdf_file, output_file)
@@ -190,7 +191,8 @@ def standardize_pdf_filenames(pdf_dir: Path) -> None:
         new_filename = output_file.with_name(f"{new_filename}.pdf")
         if new_filename.exists():
             new_filename.unlink()
-            output_file.rename(new_filename)
+
+        output_file.rename(new_filename)
 
 
 def get_subject_ids(
@@ -211,14 +213,20 @@ def get_subject_ids(
             List of subject IDs.
     """
     subjects = subjects or []
+    if subjects:
+        reformatted_pdf_files = [
+            file
+            for file in reformatted_pdf_files
+            if any(subject in file for subject in subjects)
+        ]
+
     all_subjects_list = [
-        get_entity_value(file.name, "sub") for file in reformatted_pdf_files
+        (get_entity_value(file.name, "sub"), get_entity_value(file.name, "rater"))
+        for file in reformatted_pdf_files
     ]
 
-    if subjects:
-        return [subject for subject in all_subjects_list if subject in subjects]
-    else:
-        return all_subjects_list
+    print(all_subjects_list)
+    return zip(*all_subjects_list)
 
 
 def get_sessions(subject_id_list: list[str]) -> list[str]:
@@ -369,11 +377,19 @@ def run_pipeline(
     standardize_pdf_filenames(pdf_dir)
 
     reformatted_pdf_files = sorted(
-        get_files(pdf_dir / "reformatted_filenames" / "child", "pdf")
+        get_files(pdf_dir / "reformatted_filenames" / "child", "*sub-*.pdf")
+    )
+    reformatted_pdf_files += sorted(
+        get_files(pdf_dir / "reformatted_filenames" / "parent", "*sub-*.pdf")
     )
 
+    if not reformatted_pdf_files:
+        return None
+
     data_fields_dict = initialization_sessions_dict()
-    data_fields_dict["SN"] = get_subject_ids(reformatted_pdf_files, subjects)
+    data_fields_dict["SN"], data_fields_dict["Rater"] = get_subject_ids(
+        reformatted_pdf_files, subjects
+    )
     data_fields_dict["Visit"] = get_sessions(data_fields_dict["SN"])
     data_fields_dict["Snvisit"] = get_sn_visit(
         data_fields_dict["SN"], data_fields_dict["Visit"]
@@ -388,14 +404,36 @@ def run_pipeline(
         reformatted_pdf_files, conners_data_fields_dict
     )
 
-    file_name = (
+    df = pd.DataFrame(extracted_conners_data_dict)
+    df["SN"] = df["SN"].astype(str)
+    filename = (
         pdf_dir / "reformatted_filenames" / "conners_data.csv"
         if csv_file_path is None
         else csv_file_path
     )
+    if csv_file_path and Path(csv_file_path).exists():
+        LGR.info(f"Appending new data to {Path(filename).name}...")
+        if csv_file_path.endswith(".xlsx"):
+            original_df = pd.read_excel(filename)
+        else:
+            original_df = pd.read_csv(
+                filename, sep=None, engine="python", encoding="utf-8-sig"
+            )
 
-    df = pd.DataFrame(extracted_conners_data_dict)
-    # Fix for dash encoding issue
-    df.to_csv(file_name, sep=",", encoding="utf-8-sig", index=False)
+        original_df.columns = [col.replace("\ufeff", "") for col in original_df.columns]
+        original_df["SN"] = original_df["SN"].astype(str)
 
-    return file_name
+        df = pd.concat([original_df, df], axis=0, ignore_index=True)
+        df = df.drop_duplicates()
+
+        if csv_file_path.endswith(".xlsx"):
+            df.to_excel(filename)
+        else:
+            # Fix for dash encoding issue
+            df.to_csv(filename, sep=",", encoding="utf-8-sig", index=False)
+    else:
+        LGR.info(f"Creating {Path(filename).name}...")
+        # Fix for dash encoding issue
+        df.to_csv(filename, sep=",", encoding="utf-8-sig", index=False)
+
+    return filename

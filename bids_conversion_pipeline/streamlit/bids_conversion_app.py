@@ -186,12 +186,17 @@ if st.button("Run Pipeline", type="primary"):
     elif not st.session_state.subjects_visits_file:
         st.error("Please upload a subjects visits file before running.")
     else:
-        with st.status("Running pipeline", expanded=True) as status:
+        status_container = st.empty()
+        with status_container.status("Running pipeline...", expanded=True) as status:
             handler = StreamlitLogHandler(status)
             logging.getLogger().addHandler(handler)
 
             bids_dir = run_pipeline(**kwargs)
 
             logging.getLogger().removeHandler(handler)
-            
-            status.update(label=f"BIDS conversion complete. Dataset located at {bids_dir}", state="complete", expanded=False)
+
+            status.update(
+                label=f"BIDS conversion complete. Dataset located at {bids_dir}",
+                state="complete",
+                expanded=False,
+            )

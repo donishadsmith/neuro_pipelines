@@ -45,3 +45,42 @@ For a point-and-click interface, launch the Streamlit app:
 streamlit run bids_events_app.py
 ```
 
+---
+
+# Extracting Behavioral Data
+
+Generates a CSV summarizing accuracy and reaction time across subjects and sessions. Runs the events pipeline first, then reads the resulting TSV files to compute per-condition behavioral metrics.
+
+## Output Columns
+
+For **block tasks**: accuracy mean/std and weighted mean RT (weighted by response count per block) for each condition.
+
+For **event tasks**: accuracy mean/std, overall RT mean/std, and separate correct/error RT mean/std for each condition.
+
+## Command Line Interface (CLI)
+
+### Basic Usage
+
+```bash
+python behavioral_data_cli.py --log_dir /path/to/log/files --task nback --subjects_visits_file /path/to/visits.csv
+```
+
+### Appending to an Existing Behavioral Data File
+
+If a behavioral CSV already exists, new subjects/sessions are appended (duplicates are skipped):
+
+```bash
+python behavioral_data_cli.py --log_dir /path/to/log/files --task nback --subjects_visits_file /path/to/visits.csv --behavioral_data_file /path/to/existing_behavioral_data.csv
+```
+
+### Full Help
+
+```bash
+python behavioral_data_cli.py --help
+```
+
+## Streamlit Graphical User Interface (GUI)
+
+```bash
+streamlit run behavioral_data_app.py
+```

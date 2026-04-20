@@ -16,9 +16,9 @@
 
 # Pharmacological fMRI paper: https://pmc.ncbi.nlm.nih.gov/articles/PMC5067101/
 
-# =============================================
-# center FLOW VARIABLES (Set to true or false)
-# =============================================
+# ==============================================
+# PIPELINE FLOW VARIABLES (Set to true or false)
+# ==============================================
 RUN_FIRST_LEVEL=true                                    # Runs the individual first level analysis
 RUN_SECOND_LEVEL=true                                   # Runs the group level second level analysis
 RUN_CLUSTER_RESULTS=true                                # Determines the significant clusters and outputs to a table and various masks
