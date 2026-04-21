@@ -212,6 +212,8 @@ def add_info_to_data_table(
         )
     )
 
+    data_table["condition_label"] = beta_name
+
     second_level_glt_code_str = cluster_mask_filename.name.split("gltcode-")[-1].split(
         "_clusterid"
     )[0]
