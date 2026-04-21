@@ -510,12 +510,12 @@ def get_task_deconvolve_adults_cmd(
         deconvolve_cmd = {
             "num_stimts": "-num_stimts 5 ",
             "args": f"-stim_file 1 {seed_timeseries_file} -stim_label 1 {seed_name} "
-            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 3 0-back "
-            f"-stim_times 3 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 4 2-back "
-            f"-stim_file 4 {ppi_dir / 'PPI_0-back.1D'} -stim_label 6 PPI_0-back "
-            f"-stim_file 5 {ppi_dir / 'PPI_2-back.1D'} -stim_label 7 PPI_2-back "
+            f"-stim_times 2 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 2 0-back "
+            f"-stim_times 3 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 3 2-back "
+            f"-stim_file 4 {ppi_dir / 'PPI_0-back.1D'} -stim_label 4 PPI_0-back "
+            f"-stim_file 5 {ppi_dir / 'PPI_2-back.1D'} -stim_label 5 PPI_2-back "
             f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 2 PPI_2-back_vs_PPI_0-back ",
+            "-gltsym 'SYM: +1*PPI_2-back -1*PPI_0-back' -glt_label 1 PPI_2-back_vs_PPI_0-back ",
         }
     elif task == "mtle":
         deconvolve_cmd = {
