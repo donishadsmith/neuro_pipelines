@@ -181,7 +181,7 @@ def get_coordinate_from_filename(seed_mask_path, replace_underscore=True):
     possible_coordinate = ""
     if "_sphere_mask_" in seed_mask_path.name:
         possible_coordinate = seed_mask_path.name.split("_sphere_mask_")[1]
-        suffix = "".join(seed_mask_path.suffixes)
+        suffix = "".join(seed_mask_path.suffixes[3:])
         possible_coordinate = possible_coordinate.removesuffix(suffix)
         if replace_underscore:
             possible_coordinate = possible_coordinate.replace("_", ",")
