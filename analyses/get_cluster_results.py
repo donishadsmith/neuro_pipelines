@@ -311,10 +311,10 @@ def identify_clusters(
 
         if second_level_glt_code == "mean":
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"Mean {positive_interpretation.removesuffix('Increased').lower()} across doses > 0"
+                f"Mean {positive_interpretation.removeprefix('Increased').lower()} across doses > 0"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"Mean {positive_interpretation.removesuffix('Increased').lower()} across doses < 0"
+                f"Mean {negative_interpretation.removeprefix('Decreased').lower()} across doses < 0"
             )
         elif "_vs_" not in second_level_glt_code:
             clusters_table["Group"] = f"Within {second_level_glt_code}{suffix} only"

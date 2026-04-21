@@ -514,10 +514,10 @@ def _create_nback_eprime_events_files(
                 response_required_only=True,
             )
             events["reaction_time"] = extractor.extract_mean_reaction_times(
-                "StimDisplay.RTTime"
+                reaction_time_column_name="StimDisplay.RTTime",
             )
             events["response_count"] = extractor.extract_response_counts(
-                "StimDisplay.RTTime"
+                reaction_time_column_name="StimDisplay.RTTime",
             )
             event_df = pd.DataFrame(events)
 
@@ -569,11 +569,25 @@ def _create_nback_presentation_events_files(
         events["onset"] = extractor.extract_onsets()
         events["duration"] = extractor.extract_durations()
         events["trial_type"] = extractor.extract_trial_types()
+
+        # Ensure "other" not counted, for mean reaction time and response counts
+        # if one of the keys in the map is NaN it is ignored completely
+        response_map = {
+            "hit": 1,
+            "miss": 0,
+            "other": float("nan"),
+            "incorrect": 0,
+            "correct": 1,
+        }
         events["accuracy"] = extractor.extract_mean_accuracies(
-            {"hit": 1, "miss": 0, "other": float("nan"), "incorrect": 0, "correct": 1}
+            response_map=response_map
         )
-        events["reaction_time"] = extractor.extract_mean_reaction_times()
-        events["response_count"] = extractor.extract_response_counts()
+        events["reaction_time"] = extractor.extract_mean_reaction_times(
+            response_map=response_map
+        )
+        events["response_count"] = extractor.extract_response_counts(
+            response_map=response_map
+        )
 
         event_df = pd.DataFrame(events)
         event_df["trial_type"] = event_df["trial_type"].replace(
@@ -635,11 +649,23 @@ def _create_mtl_events_files(
         durations[-1] = durations[-1] if durations[-1] != 0 else 20.0
         events["duration"] = durations
         events["trial_type"] = extractor.extract_trial_types()
-        events["accuracy"] = extractor.extract_mean_accuracies(
-            {"hit": 1, "miss": 0, "other": float("nan"), "incorrect": 0, "correct": 1}
+
+        # Ensure "other" not counted, for mean reaction time and response counts
+        # if one of the keys in the map is NaN it is ignored completely
+        response_map = {
+            "hit": 1,
+            "miss": 0,
+            "other": float("nan"),
+            "incorrect": 0,
+            "correct": 1,
+        }
+        events["accuracy"] = extractor.extract_mean_accuracies(response_map)
+        events["reaction_time"] = extractor.extract_mean_reaction_times(
+            response_map=response_map
         )
-        events["reaction_time"] = extractor.extract_mean_reaction_times()
-        events["response_count"] = extractor.extract_response_counts()
+        events["response_count"] = extractor.extract_response_counts(
+            response_map=response_map
+        )
 
         event_df = pd.DataFrame(events)
         event_df["trial_type"] = event_df["trial_type"].replace(
@@ -756,11 +782,14 @@ def _create_princess_events_files(
             events["accuracy"] = extractor.extract_mean_accuracies(
                 subject_response_column="dagnacht.RESP",
                 correct_response_column="dagnacht.CRESP",
+                response_required_only=True,
             )
             events["reaction_time"] = extractor.extract_mean_reaction_times(
-                "dagnacht.RT"
+                reaction_time_column_name="dagnacht.RT",
             )
-            events["response_count"] = extractor.extract_response_counts("dagnacht.RT")
+            events["response_count"] = extractor.extract_response_counts(
+                reaction_time_column_name="dagnacht.RT",
+            )
 
             event_df = pd.DataFrame(events)
             # For some subjects, the recorded timing at the end may be about 1 second out of bounds

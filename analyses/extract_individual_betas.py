@@ -258,7 +258,8 @@ def get_subject_beta_filenames(
 
     if parent_path:
         subject_beta_filenames = [
-            parent_path / Path(file).name for file in subject_beta_filenames
+            next(parent_path.glob(f"*{Path(file).name}*"))
+            for file in subject_beta_filenames
         ]
 
     return subject_beta_filenames
