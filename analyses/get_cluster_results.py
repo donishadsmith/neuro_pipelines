@@ -7,6 +7,7 @@ from nilearn.masking import _unmask_3d
 from nilearn.maskers import nifti_spheres_masker
 from nilearn.plotting import plot_stat_map, plot_roi
 from nilearn.reporting import get_clusters_table
+from matplotlib.colors import ListedColormap
 from scipy.stats import norm
 
 from bidsaid.logging import setup_logger
@@ -501,7 +502,13 @@ def create_seed_masks(
 
         nib.save(sphere_mask, sphere_filename)
 
-        display = plot_roi(sphere_filename, bg_img=template_img_path, draw_cross=False)
+        display = plot_roi(
+            sphere_filename,
+            bg_img=template_img_path,
+            draw_cross=False,
+            cmap=ListedColormap(["red"]),
+            colorbar=False,
+        )
 
         plot_filename = plot_parent_path / sphere_filename.name.replace(
             ".nii.gz", ".png"
