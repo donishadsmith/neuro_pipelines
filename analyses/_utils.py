@@ -398,7 +398,7 @@ def get_group_labels(second_level_glt_code):
 
 
 def save_binary_mask(mask_img_fdata, affine, hdr, mask_filename):
-    """To save as a True binary mask and prevent equality index due to floating point issues"""
+    """To save as a true binary mask and prevent equality index due to floating point issues"""
     mask_img_fdata = mask_img_fdata.astype(np.int8)
     hdr.set_data_dtype(np.int8)
 
