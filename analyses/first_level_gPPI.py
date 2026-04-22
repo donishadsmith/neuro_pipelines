@@ -102,7 +102,7 @@ from _gen_afni_files import (
     create_nuisance_regressor_file,
     is_timing_file_empty,
 )
-from _argparse_typing import n_dummy_type, boolean_flags
+from _argparse_typing import n_dummy_type, boolean_flags, censor_mode_type
 from _models import create_design_matrix, perform_first_level
 from _utils import (
     VALID_TASK_NAMES,
@@ -244,7 +244,8 @@ def _get_cmd_args():
         required=False,
         help=(
             "Number of dummy scans to remove. If 'auto' computes number of dummy scans "
-            "by the numnber of 'non_steady_state_outlier_XX' columns."
+            "by the numnber of 'non_steady_state_outlier_XX' columns. Used for the seed timeseries "
+            "and BOLD image."
         ),
     )
     parser.add_argument(
@@ -285,6 +286,39 @@ def _get_cmd_args():
         type=int,
         required=False,
         help="Spatial blurring.",
+    )
+    parser.add_argument(
+        "--clean_seed_timeseries",
+        dest="clean_seed_timeseries",
+        default=True,
+        type=boolean_flags,
+        required=False,
+        help="Whether to denoise the seed timeseries.",
+    ),
+    parser.add_argument(
+        "--n_seed_motion_parameters",
+        dest="n_seed_motion_parameters",
+        default=6,
+        type=int,
+        choices=[6, 12, 18, 24],
+        required=False,
+        help=(
+            "Number of motion parameters to use for the seed timeseries: 6 (base trans + rot), "
+            "12 (base + derivatives), 18 (base + derivatives + power), "
+            "24 (base + derivatives + power + derivative power). "
+            "Seed denoising will always exclusively use 6 motion parameters (base trans + rot)"
+        ),
+    )
+    parser.add_argument(
+        "--seed_motion_censor_mode",
+        dest="seed_motion_censor_mode",
+        default="ZERO",
+        type=censor_mode_type,
+        required=False,
+        help=(
+            "Whether to set censored volumes to 'ZERO' or not to censor. "
+            "Everything that is not is set to None."
+        ),
     )
     parser.add_argument(
         "--upsample_dt",
@@ -392,6 +426,8 @@ def denoise_seed_timeseries(
     task,
     space,
     seed_timeseries_file,
+    n_seed_motion_parameters,
+    seed_motion_censor_mode,
     censor_file,
     afni_img_path,
     confounds_df,
@@ -401,15 +437,15 @@ def denoise_seed_timeseries(
         seed_timeseries_file.parent
         / seed_timeseries_file.name.replace("_desc-timeseries", "_desc-denoised")
     )
-    regressor_names = ["trans_x", "trans_y", "trans_z", "rot_x", "rot_y", "rot_z"]
-    motion_regressors = confounds_df[regressor_names].to_numpy()
+    motion_regressors, regressor_names = get_motion_regressors(confounds_df, n_seed_motion_parameters)
 
-    LGR.info(
-        "Only the six base motion parameters will be used to denoise the "
-        f"seed timeseries: {regressor_names}"
-    )
+    if seed_motion_censor_mode == "ZERO":
+        censor_mask = np.loadtxt(censor_file)
+        censor_str = f"-censor {censor_file} -cenmode {seed_motion_censor_mode} "
+    else:
+        censor_mask = None
+        censor_str = ""
 
-    censor_mask = np.loadtxt(censor_file)
     seed_nuisance_regressor_file = create_nuisance_regressor_file(
         subject_analysis_dir,
         subject,
@@ -420,8 +456,10 @@ def denoise_seed_timeseries(
         regressor_names,
         motion_regressors,
         regressor_file_prefix="seed",
+        identity="seed"
     )
 
+    LGR.info(f"The following seed censor mode will be used: {seed_motion_censor_mode}")
     # Note: Some Afni functions only accept rows and require \', using \\' to
     # make the backslash literal
     cmd = (
@@ -429,8 +467,7 @@ def denoise_seed_timeseries(
         f"-input {seed_timeseries_file}\\' "
         f"-ort {seed_nuisance_regressor_file} "
         f"-polort A "
-        f"-censor {censor_file} "
-        "-cenmode ZERO "
+        f"{censor_str}"
         f"-prefix {denoised_seed_timeseries_file}"
     )
 
@@ -680,7 +717,7 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
     if method == "upsample":
         resampled_filename = target_file.parent / target_file.name.replace(
             "_desc-denoised", "_desc-upsampled"
-        )
+        ).replace("_desc-timeseries", "_desc-upsampled")
 
         # New length of interpolated timseries is (tr / upsample_dt) * n_original_volumes
         cmd = (
@@ -872,6 +909,9 @@ def main(
     n_acompcor,
     acompcor_strategy,
     fwhm,
+    clean_seed_timeseries,
+    n_seed_motion_parameters,
+    seed_motion_censor_mode,
     upsample_dt,
     pad_seconds,
     faltung_penalty_syntax,
@@ -1098,22 +1138,27 @@ def main(
         plot_title = "Seed Timeseries"
         plot_signal(seed_timeseries_file, nifti_file, plot_title)
 
-        denoised_seed_timeseries_file = denoise_seed_timeseries(
-            subject_analysis_dir,
-            subject,
-            session,
-            task,
-            space,
-            seed_timeseries_file,
-            censor_file,
-            afni_img_path,
-            confounds_df,
-        )
-        plot_title = "Denoised Seed Timeseries"
-        plot_signal(denoised_seed_timeseries_file, nifti_file, plot_title)
+        if clean_seed_timeseries:
+            seed_timeseries_file = denoise_seed_timeseries(
+                subject_analysis_dir,
+                subject,
+                session,
+                task,
+                space,
+                seed_timeseries_file,
+                n_seed_motion_parameters,
+                seed_motion_censor_mode,
+                censor_file,
+                afni_img_path,
+                confounds_df,
+            )
+            plot_title = "Denoised Seed Timeseries"
+            plot_signal(seed_timeseries_file, nifti_file, plot_title)
+        else:
+            LGR.info("Seed denoising has been skipped")
 
         upsampled_seed_timeseries_file = resample_data(
-            denoised_seed_timeseries_file,
+            seed_timeseries_file,
             tr,
             afni_img_path,
             upsample_dt,

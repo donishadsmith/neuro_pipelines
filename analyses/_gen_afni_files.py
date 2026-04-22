@@ -29,9 +29,11 @@ def create_nuisance_regressor_file(
     regressor_names,
     *regressor_arrays,
     regressor_file_prefix="3ddeconvolve",
+    identity="BOLD"
 ):
     regressor_positions = {pos: name for pos, name in enumerate(regressor_names)}
-    LGR.info(f"Regressor names and positions: {regressor_positions}")
+    identity_str = "BOLD/NIfTI image" if identity == "BOLD" else "seed timeseries" 
+    LGR.info(f"Regressor names for the {identity_str} and positions: {regressor_positions}")
     regressor_file = (
         subject_dir
         / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-{regressor_file_prefix}_nuisance_regressors.1D"
@@ -58,6 +60,13 @@ def create_nuisance_regressor_file(
         )
 
         LGR.warning(f"New regressor names and positions: {regressor_positions}")
+
+    if censor_mask is None:
+        LGR.info("No volume censoring will be done.")
+        censor_mask = np.ones(data.shape[0])
+    else:
+        censored_volumes = np.where(censor_mask == 0)[0].tolist()
+        LGR.info(f"The following volume indices will be censored: {censored_volumes}")
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)

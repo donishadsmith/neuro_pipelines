@@ -377,6 +377,13 @@ def exclude_beta_files(beta_files, exclude_niftis_file):
         "nifti_prefix_filename"
     ].tolist()
 
+    LGR.info(
+        (
+            "Beta image files starting with the following prefixes "
+            f"will be excluded: {excluded_niftis_prefixes}"
+        )
+    )
+
     return [
         beta_file
         for beta_file in beta_files
