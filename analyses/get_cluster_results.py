@@ -22,6 +22,7 @@ from _utils import (
     in_between_group_code,
     get_between_group_code,
     resample_seed_img,
+    save_binary_mask,
 )
 
 LGR = setup_logger(__name__)
@@ -373,18 +374,17 @@ def identify_clusters(
                 label_mask_fdata = np.zeros_like(label_map.get_fdata())
                 label_mask_fdata[label_map.get_fdata() == label_id] = 1
 
-                hdr = label_map.header.copy()
-                hdr.set_data_dtype(np.int8)
-
-                label_mask_img = nib.nifti1.Nifti1Image(
-                    label_mask_fdata, label_map.affine, hdr
-                )
                 label_mask_filename = label_base_dir / (
                     f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
                     f"_clusterid-{cluster_id}_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
                 )
 
-                nib.save(label_mask_img, label_mask_filename)
+                save_binary_mask(
+                    label_mask_fdata,
+                    label_map.affine,
+                    label_map.header.copy(),
+                    label_mask_filename,
+                )
 
     return cluster_table_filename
 
@@ -489,7 +489,7 @@ def create_seed_masks(
 
         sphere_mask = _unmask_3d(
             X=A.toarray().flatten(), mask=template_mask.get_fdata().astype(bool)
-        )
+        ).astype(np.int8)
 
         hdr = template_mask.header.copy()
         hdr.set_data_dtype(np.int8)

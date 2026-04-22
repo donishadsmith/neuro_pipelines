@@ -395,3 +395,13 @@ def drop_dose_rows(data_table, dose_list, only_paired_data=False):
 
 def get_group_labels(second_level_glt_code):
     return second_level_glt_code.split("_vs_")
+
+
+def save_binary_mask(mask_img_fdata, affine, hdr, mask_filename):
+    """To save as a True binary mask and prevent equality index due to floating point issues"""
+    mask_img_fdata = mask_img_fdata.astype(np.int8)
+    hdr.set_data_dtype(np.int8)
+
+    mask_img = nib.nifti1.Nifti1Image(mask_img_fdata, affine, hdr)
+
+    nib.save(mask_img, mask_filename)

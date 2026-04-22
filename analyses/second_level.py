@@ -26,6 +26,7 @@ from _utils import (
     estimate_noise_smoothness,
     perform_cluster_simulation,
     threshold_palm_output,
+    save_binary_mask,
 )
 
 LGR = setup_logger(__name__)
@@ -534,6 +535,13 @@ def create_group_mask(
         gm_mask_threshold=gm_mask_threshold,
     )
     group_mask = reduce_search_space(group_mask, apriori_img_path, mask_type="apriori")
+
+    save_binary_mask(
+        group_mask.get_fdata(),
+        group_mask.affine,
+        group_mask.header.copy(),
+        group_mask_filename,
+    )
 
     nib.save(group_mask, group_mask_filename)
 

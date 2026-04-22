@@ -992,6 +992,7 @@ def main(
             n_dummy_scans=n_dummy_scans,
             threshold=fd_threshold,
         )
+        censor_mask = censor_mask.astype(np.int8)
 
         kept = censor_mask[n_dummy_scans:]
         n_censored = np.sum(kept == 0)
