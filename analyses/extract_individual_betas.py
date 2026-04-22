@@ -153,7 +153,12 @@ def save_tabular_data(
         data_table.to_excel(str(data_filename).replace(".csv", ".xlsx"), index=False)
 
 
-def get_individual_interpretations(data_table, beta_name, mask_origin, analysis_type):
+def get_individual_interpretations(
+    data_table, beta_name, mask_origin, analysis_type, remove_PPI_prefix=False
+):
+    if remove_PPI_prefix:
+        beta_name = beta_name.replace("PPI_", "")
+
     betas = data_table[f"{analysis_type}_individual_{mask_origin}_beta"].to_numpy(
         copy=True
     )
@@ -423,7 +428,12 @@ def main(
                 truncated_df = drop_dose_rows(
                     data_table, get_nontarget_dose(second_level_glt_code, cohort)
                 )
-                beta_names = get_beta_names(first_level_glt_label)
+                # The individual conditions for gPPI are main effects and should not be interpreted
+                # since there is an interaction term in the model
+                beta_names = get_beta_names(
+                    first_level_glt_label,
+                    create_sub_conditions=(analysis_type == "glm"),
+                )
 
             for beta_name in beta_names:
                 subject_beta_filenames = get_subject_beta_filenames(
@@ -480,6 +490,7 @@ def main(
                             beta_name,
                             mask_origin="cluster",
                             analysis_type="glm",
+                            remove_PPI_prefix=True,
                         )
 
                         if seed_mask_path:
@@ -510,6 +521,7 @@ def main(
                                 beta_name,
                                 mask_origin="seed",
                                 analysis_type="glm",
+                                remove_PPI_prefix=True,
                             )
 
                     beta_coefficient_df["units_of_beta_coefficient"] = (

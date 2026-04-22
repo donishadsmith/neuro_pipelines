@@ -373,8 +373,11 @@ def identify_clusters(
                 label_mask_fdata = np.zeros_like(label_map.get_fdata())
                 label_mask_fdata[label_map.get_fdata() == label_id] = 1
 
+                hdr = label_map.header.copy()
+                hdr.set_data_dtype(np.int8)
+
                 label_mask_img = nib.nifti1.Nifti1Image(
-                    label_mask_fdata, label_map.affine, label_map.header
+                    label_mask_fdata, label_map.affine, hdr
                 )
                 label_mask_filename = label_base_dir / (
                     f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
@@ -488,9 +491,10 @@ def create_seed_masks(
             X=A.toarray().flatten(), mask=template_mask.get_fdata().astype(bool)
         )
 
-        sphere_mask = nib.nifti1.Nifti1Image(
-            sphere_mask, template_mask.affine, template_mask.header
-        )
+        hdr = template_mask.header.copy()
+        hdr.set_data_dtype(np.int8)
+
+        sphere_mask = nib.nifti1.Nifti1Image(sphere_mask, template_mask.affine, hdr)
         sphere_mask = resample_seed_img(sphere_mask, thresholded_img)
 
         coord_name = "_".join([str(x) for x in coord])

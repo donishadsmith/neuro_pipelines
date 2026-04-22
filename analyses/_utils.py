@@ -135,9 +135,12 @@ def modify_contrast_names(contrasts):
     return modified_contrasts
 
 
-def get_beta_names(gltsyms, add_coef_str=False):
+def get_beta_names(gltsyms, add_coef_str=False, create_sub_conditions=True):
     if isinstance(gltsyms, str):
         gltsyms = [gltsyms]
+
+    if not create_sub_conditions:
+        return gltsyms
 
     beta_names = []
     for gltsym in gltsyms:
