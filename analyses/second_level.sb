@@ -88,7 +88,7 @@ if [[ -n $FIRST_LEVEL_GLT_LABEL ]]; then
 fi
 
 if [[ -n $EXCLUDE_NIFTI_FILES ]]; then
-	CMD+=" --exclude_niftis_file $EXCLUDE_NIFTI_FILES"
+	CMD+=" --exclude_nifti_files $EXCLUDE_NIFTI_FILES"
 fi
 
 if [[ $METHOD == "nonparametric" ]]; then
