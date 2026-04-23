@@ -33,7 +33,7 @@ EMAIL_ADDRESS=""                                        # Email address to repor
 # ========================
 export FMRIPREP_VERSION="25.2.3"                        # Version of fMRIPrep being used
 export ANALYSIS_TYPE="glm"                              # Choose "glm" or "gPPI"
-export METHOD="nonparametric"                           # Choose "parametric" or "nonparametric"
+export METHOD="parametric"                              # Choose "parametric" or "nonparametric"
 export SEED_MASK_PATH=""                                # Add path if using gPPI
 export COHORT="kids"                                    # Choose "kids" or "adults"
 
@@ -55,16 +55,12 @@ TASKS=("all")                                           # Set all or specific on
 export N_MOTION_PARAMETERS=12                            # Choose 6, 12, 18, 24
 export ACOMPCOR_STRATEGY="separate"                      # Choose "combined", "separate", or "none"; The "separate" options uses the white matter and CSF acompcor, so N_ACOMPCORS=5 adds 10 parameters
 export N_ACOMPCORS=5                                     # Recommend choosing 5 or 6
-export N_GLOBAL_PARAMETERS=0                             # Choose 0, 1, 2, 3, or 4
 export FD_THRESHOLD=0.5                                  # Choose a float between 0-1.0
 export EXCLUSION_CRITERIA=0.3                            # Choose a float between 0.20-0.40
 export FWHM=6                                            # Choose integer
 export FILTER_CORRECT_TRIALS=false                       # Filter event-related tasks for correctness set to true or false
 
 # GPPI SPECIFIC PARAMETERS
-export GPPI_CLEAN_SEED_TIMESERIES=true                   # Choose true or false
-export GPPI_N_SEED_MOTION_PARAMETERS=6                   # Choose 6, 12, 18, 24; Should NOT be more than N_MOTION_PARAMETERS
-export GPPI_SEED_MOTION_CENSOR_MODE="ZERO"               # Choose ZERO to implement seed censoring before deconvolution. Anything else is None
 export GPPI_UPSAMPLE_DT=0.1						         # Choose float, Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.
 export GPPI_PAD_SECONDS=10.0                             # Choose float, pads timeseries for deconvolution for gPPI
 export GPPI_FALTUNG_PENALTY_SYNTAX="012 0"               # Deconvolution penalty syntax. See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"

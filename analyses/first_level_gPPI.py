@@ -17,9 +17,8 @@ AFNI:
 2) PSC scaling of NIfTI image, compute mean for censored files
 3) Resample mask to NIfTI (if needed) then extract timeseries
 4) Tranpose the seed timeseries to a column vector
-5) Denoise seed timeseries not too aggressively, we want to keep the temporal autocorrelation
-in the seed timeseries to not bias the deconvolution later. Ensure regular OLS is used just to
-orthogonalize to the minimal nuisance regressors, no prewhitening should be done to prevent
+5) Denoise seed timeseries. Do same denoising with seed and image. Ensure regular OLS is used just
+to orthogonalize to the nuisance regressors for the seed, no prewhitening should be done to prevent
 temporal autocorrelation in the residuals. Note that smoothing is not done prior
 to extracting the seed, the timeseries is already averaged which helps with spatial noise
 reduction. More importantly, smoothing blur signal outside of the voxels of interest into
@@ -91,7 +90,6 @@ from bidsaid.qc import (
 from _denoising import (
     get_acompcor_component_names,
     get_cosine_regressors,
-    get_global_signal_regressors,
     get_motion_regressors,
     percent_signal_change,
     perform_spatial_smoothing,
@@ -214,7 +212,6 @@ def _get_cmd_args():
             "Number of motion parameters to use: 6 (base trans + rot), "
             "12 (base + derivatives), 18 (base + derivatives + power), "
             "24 (base + derivatives + power + derivative power). "
-            "Seed denoising will always exclusively use 6 motion parameters (base trans + rot)"
         ),
     )
     parser.add_argument(
@@ -244,8 +241,7 @@ def _get_cmd_args():
         required=False,
         help=(
             "Number of dummy scans to remove. If 'auto' computes number of dummy scans "
-            "by the numnber of 'non_steady_state_outlier_XX' columns. Used for the seed timeseries "
-            "and BOLD image."
+            "by the numnber of 'non_steady_state_outlier_XX' columns."
         ),
     )
     parser.add_argument(
@@ -266,59 +262,12 @@ def _get_cmd_args():
         help="Whether to use 'combined' aCompCor, 'separate' components, or 'none'.",
     )
     parser.add_argument(
-        "--n_global_parameters",
-        dest="n_global_parameters",
-        default=0,
-        choices=[0, 1, 2, 3, 4],
-        type=int,
-        required=False,
-        help=(
-            "Global signal regression. If 0, no global signal parameters used. "
-            "If 1, 'global_signal' is used, if 2 'global_signal' and 'global_signal_derivative1' used "
-            "If 3, 'global_signal', global_signal_derivative1', and global_signal_power2' used. "
-            "If 4, 'global_signal', global_signal_derivative1', global_signal_power2', an global_signal_derivative1_power2' used."
-        ),
-    )
-    parser.add_argument(
         "--fwhm",
         dest="fwhm",
         default=6,
         type=int,
         required=False,
         help="Spatial blurring.",
-    )
-    parser.add_argument(
-        "--clean_seed_timeseries",
-        dest="clean_seed_timeseries",
-        default=True,
-        type=boolean_flags,
-        required=False,
-        help="Whether to denoise the seed timeseries.",
-    ),
-    parser.add_argument(
-        "--n_seed_motion_parameters",
-        dest="n_seed_motion_parameters",
-        default=6,
-        type=int,
-        choices=[6, 12, 18, 24],
-        required=False,
-        help=(
-            "Number of motion parameters to use for the seed timeseries: 6 (base trans + rot), "
-            "12 (base + derivatives), 18 (base + derivatives + power), "
-            "24 (base + derivatives + power + derivative power). "
-            "Seed denoising will always exclusively use 6 motion parameters (base trans + rot)"
-        ),
-    )
-    parser.add_argument(
-        "--seed_motion_censor_mode",
-        dest="seed_motion_censor_mode",
-        default="ZERO",
-        type=censor_mode_type,
-        required=False,
-        help=(
-            "Whether to set censored volumes to 'ZERO' or not to censor. "
-            "Everything that is not is set to None."
-        ),
     )
     parser.add_argument(
         "--upsample_dt",
@@ -420,58 +369,31 @@ def plot_signal(
 
 
 def denoise_seed_timeseries(
-    subject_analysis_dir,
-    subject,
-    session,
-    task,
-    space,
-    seed_timeseries_file,
-    n_seed_motion_parameters,
-    seed_motion_censor_mode,
-    censor_file,
     afni_img_path,
-    confounds_df,
+    seed_timeseries_file,
+    nuisance_regressors_file,
+    censor_file,
 ):
-
     denoised_seed_timeseries_file = (
         seed_timeseries_file.parent
         / seed_timeseries_file.name.replace("_desc-timeseries", "_desc-denoised")
     )
-    motion_regressors, regressor_names = get_motion_regressors(confounds_df, n_seed_motion_parameters)
 
-    if seed_motion_censor_mode == "ZERO":
-        censor_mask = np.loadtxt(censor_file)
-        censor_str = f"-censor {censor_file} -cenmode {seed_motion_censor_mode} "
-    else:
-        censor_mask = None
-        censor_str = ""
-
-    seed_nuisance_regressor_file = create_nuisance_regressor_file(
-        subject_analysis_dir,
-        subject,
-        session,
-        task,
-        space,
-        censor_mask,
-        regressor_names,
-        motion_regressors,
-        regressor_file_prefix="seed",
-        identity="seed"
-    )
-
-    LGR.info(f"The following seed censor mode will be used: {seed_motion_censor_mode}")
     # Note: Some Afni functions only accept rows and require \', using \\' to
     # make the backslash literal
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "
         f"-input {seed_timeseries_file}\\' "
-        f"-ort {seed_nuisance_regressor_file} "
+        f"-ort {nuisance_regressors_file} "
         f"-polort A "
-        f"{censor_str}"
+        f"-censor {censor_file} "
+        "-cenmode ZERO"
         f"-prefix {denoised_seed_timeseries_file}"
     )
 
-    LGR.info(f"Denoising seed: {cmd}")
+    LGR.info(
+        f"Denoising seed (same nuisance regressors used for seed and BOLD/NIfTI image): {cmd}"
+    )
     subprocess.run(cmd, shell=True, check=True)
 
     return denoised_seed_timeseries_file
@@ -902,16 +824,12 @@ def main(
     task,
     filter_correct_trials,
     n_motion_parameters,
-    n_global_parameters,
     fd_threshold,
     exclusion_criteria,
     n_dummy_scans,
     n_acompcor,
     acompcor_strategy,
     fwhm,
-    clean_seed_timeseries,
-    n_seed_motion_parameters,
-    seed_motion_censor_mode,
     upsample_dt,
     pad_seconds,
     faltung_penalty_syntax,
@@ -1074,19 +992,12 @@ def main(
                 copy=True
             )
 
-        global_regressors, global_regressor_names = (
-            get_global_signal_regressors(confounds_df, n_global_parameters)
-            if n_global_parameters
-            else (None, None)
-        )
-
         regressor_names_nested_list = filter(
             None,
             [
                 cosine_regressor_names,
                 motion_regressor_names,
                 acompcor_regressor_names,
-                global_regressor_names,
             ],
         )
         regressor_names = [
@@ -1105,7 +1016,7 @@ def main(
             cosine_regressors,
             motion_regressors,
             acompcor_regressors,
-            global_regressors,
+            analysis_type="gPPI",
         )
 
         timing_dir = create_timing_files(
@@ -1138,27 +1049,17 @@ def main(
         plot_title = "Seed Timeseries"
         plot_signal(seed_timeseries_file, nifti_file, plot_title)
 
-        if clean_seed_timeseries:
-            seed_timeseries_file = denoise_seed_timeseries(
-                subject_analysis_dir,
-                subject,
-                session,
-                task,
-                space,
-                seed_timeseries_file,
-                n_seed_motion_parameters,
-                seed_motion_censor_mode,
-                censor_file,
-                afni_img_path,
-                confounds_df,
-            )
-            plot_title = "Denoised Seed Timeseries"
-            plot_signal(seed_timeseries_file, nifti_file, plot_title)
-        else:
-            LGR.info("Seed denoising has been skipped")
+        denoised_seed_timeseries_file = denoise_seed_timeseries(
+            afni_img_path,
+            seed_timeseries_file,
+            nuisance_regressors_file,
+            censor_file,
+        )
+        plot_title = "Denoised Seed Timeseries"
+        plot_signal(denoised_seed_timeseries_file, nifti_file, plot_title)
 
         upsampled_seed_timeseries_file = resample_data(
-            seed_timeseries_file,
+            denoised_seed_timeseries_file,
             tr,
             afni_img_path,
             upsample_dt,

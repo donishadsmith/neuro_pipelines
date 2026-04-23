@@ -75,22 +75,6 @@ def get_acompcor_component_names(confounds_json_data, n_components, strategy):
     return components_list
 
 
-def get_global_signal_regressors(confounds_df, n_global_parameters):
-    global_params = ["global_signal"]
-    if n_global_parameters in [2, 3, 4]:
-        global_params += ["global_signal_derivative1"]
-
-    if n_global_parameters in [3, 4]:
-        global_params += ["global_signal_power2"]
-
-    if n_global_parameters == 4:
-        global_params += ["global_signal_derivative1_power2"]
-
-    LGR.info(f"Using global signal parameters: {global_params}")
-
-    return confounds_df[global_params].to_numpy(copy=True), global_params
-
-
 def percent_signal_change(
     subject_dir, afni_img_path, nifti_file, mask_file, censor_file
 ):

@@ -29,11 +29,16 @@ def create_nuisance_regressor_file(
     regressor_names,
     *regressor_arrays,
     regressor_file_prefix="3ddeconvolve",
-    identity="BOLD"
+    analysis_type="glm",
 ):
     regressor_positions = {pos: name for pos, name in enumerate(regressor_names)}
-    identity_str = "BOLD/NIfTI image" if identity == "BOLD" else "seed timeseries" 
-    LGR.info(f"Regressor names for the {identity_str} and positions: {regressor_positions}")
+    dependent_var = "BOLD/NIfTI image"
+    if analysis_type == "gPPI":
+        dependent_var += " and seed timeseries"
+
+    LGR.info(
+        f"Regressor names for the {dependent_var} and positions: {regressor_positions}"
+    )
     regressor_file = (
         subject_dir
         / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-{regressor_file_prefix}_nuisance_regressors.1D"
@@ -61,12 +66,8 @@ def create_nuisance_regressor_file(
 
         LGR.warning(f"New regressor names and positions: {regressor_positions}")
 
-    if censor_mask is None:
-        LGR.info("No volume censoring will be done.")
-        censor_mask = np.ones(data.shape[0])
-    else:
-        censored_volumes = np.where(censor_mask == 0)[0].tolist()
-        LGR.info(f"The following volume indices will be censored: {censored_volumes}")
+    censored_volumes = np.where(censor_mask == 0)[0].tolist()
+    LGR.info(f"The following volume indices will be censored: {censored_volumes}")
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)

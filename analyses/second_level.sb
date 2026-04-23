@@ -17,7 +17,7 @@ module load matlab
 FMRIPREP_VERSION=${FMRIPREP_VERSION:-"25.2.3"}
 
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
-METHOD=${METHOD:-nonparametric}
+METHOD=${METHOD:-parametric}
 
 COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
 BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"

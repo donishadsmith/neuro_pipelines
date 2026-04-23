@@ -24,7 +24,6 @@ from bidsaid.qc import compute_n_dummy_scans, create_censor_mask
 from _denoising import (
     get_acompcor_component_names,
     get_cosine_regressors,
-    get_global_signal_regressors,
     get_motion_regressors,
     percent_signal_change,
     perform_spatial_smoothing,
@@ -152,20 +151,6 @@ def _get_cmd_args():
         choices=["combined", "separate", "none"],
         required=False,
         help="Whether to use 'combined' aCompCor, 'separate' components, or 'none'",
-    )
-    parser.add_argument(
-        "--n_global_parameters",
-        dest="n_global_parameters",
-        default=0,
-        choices=[0, 1, 2, 3, 4],
-        type=int,
-        required=False,
-        help=(
-            "Global signal regression. If 0, no global signal parameters used. "
-            "If 1, 'global_signal' is used, if 2 'global_signal' and 'global_signal_derivative1' used "
-            "If 3, 'global_signal', global_signal_derivative1', and global_signal_power2' used. "
-            "If 4, 'global_signal', global_signal_derivative1', global_signal_power2', an global_signal_derivative1_power2' used."
-        ),
     )
     parser.add_argument(
         "--fwhm",
@@ -359,7 +344,6 @@ def main(
     task,
     filter_correct_trials,
     n_motion_parameters,
-    n_global_parameters,
     fd_threshold,
     exclusion_criteria,
     n_dummy_scans,
@@ -523,19 +507,12 @@ def main(
                 copy=True
             )
 
-        global_regressors, global_regressor_names = (
-            get_global_signal_regressors(confounds_df, n_global_parameters)
-            if n_global_parameters
-            else (None, None)
-        )
-
         regressor_names_nested_list = filter(
             None,
             [
                 cosine_regressor_names,
                 motion_regressor_names,
                 acompcor_regressor_names,
-                global_regressor_names,
             ],
         )
         regressor_names = [
@@ -554,7 +531,6 @@ def main(
             cosine_regressors,
             motion_regressors,
             acompcor_regressors,
-            global_regressors,
         )
 
         timing_dir = create_timing_files(

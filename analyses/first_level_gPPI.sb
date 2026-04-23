@@ -34,13 +34,9 @@ FILTER_CORRECT_TRIALS=${FILTER_CORRECT_TRIALS:-false}                 # Filter e
 N_MOTION_PARAMETERS=${N_MOTION_PARAMETERS:-12}                        # Choose 6, 12, 18, 24
 N_ACOMPCORS=${N_ACOMPCORS:-5}                                         # Recommend choosing 5 or 6
 ACOMPCOR_STRATEGY=${ACOMPCOR_STRATEGY:-"separate"}                    # Choose "combined" or "separate"
-N_GLOBAL_PARAMETERS=${N_GLOBAL_PARAMETERS:-0}                         # Choose 0, 1, 2, 3, or 4
 FD_THRESHOLD=${FD_THRESHOLD:-0.5}                                     # Choose a float between 0-1.0
 EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.3}                         # Choose a float between 0.20-0.40
 FWHM=${FWHM:-6}                                                       # Choose integer
-GPPI_CLEAN_SEED_TIMESERIES=${GPPI_CLEAN_SEED_TIMESERIES:-true}        # Choose true or false
-GPPI_N_SEED_MOTION_PARAMETERS=${GPPI_N_SEED_MOTION_PARAMETERS:-6}     # Choose 6, 12, 18, 24; Should NOT be more than N_MOTION_PARAMETERS
-GPPI_SEED_MOTION_CENSOR_MODE=${GPPI_SEED_MOTION_CENSOR_MODE:-"ZERO"}  # Choose ZERO to implement seed censoring before deconvolution. Anything else is None
 GPPI_UPSAMPLE_DT=${GPPI_UPSAMPLE_DT:-0.1} 						      # Choose float, Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.
 GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-10.0}                            # Choose float, pads timeseries for deconvolution for gPPI
 GPPI_FALTUNG_PENALTY_SYNTAX=${GPPI_FALTUNG_PENALTY_SYNTAX:-"012 0"}   # Deconvolution penalty syntax. See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"
@@ -72,13 +68,9 @@ CMD="$PYTHON first_level_gPPI.py \
 	--n_motion_parameters $N_MOTION_PARAMETERS \
 	--n_acompcor $N_ACOMPCORS \
 	--acompcor_strategy $ACOMPCOR_STRATEGY \
-	--n_global_parameters $N_GLOBAL_PARAMETERS \
 	--fd_threshold $FD_THRESHOLD \
 	--exclusion_criteria $EXCLUSION_CRITERIA \
 	--fwhm $FWHM \
-	--clean_seed_timeseries $GPPI_CLEAN_SEED_TIMESERIES \
-	--n_seed_motion_parameters $GPPI_N_SEED_MOTION_PARAMETERS \
-	--seed_motion_censor_mode $GPPI_SEED_MOTION_CENSOR_MODE \
 	--upsample_dt $GPPI_UPSAMPLE_DT \
 	--pad_seconds $GPPI_PAD_SECONDS"
 

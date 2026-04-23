@@ -81,7 +81,7 @@ def _get_cmd_args():
         "--method",
         dest="method",
         required=False,
-        default="nonparametric",
+        default="parametric",
         choices=["parametric", "nonparametric"],
         help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
     )

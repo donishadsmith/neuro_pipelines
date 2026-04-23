@@ -10,7 +10,7 @@
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.err
 # --------------------------------------------------------------------------------------------
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
-METHOD=${METHOD:-nonparametric}
+METHOD=${METHOD:-parametric}
 WHEREAMI_ATLAS=${WHEREAMI_ATLAS:-"Haskins_Pediatric_Nonlinear_1.0"}
 
 COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"

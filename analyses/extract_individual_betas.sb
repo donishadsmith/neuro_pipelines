@@ -10,7 +10,7 @@
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_individual_betas_%A_%a.err
 # ------------------------------------------------------------------------------------------
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
-METHOD=${METHOD:-nonparametric}
+METHOD=${METHOD:-parametric}
 
 COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
 BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
