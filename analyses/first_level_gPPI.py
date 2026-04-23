@@ -387,7 +387,7 @@ def denoise_seed_timeseries(
         f"-ort {nuisance_regressors_file} "
         f"-polort A "
         f"-censor {censor_file} "
-        "-cenmode ZERO"
+        "-cenmode ZERO "
         f"-prefix {denoised_seed_timeseries_file}"
     )
 
