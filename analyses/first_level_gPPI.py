@@ -402,7 +402,7 @@ def denoise_seed_timeseries(
 def get_task_deconvolve_kids_cmd(
     task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
 ):
-    seed_name = str(seed_timeseries_file).split("_desc")[0]
+    seed_name = Path(seed_timeseries_file).name.split("_desc")[0]
 
     if task == "nback":
         deconvolve_cmd = {
@@ -463,7 +463,7 @@ def get_task_deconvolve_kids_cmd(
 def get_task_deconvolve_adults_cmd(
     task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
 ):
-    seed_name = str(seed_timeseries_file).split("_desc")[0]
+    seed_name = Path(seed_timeseries_file).name.split("_desc")[0]
 
     if task == "nback":
         deconvolve_cmd = {
