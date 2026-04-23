@@ -17,10 +17,3 @@ def n_dummy_type(x):
 
 def boolean_flags(x):
     return True if x.lower() in ["t", "true", "1", "y", "yes"] else False
-
-
-def censor_mode_type(x):
-    if x.lower() == "zero":
-        return "ZERO"
-    else:
-        return None

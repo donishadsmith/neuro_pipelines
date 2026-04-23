@@ -100,7 +100,7 @@ from _gen_afni_files import (
     create_nuisance_regressor_file,
     is_timing_file_empty,
 )
-from _argparse_typing import n_dummy_type, boolean_flags, censor_mode_type
+from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
 from _utils import (
     VALID_TASK_NAMES,
@@ -369,10 +369,10 @@ def plot_signal(
 
 
 def denoise_seed_timeseries(
-    afni_img_path,
     seed_timeseries_file,
     nuisance_regressors_file,
     censor_file,
+    afni_img_path,
 ):
     denoised_seed_timeseries_file = (
         seed_timeseries_file.parent
@@ -639,7 +639,7 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
     if method == "upsample":
         resampled_filename = target_file.parent / target_file.name.replace(
             "_desc-denoised", "_desc-upsampled"
-        ).replace("_desc-timeseries", "_desc-upsampled")
+        )
 
         # New length of interpolated timseries is (tr / upsample_dt) * n_original_volumes
         cmd = (
@@ -1050,10 +1050,10 @@ def main(
         plot_signal(seed_timeseries_file, nifti_file, plot_title)
 
         denoised_seed_timeseries_file = denoise_seed_timeseries(
-            afni_img_path,
             seed_timeseries_file,
             nuisance_regressors_file,
             censor_file,
+            afni_img_path,
         )
         plot_title = "Denoised Seed Timeseries"
         plot_signal(denoised_seed_timeseries_file, nifti_file, plot_title)
