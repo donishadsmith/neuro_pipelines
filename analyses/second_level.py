@@ -15,6 +15,7 @@ from bidsaid.qc import get_n_censored_volumes
 
 from _denoising import remove_collinear_columns
 from _utils import (
+    _get_dataframe,
     drop_dose_rows,
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
@@ -251,8 +252,8 @@ def _get_cmd_args():
         help="Number of cores to use for 3dlmer when method is parametric.",
     )
     parser.add_argument(
-        "--exclude_niftis_file",
-        dest="exclude_niftis_file",
+        "--exclude_nifti_files",
+        dest="exclude_nifti_files",
         default=None,
         required=False,
         help=(
@@ -348,32 +349,11 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
         )
     )
 
-
-# pd.read_csv(exclude_niftis_file, sep=None, engine="python") fails in cases
-# where there is only one column and row
-def _get_dataframe(filename):
-    try:
-        return pd.read_excel(filename)
-    except:
-        pass
-
-    df = pd.read_csv(filename, sep=None, engine="python")
-    if "nifti_prefix_filename" not in df.columns:
-        # Any separator will work
-        df = pd.read_csv(filename)
-        if "nifti_prefix_filename" not in df.columns:
-            raise Exception(
-                "`exclude_nifti_file` must contain a column named 'nifti_prefix_filename'."
-            )
-
-    return df
-
-
-def exclude_beta_files(beta_files, exclude_niftis_file):
-    if not exclude_niftis_file:
+def exclude_beta_files(beta_files, exclude_nifti_files):
+    if not exclude_nifti_files:
         return beta_files
 
-    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
+    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_files)[
         "nifti_prefix_filename"
     ].tolist()
 
@@ -1468,7 +1448,7 @@ def main(
     tfce_C,
     cluster_correction_p,
     n_cores,
-    exclude_niftis_file,
+    exclude_nifti_files,
     excluded_covariates,
 ):
     bids_dir = Path(bids_dir)
@@ -1493,7 +1473,7 @@ def main(
         LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_glt_label}")
         beta_files = exclude_beta_files(
             get_beta_files(analysis_dir, task, first_level_glt_label),
-            exclude_niftis_file,
+            exclude_nifti_files,
         )
 
         if not beta_files:

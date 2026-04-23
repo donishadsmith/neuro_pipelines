@@ -3,7 +3,7 @@
 from pathlib import Path
 import shutil, subprocess
 
-import nibabel as nib, numpy as np
+import nibabel as nib, numpy as np, pandas as pd
 from nilearn.image import new_img_like, resample_to_img
 
 from bidsaid.files import get_entity_value
@@ -405,3 +405,46 @@ def save_binary_mask(mask_img_fdata, affine, hdr, mask_filename):
     mask_img = nib.nifti1.Nifti1Image(mask_img_fdata, affine, hdr)
 
     nib.save(mask_img, mask_filename)
+
+# pd.read_csv(exclude_nifti_files, sep=None, engine="python") fails in cases
+# where there is only one column and row
+def _get_dataframe(filename):
+    try:
+        return pd.read_excel(filename)
+    except:
+        pass
+
+    df = pd.read_csv(filename, sep=None, engine="python")
+    if "nifti_prefix_filename" not in df.columns:
+        # Any separator will work
+        df = pd.read_csv(filename)
+        if "nifti_prefix_filename" not in df.columns:
+            raise Exception(
+                "`exclude_nifti_file` must contain a column named 'nifti_prefix_filename'."
+            )
+
+    return df
+
+def skip_denoising(nifti_filename, exclude_nifti_files):
+    if not exclude_nifti_files:
+        return False
+    
+    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_files)[
+        "nifti_prefix_filename"
+    ].tolist()
+
+    return any(
+            Path(nifti_filename).name.startswith(excluded_niftis_prefix)
+            for excluded_niftis_prefix in excluded_niftis_prefixes
+        )
+
+def delete_dir(dirname):
+   """
+   Delete dir to prevent file pollution due to re-running pipeline. Differences in number
+   of clusters could occur so not all files will be overwritten. Use only for the "get_cluster_results"
+   and "extract_individual_betas" pipelines. These are were this issue occurs and were the pipeline is not
+   expected to run in parallel and write to the same output directory like "second_level.py". Also
+   used for the "first_level" pipeline to clean out directory due to changes in exclusion criteria
+   """
+   if Path(dirname).exists():
+        shutil.rmtree(dirname, ignore_errors=True)

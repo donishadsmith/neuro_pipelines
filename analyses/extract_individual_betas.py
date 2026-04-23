@@ -7,6 +7,7 @@ from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
 from _utils import (
+    delete_dir,
     drop_dose_rows,
     get_beta_names,
     get_contrast_entity_key,
@@ -360,6 +361,8 @@ def main(
         seed_mask_path = Path(seed_mask_path)
     else:
         seed_mask_path = None
+
+    delete_dir(dst_dir / "individual_betas_files" / method)
 
     first_level_glt_labels = get_first_level_gltsym_codes(
         cohort, task, analysis_type, caller="extract_individual_betas"

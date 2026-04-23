@@ -71,7 +71,7 @@ export GPPI_FALTUNG_PENALTY_SYNTAX="012 0"               # Deconvolution penalty
 export EXCLUDED_COVARIATES="age sex race ethnicity"     # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all covariates. Note, only number of censored volumes varies within person
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
-export EXCLUDE_NIFTI_FILE=""                            # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
+export EXCLUDE_NIFTI_FILES=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
                                                         # should contain a single column named 'nifti_prefix_filename'
 export VOXEL_CORRECTION_P=0.001                         # Cluster forming threshold for parametric method
 export CLUSTER_CORRECTION_P=0.05                        # Cluster correction threshold for parametric method

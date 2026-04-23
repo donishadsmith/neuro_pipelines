@@ -36,7 +36,7 @@ from _gen_afni_files import (
 )
 from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
-from _utils import VALID_TASK_NAMES, create_beta_files
+from _utils import VALID_TASK_NAMES, delete_dir, create_beta_files, skip_denoising
 
 LGR = setup_logger(__name__)
 
@@ -159,6 +159,18 @@ def _get_cmd_args():
         type=int,
         required=False,
         help="Spatial blurring.",
+    )
+    parser.add_argument(
+        "--exclude_nifti_files",
+        dest="exclude_nifti_files",
+        default=None,
+        required=False,
+        help=(
+            "Prefixes of the filename of the NIfTI images to exclude. "
+            "Can list the fill name of the file (no parent directories) to exlude that specific file "
+            "or can include the prefix (i.e., 'sub-101_task-nback_ses-01_space-MNI' or 'sub-101') to exclude all files starting "
+            "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
+        ),
     )
 
     return parser
@@ -350,6 +362,7 @@ def main(
     n_acompcor,
     acompcor_strategy,
     fwhm,
+    exclude_nifti_files,
 ):
     if task not in VALID_TASK_NAMES[cohort]:
         LGR.warning(
@@ -450,7 +463,13 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
+        if skip_denoising(nifti_file, exclude_nifti_files):
+            LGR.info("The following file will be skipped due to the prefix being found in "
+                     f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}")
+            continue
+
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
+        delete_dir(subject_dir.parent)
         subject_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)

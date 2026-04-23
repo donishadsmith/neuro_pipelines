@@ -14,6 +14,7 @@ from bidsaid.logging import setup_logger
 from bidsaid.parsers import _is_float
 
 from _utils import (
+    delete_dir,
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
     get_group_labels,
@@ -539,6 +540,8 @@ def main(
 ):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
+
+    delete_dir(dst_dir / "cluster_results" / method)
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 

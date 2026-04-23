@@ -105,10 +105,12 @@ from _models import create_design_matrix, perform_first_level
 from _utils import (
     VALID_TASK_NAMES,
     create_beta_files,
+    delete_dir, 
     get_beta_names,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
     resample_seed_img,
+    skip_denoising
 )
 
 LGR = setup_logger(__name__)
@@ -300,12 +302,24 @@ def _get_cmd_args():
             "(fset fpre pen fac). See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"
         ),
     )
+    parser.add_argument(
+        "--exclude_nifti_files",
+        dest="exclude_nifti_files",
+        default=None,
+        required=False,
+        help=(
+            "Prefixes of the filename of the NIfTI images to exclude. "
+            "Can list the fill name of the file (no parent directories) to exlude that specific file "
+            "or can include the prefix (i.e., 'sub-101_task-nback_ses-01_space-MNI' or 'sub-101') to exclude all files starting "
+            "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
+        ),
+    )
 
     return parser
 
 
 def extract_seed_timeseries(
-    subject_analysis_dir,
+    subject_dir,
     subject_nifti_file,
     seed_mask_path,
     afni_img_path,
@@ -321,13 +335,13 @@ def extract_seed_timeseries(
         seed_name = f"seed"
 
     seed_timeseries_file = (
-        subject_analysis_dir / "seed" / f"{seed_name}_desc-timeseries.1D"
+        subject_dir / "seed" / f"{seed_name}_desc-timeseries.1D"
     )
     seed_timeseries_file.parent.mkdir(parents=True, exist_ok=True)
 
     seed_img = resample_seed_img(nib.load(seed_mask_path), nib.load(subject_nifti_file))
 
-    resampled_seed_file = subject_analysis_dir / f"resampled_{seed_mask_path.name}"
+    resampled_seed_file = subject_dir / f"resampled_{seed_mask_path.name}"
     nib.save(seed_img, resampled_seed_file)
 
     # Note: output is a column vector
@@ -833,6 +847,7 @@ def main(
     upsample_dt,
     pad_seconds,
     faltung_penalty_syntax,
+    exclude_nifti_files
 ):
     if task not in VALID_TASK_NAMES[cohort]:
         LGR.warning(
@@ -933,10 +948,16 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
-        subject_analysis_dir = (
+        if skip_denoising(nifti_file, exclude_nifti_files):
+            LGR.info("The following file will be skipped due to the prefix being found in "
+                     f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}")
+            continue
+
+        subject_dir = (
             Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
         )
-        subject_analysis_dir.mkdir(parents=True, exist_ok=True)
+        delete_dir(subject_dir.parent)
+        subject_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
@@ -970,7 +991,7 @@ def main(
             continue
 
         censor_file = create_censor_file(
-            subject_analysis_dir, subject, session, task, space, censor_mask
+            subject_dir, subject, session, task, space, censor_mask
         )
 
         cosine_regressors, cosine_regressor_names = get_cosine_regressors(confounds_df)
@@ -1006,7 +1027,7 @@ def main(
             for regressor in regressor_list
         ]
         nuisance_regressors_file = create_nuisance_regressor_file(
-            subject_analysis_dir,
+            subject_dir,
             subject,
             session,
             task,
@@ -1020,7 +1041,7 @@ def main(
         )
 
         timing_dir = create_timing_files(
-            subject_analysis_dir,
+            subject_dir,
             event_file,
             task=task,
             filter_correct_trials=filter_correct_trials,
@@ -1028,7 +1049,7 @@ def main(
         )
 
         percent_change_nifti_file = percent_signal_change(
-            subject_analysis_dir, afni_img_path, nifti_file, mask_file, censor_file
+            subject_dir, afni_img_path, nifti_file, mask_file, censor_file
         )
 
         # gPPI preparation
@@ -1041,7 +1062,7 @@ def main(
         ppi_dir.mkdir(parents=True, exist_ok=True)
 
         seed_timeseries_file = extract_seed_timeseries(
-            subject_analysis_dir,
+            subject_dir,
             percent_change_nifti_file,
             seed_mask_path,
             afni_img_path,
@@ -1126,7 +1147,7 @@ def main(
             plot_signal(downsampled_ppi_regressor_file, nifti_file, plot_title)
 
         smoothed_nifti_file = perform_spatial_smoothing(
-            subject_analysis_dir.parent,
+            subject_dir.parent,
             afni_img_path,
             percent_change_nifti_file,
             mask_file,
@@ -1142,7 +1163,7 @@ def main(
             task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
         design_matrix_file = create_design_matrix(
-            subject_analysis_dir.parent,
+            subject_dir.parent,
             afni_img_path,
             smoothed_nifti_file,
             mask_file,
@@ -1152,7 +1173,7 @@ def main(
         )
 
         stats_file_relm = perform_first_level(
-            subject_analysis_dir,
+            subject_dir,
             afni_img_path,
             design_matrix_file,
             smoothed_nifti_file,
