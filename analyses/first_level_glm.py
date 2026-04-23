@@ -463,13 +463,15 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
-        if skip_denoising(nifti_file, exclude_nifti_files):
-            LGR.info("The following file will be skipped due to the prefix being found in "
-                     f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}")
-            continue
-
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
         delete_dir(subject_dir.parent)
+        if skip_denoising(nifti_file, exclude_nifti_files):
+            LGR.info(
+                "Denoising of the following file will be skipped due to the prefix being found in "
+                f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}"
+            )
+            continue
+
         subject_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)

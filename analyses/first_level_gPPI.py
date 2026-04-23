@@ -105,12 +105,12 @@ from _models import create_design_matrix, perform_first_level
 from _utils import (
     VALID_TASK_NAMES,
     create_beta_files,
-    delete_dir, 
+    delete_dir,
     get_beta_names,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
     resample_seed_img,
-    skip_denoising
+    skip_denoising,
 )
 
 LGR = setup_logger(__name__)
@@ -334,9 +334,7 @@ def extract_seed_timeseries(
     else:
         seed_name = f"seed"
 
-    seed_timeseries_file = (
-        subject_dir / "seed" / f"{seed_name}_desc-timeseries.1D"
-    )
+    seed_timeseries_file = subject_dir / "seed" / f"{seed_name}_desc-timeseries.1D"
     seed_timeseries_file.parent.mkdir(parents=True, exist_ok=True)
 
     seed_img = resample_seed_img(nib.load(seed_mask_path), nib.load(subject_nifti_file))
@@ -847,7 +845,7 @@ def main(
     upsample_dt,
     pad_seconds,
     faltung_penalty_syntax,
-    exclude_nifti_files
+    exclude_nifti_files,
 ):
     if task not in VALID_TASK_NAMES[cohort]:
         LGR.warning(
@@ -948,15 +946,17 @@ def main(
             ][0]
             LGR.info(f"Using the following mask file: {nifti_file}")
 
-        if skip_denoising(nifti_file, exclude_nifti_files):
-            LGR.info("The following file will be skipped due to the prefix being found in "
-                     f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}")
-            continue
-
         subject_dir = (
             Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
         )
         delete_dir(subject_dir.parent)
+        if skip_denoising(nifti_file, exclude_nifti_files):
+            LGR.info(
+                "Denoising of the following file will be skipped due to the prefix being found in "
+                f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}"
+            )
+            continue
+
         subject_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)

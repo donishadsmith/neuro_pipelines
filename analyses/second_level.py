@@ -349,6 +349,7 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
         )
     )
 
+
 def exclude_beta_files(beta_files, exclude_nifti_files):
     if not exclude_nifti_files:
         return beta_files
