@@ -91,7 +91,7 @@ export AFNI_ORIENT="lpi"                                # Orientation of images 
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
 # ======================================
-[ $SEND_EMAILS = true ] && MAIL_ARGS=("--mail-type=END" "--mail-user=$EMAIL_ADDRESS") || MAIL_ARGS=()
+[[ $SEND_EMAILS == true ]] && MAIL_ARGS=("--mail-type=END" "--mail-user=$EMAIL_ADDRESS") || MAIL_ARGS=()
 
 if [[ $COHORT == "kids" ]]; then
     export TEMPLATE_SPACE="MNIPediatricAsym_cohort-1_res-2"
@@ -137,7 +137,7 @@ else
     FIRST_LEVEL_SCRIPT="first_level_glm.sb"
 fi
 
-[ ${#SUBJECTS_IDS[@]} -eq 0 ] && N_SUBJECTS=$(( $NUM_SUBJECTS -1 )) || N_SUBJECTS=$(( ${#SUBJECTS_IDS[@]} -1 ))
+[[ ${#SUBJECTS_IDS[@]} -eq 0 ]] && N_SUBJECTS=$(( $NUM_SUBJECTS -1 )) || N_SUBJECTS=$(( ${#SUBJECTS_IDS[@]} -1 ))
 
 for CURRENT_TASK in "${TASKS[@]}"; do
     export TASK=$CURRENT_TASK
@@ -178,7 +178,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ===============
     # RUN_FIRST_LEVEL
     # ===============
-    if [ $RUN_FIRST_LEVEL = true ]; then
+    if [[ $RUN_FIRST_LEVEL == true ]]; then
         JOB_ID_1=$(sbatch --parsable --array=0-$N_SUBJECTS "${MAIL_ARGS[@]}" $FIRST_LEVEL_SCRIPT)
 
         echo -e "- FIRST LEVEL JOB SUBMITTED (JOB ID: $JOB_ID_1)\n"
@@ -189,7 +189,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =======================================================
     # RUN_SECOND_LEVEL (WITH PARALLEL FIRST_LEVEL_GLT_LABELS)
     # =======================================================
-    if [ $RUN_SECOND_LEVEL = true ]; then
+    if [[ $RUN_SECOND_LEVEL == true ]]; then
         for LABEL in ${FIRST_LEVEL_GLT_LABELS[@]}; do
             [[ $LABEL != "placeholder" ]] && { export FIRST_LEVEL_GLT_LABEL=$LABEL; TEXT_STR="FOR $LABEL"; } || { export FIRST_LEVEL_GLT_LABEL=""; TEXT_STR=""; }
 
@@ -207,7 +207,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ===================
     # RUN_CLUSTER_RESULTS
     # ===================
-    if [ $RUN_CLUSTER_RESULTS = true ]; then
+    if [[ $RUN_CLUSTER_RESULTS == true ]]; then
         [[ -n $SECOND_LEVEL_JOB_IDS ]] && DEPENDENCY_STR="--dependency=afterok:$SECOND_LEVEL_JOB_IDS" || DEPENDENCY_STR=""
         JOB_ID_3=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
 
@@ -219,7 +219,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # =========================
     # RUN_CLUSTER_MNI_LOCATIONS
     # =========================
-    if [ $RUN_CLUSTER_MNI_LOCATIONS = true ]; then
+    if [[ $RUN_CLUSTER_MNI_LOCATIONS == true ]]; then
         [[ -n $JOB_ID_3 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_3" || DEPENDENCY_STR=""
         JOB_ID_4=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
 
@@ -231,7 +231,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ============================
     # RUN_EXTRACT_INDIVIDUAL_BETAS
     # ============================
-    if [ $RUN_EXTRACT_INDIVIDUAL_BETAS = true ]; then
+    if [[ $RUN_EXTRACT_INDIVIDUAL_BETAS == true ]]; then
         [[ -n $JOB_ID_4 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_4" || DEPENDENCY_STR=""
         JOB_ID_5=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
 
