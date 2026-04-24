@@ -135,7 +135,7 @@ def save_tabular_data(
 ):
     data_filename = (
         dst_dir
-        / "individual_betas_files"
+        / "individual_betas"
         / method
         / second_level_glt_code
         / first_level_glt_label
