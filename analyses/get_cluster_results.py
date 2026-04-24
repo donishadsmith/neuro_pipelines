@@ -361,7 +361,7 @@ def identify_clusters(
             else ""
         )
         if possible_coordinate:
-            clusters_table["Seed MNI Coordiante"] = possible_coordinate
+            clusters_table["Seed MNI Coordinate"] = possible_coordinate
 
         clusters_table["Condition Label"] = create_condition_label_str(
             first_level_glt_label
