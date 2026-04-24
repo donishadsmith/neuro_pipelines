@@ -367,6 +367,8 @@ def identify_clusters(
             first_level_glt_label
         )
 
+        clusters_table["Analysis Method"] = f"{method} {analysis_type}"
+
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
 
         # Get label map
