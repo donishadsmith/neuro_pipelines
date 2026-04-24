@@ -7,6 +7,7 @@ from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
 from _utils import (
+    create_condition_label_str,
     delete_dir,
     drop_dose_rows,
     get_beta_names,
@@ -180,8 +181,8 @@ def get_individual_interpretations(
             ("activation", "deactivation")
             if "PPI_" not in beta_name
             else (
-                "increased_connectivity_with_seed",
-                "decreased_connectivity_with_seed",
+                "increased_connectivity_with_seed_roi",
+                "decreased_connectivity_with_seed_roi",
             )
         )
         interpretations = np.where(
@@ -216,13 +217,13 @@ def add_info_to_data_table(
         )
     )
 
-    data_table[f"{analysis_type}_individual_beta_interpretation"] = (
+    data_table[f"{analysis_type.upper()} Individual Beta Interpretation"] = (
         get_individual_interpretations(
             data_table, beta_name, mask_origin, analysis_type
         )
     )
 
-    data_table["condition_label"] = beta_name
+    data_table["Condition Label"] = create_condition_label_str(beta_name)
 
     second_level_glt_code_str = cluster_mask_filename.name.split("gltcode-")[-1].split(
         "_clusterid"
@@ -230,13 +231,13 @@ def add_info_to_data_table(
 
     if "_vs_" in second_level_glt_code_str:
         first_group_label, second_group_label = second_level_glt_code_str.split("_vs_")
-        data_table[f"{analysis_type}_group_beta_interpretation"] = (
+        data_table[f"{analysis_type.upper()} Group Beta Interpretation"] = (
             f"{first_group_label} > {second_group_label}"
             if tail == "positive"
             else f"{second_group_label} > {first_group_label}"
         )
     else:
-        data_table[f"{analysis_type}_group_beta_interpretation"] = (
+        data_table[f"{analysis_type.upper()} Group Beta Interpretation"] = (
             f"Mean activation across doses > 0"
             if tail == "positive"
             else f"Mean activation across doses < 0"
@@ -246,10 +247,10 @@ def add_info_to_data_table(
         region_name, mni_coord = get_cluster_region_info(
             cluster_result_file, cluster_id, tail
         )
-        data_table[f"cluster_region_id"] = region_name
-        data_table[f"cluster_mni_coordinate"] = mni_coord
+        data_table[f"Cluster Region ID"] = region_name
+        data_table[f"Cluster MNI Coordinate"] = mni_coord
     else:
-        data_table[f"cluster_region_id"] = cluster_id
+        data_table[f"Cluster Region ID"] = cluster_id
 
 
 def get_subject_beta_filenames(
@@ -455,12 +456,12 @@ def main(
 
                 for cluster_mask_filename in cluster_mask_filenames:
                     beta_coefficient_df = truncated_df.copy(deep=True)
-                    beta_coefficient_df[f"{analysis_type}_individual_cluster_beta"] = (
-                        compute_average_betas(
-                            beta_coefficient_df,
-                            subject_beta_filenames,
-                            cluster_mask_filename,
-                        )
+                    beta_coefficient_df[
+                        f"{analysis_type.upper()} Individual Cluster Beta"
+                    ] = compute_average_betas(
+                        beta_coefficient_df,
+                        subject_beta_filenames,
+                        cluster_mask_filename,
                     )
 
                     add_info_to_data_table(
@@ -482,7 +483,7 @@ def main(
                             parent_path=glm_dir,
                         )
 
-                        beta_coefficient_df[f"glm_individual_cluster_beta"] = (
+                        beta_coefficient_df[f"GLM Individual Cluster Beta"] = (
                             compute_average_betas(
                                 beta_coefficient_df,
                                 glm_subject_beta_filenames,
@@ -491,7 +492,7 @@ def main(
                         )
 
                         beta_coefficient_df[
-                            f"glm_individual_cluster_beta_interpretation"
+                            f"GLM Individual Cluster Beta Interpretation"
                         ] = get_individual_interpretations(
                             beta_coefficient_df,
                             beta_name,
@@ -505,7 +506,7 @@ def main(
                                 seed_mask_path
                             )
                             if possible_coordinate:
-                                beta_coefficient_df[f"seed_mni_coordinate"] = (
+                                beta_coefficient_df[f"Seed MNI Coordinate"] = (
                                     possible_coordinate
                                 )
 
@@ -513,7 +514,7 @@ def main(
                                 f"Using the following seed mask path: {seed_mask_path}"
                             )
 
-                            beta_coefficient_df[f"glm_individual_seed_beta"] = (
+                            beta_coefficient_df[f"GLM Individual Seed Beta"] = (
                                 compute_average_betas(
                                     beta_coefficient_df,
                                     glm_subject_beta_filenames,
@@ -522,7 +523,7 @@ def main(
                                 )
                             )
                             beta_coefficient_df[
-                                f"glm_individual_seed_beta_interpretation"
+                                f"GLM Individual Seed Beta Interpretation"
                             ] = get_individual_interpretations(
                                 beta_coefficient_df,
                                 beta_name,
@@ -531,7 +532,7 @@ def main(
                                 remove_PPI_prefix=True,
                             )
 
-                    beta_coefficient_df["units_of_beta_coefficient"] = (
+                    beta_coefficient_df["Units of Beta Coefficient"] = (
                         "percent (percent_signal_change)"
                     )
 
@@ -539,6 +540,10 @@ def main(
                         beta_coefficient_df = beta_coefficient_df.drop(
                             columns=["InputFile"]
                         )
+
+                    beta_coefficient_df.columns = [
+                        x.capitalize() for x in beta_coefficient_df.columns
+                    ]
 
                     add_condition_entity_key = beta_name != first_level_glt_label
                     save_tabular_data(

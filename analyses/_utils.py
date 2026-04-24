@@ -180,6 +180,9 @@ def resample_seed_img(seed_img, subject_nifti_img):
 
 
 def get_coordinate_from_filename(seed_mask_path, replace_underscore=True):
+    if not seed_mask_path:
+        return ""
+
     seed_mask_path = Path(seed_mask_path)
     possible_coordinate = ""
     if "_sphere_mask_" in seed_mask_path.name:
@@ -451,3 +454,13 @@ def delete_dir(dirname):
     """
     if Path(dirname).exists():
         shutil.rmtree(dirname, ignore_errors=True)
+
+
+def create_condition_label_str(beta_name):
+    if "_vs_" in beta_name:
+        first_condition_label, second_condition_label = beta_name.split("_vs_")
+        condition_label = f"{first_condition_label} > {second_condition_label}"
+    else:
+        condition_label = f"{beta_name} only"
+
+    return condition_label

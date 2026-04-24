@@ -36,6 +36,8 @@ TEMPLATE_IMG_PATH=${TEMPLATE_IMG_PATH:-"/projects/bigos_lab/templateflow/tpl-MNI
 VOXEL_CORRECTION_P=${VOXEL_CORRECTION_P:-0.001}
 CLUSTER_CORRECTION_P=${CLUSTER_CORRECTION_P:-0.05}
 
+SEED_MASK_PATH=${SEED_MASK_PATH:-""}
+
 CMD="$PYTHON get_cluster_results.py \
     --analysis_dir $ANALYSIS_DIR \
     --dst_dir $ANALYSIS_DIR \
@@ -48,6 +50,10 @@ CMD="$PYTHON get_cluster_results.py \
 
 if [[ $METHOD == "parametric" ]]; then
 	CMD+=" --afni_img_path $AFNI_IMG_PATH --voxel_correction_p $VOXEL_CORRECTION_P --cluster_correction_p $CLUSTER_CORRECTION_P"
+fi
+
+if [[ $ANALYSIS_TYPE == "gPPI" && -n $SEED_MASK_PATH ]]; then
+	CMD+=" --seed_mask_path $SEED_MASK_PATH"
 fi
 
 # hostname

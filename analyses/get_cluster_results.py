@@ -14,8 +14,10 @@ from bidsaid.logging import setup_logger
 from bidsaid.parsers import _is_float
 
 from _utils import (
+    create_condition_label_str,
     delete_dir,
     get_contrast_entity_key,
+    get_coordinate_from_filename,
     get_first_level_gltsym_codes,
     get_group_labels,
     get_second_level_glt_codes,
@@ -77,6 +79,16 @@ def _get_cmd_args():
         required=True,
         choices=["glm", "gPPI"],
         help="The type of analysis performed (glm or gPPI).",
+    )
+    parser.add_argument(
+        "--seed_mask_path",
+        dest="seed_mask_path",
+        required=False,
+        default=None,
+        help=(
+            "Path to the seed mask used as the seed for the gPPI. "
+            "Used only when ``analysis_type`` is gPPI. "
+        ),
     )
     parser.add_argument(
         "--method",
@@ -258,6 +270,7 @@ def identify_clusters(
     dst_dir,
     thresholded_img,
     analysis_type,
+    seed_mask_path,
     method,
     stat_threshold,
     cluster_size,
@@ -306,15 +319,13 @@ def identify_clusters(
         positive_interpretation = (
             "Activation"
             if analysis_type == "glm"
-            else "Increased Connectivity with Seed"
+            else "Increased Connectivity with Seed ROI"
         )
         negative_interpretation = (
             "Deactivation"
             if analysis_type == "glm"
-            else "Decreased Connectivity with Seed"
+            else "Decreased Connectivity with Seed ROI"
         )
-
-        suffix = " mg MPH" if _is_float(second_level_glt_code) else ""
 
         if second_level_glt_code == "mean":
             clusters_table.loc[mask_pos, "Interpretation"] = (
@@ -324,18 +335,37 @@ def identify_clusters(
                 f"Mean {negative_interpretation.removeprefix('Decreased').lower()} across doses < 0"
             )
         elif "_vs_" not in second_level_glt_code:
-            clusters_table["Group"] = f"Within {second_level_glt_code}{suffix} only"
+            clusters_table["Group"] = f"Within {second_level_glt_code} only"
             clusters_table.loc[mask_pos, "Interpretation"] = positive_interpretation
             clusters_table.loc[mask_neg, "Interpretation"] = negative_interpretation
         else:
             first_label, second_label = get_group_labels(second_level_glt_code)
 
+            suffix = "mg MPH" if _is_float(first_label) else ""
+            end_str = (
+                "; Greater Activation"
+                if analysis_type == "glm"
+                else "; Greater Connectivity"
+            )
+
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"{first_label}{suffix} > {second_label}{suffix}"
+                f"{first_label}{suffix} > {second_label}{suffix} {end_str}"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"{second_label}{suffix} > {first_label}{suffix}"
+                f"{second_label}{suffix} > {first_label}{suffix} {end_str}"
             )
+
+        possible_coordinate = (
+            get_coordinate_from_filename(seed_mask_path)
+            if analysis_type == "gPPI"
+            else ""
+        )
+        if possible_coordinate:
+            clusters_table["Seed MNI Coordiante"] = possible_coordinate
+
+        clusters_table["Condition Label"] = create_condition_label_str(
+            first_level_glt_label
+        )
 
         clusters_table.to_csv(cluster_table_filename, sep=",", index=False)
 
@@ -534,6 +564,7 @@ def main(
     cohort,
     task,
     analysis_type,
+    seed_mask_path,
     method,
     connectivity,
     voxel_correction_p,
@@ -623,6 +654,7 @@ def main(
             dst_dir,
             thresholded_img,
             analysis_type,
+            seed_mask_path,
             method,
             voxel_correction_p if method == "parametric" else ZERO_STAT_THRESHOLD,
             cluster_size if method == "parametric" else ZERO_CLUSTER_SIZE,
