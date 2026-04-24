@@ -541,10 +541,6 @@ def main(
                             columns=["InputFile"]
                         )
 
-                    beta_coefficient_df.columns = [
-                        x.capitalize() for x in beta_coefficient_df.columns
-                    ]
-
                     add_condition_entity_key = beta_name != first_level_glt_label
                     save_tabular_data(
                         beta_coefficient_df,
