@@ -253,9 +253,9 @@ def add_info_to_data_table(
         )
 
         data_table[f"{analysis_type.upper()} Group Beta Interpretation"] = (
-            f"Mean {interpretation.removeprefix('increased')} across doses > 0"
+            f"mean {interpretation.removeprefix('increased')} across doses > 0"
             if tail == "positive"
-            else f"Mean {interpretation.removeprefix('increased')} across doses < 0"
+            else f"mean {interpretation.removeprefix('increased')} across doses < 0"
         )
 
     if cluster_result_file:
