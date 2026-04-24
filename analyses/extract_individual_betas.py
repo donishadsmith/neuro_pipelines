@@ -5,6 +5,7 @@ import nibabel as nib, numpy as np, pandas as pd
 
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
+from bidsaid.parsers import _is_float
 
 from _utils import (
     create_condition_label_str,
@@ -231,16 +232,30 @@ def add_info_to_data_table(
 
     if "_vs_" in second_level_glt_code_str:
         first_group_label, second_group_label = second_level_glt_code_str.split("_vs_")
+        suffix = " mg MPH" if _is_float(first_group_label) else ""
+        end_str = (
+            "; greater activation"
+            if analysis_type == "glm"
+            else "; greater connectivity"
+        )
+
         data_table[f"{analysis_type.upper()} Group Beta Interpretation"] = (
-            f"{first_group_label} > {second_group_label}"
+            f"{first_group_label}{suffix} > {second_group_label}{suffix} {end_str}"
             if tail == "positive"
-            else f"{second_group_label} > {first_group_label}"
+            else f"{second_group_label}{suffix} > {first_group_label}{suffix} {end_str}"
         )
     else:
+
+        interpretation = (
+            "activation"
+            if analysis_type == "glm"
+            else "increased connectivity with seed ROI"
+        )
+
         data_table[f"{analysis_type.upper()} Group Beta Interpretation"] = (
-            f"Mean activation across doses > 0"
+            f"Mean {interpretation.removeprefix('increased')} across doses > 0"
             if tail == "positive"
-            else f"Mean activation across doses < 0"
+            else f"Mean {interpretation.removeprefix('increased')} across doses < 0"
         )
 
     if cluster_result_file:

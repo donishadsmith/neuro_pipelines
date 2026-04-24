@@ -317,22 +317,22 @@ def identify_clusters(
         mask_neg = mask_primary & (peaks < 0)
 
         positive_interpretation = (
-            "Activation"
+            "activation"
             if analysis_type == "glm"
-            else "Increased Connectivity with Seed ROI"
+            else "increased connectivity with seed ROI"
         )
         negative_interpretation = (
-            "Deactivation"
+            "deactivation"
             if analysis_type == "glm"
-            else "Decreased Connectivity with Seed ROI"
+            else "decreased connectivity with seed ROI"
         )
 
         if second_level_glt_code == "mean":
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"Mean {positive_interpretation.removeprefix('Increased').lower()} across doses > 0"
+                f"mean {positive_interpretation.removeprefix('increased').lower()} across doses > 0"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"Mean {negative_interpretation.removeprefix('Decreased').lower()} across doses < 0"
+                f"mean {positive_interpretation.removeprefix('increased').lower()} across doses < 0"
             )
         elif "_vs_" not in second_level_glt_code:
             clusters_table["Group"] = f"Within {second_level_glt_code} only"
@@ -341,11 +341,11 @@ def identify_clusters(
         else:
             first_label, second_label = get_group_labels(second_level_glt_code)
 
-            suffix = "mg MPH" if _is_float(first_label) else ""
+            suffix = " mg MPH" if _is_float(first_label) else ""
             end_str = (
-                "; Greater Activation"
+                "; greater activation"
                 if analysis_type == "glm"
-                else "; Greater Connectivity"
+                else "; greater connectivity"
             )
 
             clusters_table.loc[mask_pos, "Interpretation"] = (
