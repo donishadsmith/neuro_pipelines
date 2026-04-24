@@ -162,9 +162,9 @@ def get_individual_interpretations(
     if remove_PPI_prefix:
         beta_name = beta_name.replace("PPI_", "")
 
-    betas = data_table[f"{analysis_type}_individual_{mask_origin}_beta"].to_numpy(
-        copy=True
-    )
+    betas = data_table[
+        f"{analysis_type.upper()} Individual {mask_origin.capitalize()} Beta"
+    ].to_numpy(copy=True)
     if "_vs_" in beta_name:
         first_condition_label, second_condition_label = beta_name.split("_vs_")
         interpretations = np.where(
