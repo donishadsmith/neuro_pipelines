@@ -179,7 +179,10 @@ def get_individual_interpretations(
         descriptions = (
             ("activation", "deactivation")
             if "PPI_" not in beta_name
-            else ("increased_connectivity", "decreased_connectivity")
+            else (
+                "increased_connectivity_with_seed",
+                "decreased_connectivity_with_seed",
+            )
         )
         interpretations = np.where(
             np.isnan(betas) | (betas == 0),

@@ -304,10 +304,14 @@ def identify_clusters(
         mask_neg = mask_primary & (peaks < 0)
 
         positive_interpretation = (
-            "Activation" if analysis_type == "glm" else "Increased Connectivity"
+            "Activation"
+            if analysis_type == "glm"
+            else "Increased Connectivity with Seed"
         )
         negative_interpretation = (
-            "Deactivation" if analysis_type == "glm" else "Decreased Connectivity"
+            "Deactivation"
+            if analysis_type == "glm"
+            else "Decreased Connectivity with Seed"
         )
 
         suffix = " mg MPH" if _is_float(second_level_glt_code) else ""
