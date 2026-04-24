@@ -240,9 +240,9 @@ def add_info_to_data_table(
         )
 
         data_table[f"{analysis_type.upper()} Group Beta Interpretation"] = (
-            f"{first_group_label}{suffix} > {second_group_label}{suffix} {end_str}"
+            f"{first_group_label}{suffix} > {second_group_label}{suffix}{end_str}"
             if tail == "positive"
-            else f"{second_group_label}{suffix} > {first_group_label}{suffix} {end_str}"
+            else f"{second_group_label}{suffix} > {first_group_label}{suffix}{end_str}"
         )
     else:
 

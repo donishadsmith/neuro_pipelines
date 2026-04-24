@@ -349,10 +349,10 @@ def identify_clusters(
             )
 
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"{first_label}{suffix} > {second_label}{suffix} {end_str}"
+                f"{first_label}{suffix} > {second_label}{suffix}{end_str}"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"{second_label}{suffix} > {first_label}{suffix} {end_str}"
+                f"{second_label}{suffix} > {first_label}{suffix}{end_str}"
             )
 
         possible_coordinate = (
