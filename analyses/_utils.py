@@ -459,7 +459,7 @@ def delete_dir(dirname):
 def create_condition_label_str(beta_name):
     if "_vs_" in beta_name:
         first_condition_label, second_condition_label = beta_name.split("_vs_")
-        condition_label = f"{first_condition_label} > {second_condition_label}"
+        condition_label = f"{first_condition_label} - {second_condition_label}"
     else:
         condition_label = f"{beta_name} only"
 
