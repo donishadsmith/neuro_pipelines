@@ -288,13 +288,13 @@ class DataContainer:
     def get_glt_codes(cohort: str) -> str:
         glt_codes = {
             "kids": (
-                "-gltCode 5_vs_0 'dose : 1*'5' -1*'0'' ",
-                "-gltCode 10_vs_0 'dose : 1*'10' -1*'0'' ",
-                "-gltCode 10_vs_5 'dose : 1*'10' -1*'5'' ",
+                "-gltCode 5_vs_0 'dose : 1*5 -1*0' ",
+                "-gltCode 10_vs_0 'dose : 1*10 -1*0' ",
+                "-gltCode 10_vs_5 'dose : 1*10 -1*5' ",
                 "-gltCode mean 'dose : {mean_code}' ",
             ),
             "adults": (
-                "-gltCode mph_vs_placebo 'dose : 1*'mph' -1*'placebo'' ",
+                "-gltCode mph_vs_placebo 'dose : 1*mph -1*placebo' ",
                 "-gltCode mean 'dose : {mean_code}' ",
             ),
         }
@@ -437,13 +437,10 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     )
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
-    if pd.to_numeric(data_table["dose"].dropna(), errors="coerce").notna().all():
+    if pd.to_numeric(data_table["dose"], errors="coerce").notna().all():
         data_table["dose"] = data_table["dose"].astype(int).astype(str)
     else:
         data_table["dose"] = data_table["dose"].astype(str)
-
-    if "dose_mg" in data_table.columns:
-        data_table["dose_mg"] = data_table["dose_mg"].astype(int).astype(str)
 
     continuous_vars = set(data_table.columns).difference(
         datacontainer.non_continuous_cols + datacontainer.excluded_regressors
@@ -557,7 +554,7 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
         level_str = glt_code.removeprefix("-gltCode").lstrip().split(" ")[0]
         if level_str == "mean":
             value = round(1 / len(available_doses), 4)
-            dose_list = [f"'{x}'" for x in available_doses]
+            dose_list = [f"{x}" for x in available_doses] 
             mean_code = f"{value}*" + f" +{value}*".join(dose_list)
             glt_str += glt_code.format(mean_code=mean_code)
         else:
