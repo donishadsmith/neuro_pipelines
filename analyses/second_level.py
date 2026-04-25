@@ -6,6 +6,7 @@ from pathlib import Path
 import bids, nibabel as nib, numpy as np, pandas as pd
 from nilearn.masking import intersect_masks
 from nilearn.image import resample_to_img
+from pandas.api.types import is_object_dtype, is_string_dtype
 
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
@@ -381,6 +382,13 @@ def drop_constant_columns(data_table):
     return data_table.drop(columns=constant_columns)
 
 
+def replace_whitespace_with_underscores(data_table):
+    for column in data_table.columns:
+        if is_object_dtype(data_table[column]) or is_string_dtype(data_table[column]):
+            data_table[column] = data_table[column].str.replace(" ", "_")
+
+    return data_table
+
 def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     bids_dir = Path(bids_dir)
     participants_df = pd.read_csv(bids_dir / "participants.tsv", sep="\t")
@@ -448,6 +456,8 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     for continuous_var in continuous_vars:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
+    data_table = replace_whitespace_with_underscores(data_table)
+    
     return drop_constant_columns(data_table)
 
 
@@ -554,7 +564,7 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
         level_str = glt_code.removeprefix("-gltCode").lstrip().split(" ")[0]
         if level_str == "mean":
             value = round(1 / len(available_doses), 4)
-            dose_list = [f"{x}" for x in available_doses] 
+            dose_list = [f"{x}" for x in available_doses]
             mean_code = f"{value}*" + f" +{value}*".join(dose_list)
             glt_str += glt_code.format(mean_code=mean_code)
         else:
