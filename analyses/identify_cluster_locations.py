@@ -204,7 +204,7 @@ def main(
     first_level_glt_label_list = list(
         itertools.product(
             first_level_glt_label,
-            get_second_level_glt_codes(cohort, add_dose_mg_groups=(cohort == "adults")),
+            get_second_level_glt_codes(cohort),
         )
     )
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:

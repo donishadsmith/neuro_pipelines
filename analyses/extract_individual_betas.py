@@ -17,8 +17,6 @@ from _utils import (
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
     get_nontarget_dose,
-    is_between_group_dose_code,
-    get_between_group_code,
     resample_seed_img,
 )
 
@@ -245,7 +243,6 @@ def add_info_to_data_table(
             else f"{second_group_label}{suffix} > {first_group_label}{suffix}{end_str}"
         )
     else:
-
         interpretation = (
             "activation"
             if analysis_type == "glm"
@@ -262,10 +259,10 @@ def add_info_to_data_table(
         region_name, mni_coord = get_cluster_region_info(
             cluster_result_file, cluster_id, tail
         )
-        data_table[f"Cluster Region ID"] = region_name
-        data_table[f"Cluster MNI Coordinate"] = mni_coord
+        data_table["Cluster Region ID"] = region_name
+        data_table["Cluster MNI Coordinate"] = mni_coord
     else:
-        data_table[f"Cluster Region ID"] = cluster_id
+        data_table["Cluster Region ID"] = cluster_id
 
 
 def get_subject_beta_filenames(
@@ -320,44 +317,6 @@ def compute_average_betas(
     return average_betas
 
 
-def build_between_group_data_table(
-    analysis_dir,
-    data_table,
-    task,
-    method,
-    entity_key,
-    first_level_glt_label,
-    second_level_glt_code,
-):
-    prefix = (
-        f"task-{task}_{entity_key}-{first_level_glt_label}"
-        f"_gltcode-{second_level_glt_code}"
-    )
-    diff_map_files = sorted(
-        list(analysis_dir.rglob(f"*{prefix}_desc-{method}_difference_betas.nii.gz"))
-    )
-
-    if not diff_map_files:
-        LGR.warning(
-            f"No difference maps found for {second_level_glt_code} in {analysis_dir}"
-        )
-        return None
-
-    # Build subject -> diff map mapping
-    diff_map_dict = {}
-    for diff_file in diff_map_files:
-        sub_id = get_entity_value(diff_file.name, "sub")
-        if sub_id:
-            diff_map_dict[f"sub-{sub_id}"] = str(diff_file)
-
-    mph_rows = data_table[data_table["dose"].astype(str) == "mph"].copy()
-    mph_rows = mph_rows[mph_rows["Subj"].isin(diff_map_dict.keys())].copy()
-    mph_rows["InputFile"] = mph_rows["Subj"].map(diff_map_dict)
-    mph_rows = mph_rows[mph_rows["Subj"].isin(diff_map_dict.keys())]
-
-    return mph_rows.reset_index(drop=True)
-
-
 def main(
     analysis_dir,
     dst_dir,
@@ -381,7 +340,7 @@ def main(
     else:
         seed_mask_path = None
 
-    delete_dir(dst_dir / "individual_betas_files" / method)
+    delete_dir(dst_dir / "individual_betas" / method)
 
     first_level_glt_labels = get_first_level_gltsym_codes(
         cohort, task, analysis_type, caller="extract_individual_betas"
@@ -404,9 +363,7 @@ def main(
         if cohort == "kids":
             data_table["dose"] = data_table["dose"].astype(int)
 
-        for second_level_glt_code in get_second_level_glt_codes(
-            cohort, add_dose_mg_groups=(cohort == "adults")
-        ):
+        for second_level_glt_code in get_second_level_glt_codes(cohort):
             LGR.info(
                 f"Creating tabular data for TASK: {task}, FIRST LEVEL GLTLABEL: "
                 f"{first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
@@ -424,40 +381,15 @@ def main(
                 )
                 continue
 
-            is_between_group = is_between_group_dose_code(second_level_glt_code, cohort)
-            use_between_logic = (
-                is_between_group
-                or second_level_glt_code in get_between_group_code(cohort)
+            truncated_df = drop_dose_rows(
+                data_table, get_nontarget_dose(second_level_glt_code, cohort)
             )
-            if use_between_logic:
-                truncated_df = build_between_group_data_table(
-                    analysis_dir,
-                    data_table,
-                    task,
-                    entity_key,
-                    first_level_glt_label,
-                    second_level_glt_code,
-                )
-                if truncated_df is None or truncated_df.empty:
-                    LGR.warning(
-                        f"No between-group data table for {second_level_glt_code}"
-                    )
-                    continue
-
-                # between group will use difference maps for computation, these difference maps are only computed at the second level
-                # and is only computed for first_level_glt_label not all labels returned by `get_beta_names`
-                beta_names = [first_level_glt_label]
-            else:
-                truncated_df = drop_dose_rows(
-                    data_table, get_nontarget_dose(second_level_glt_code, cohort)
-                )
-                # The individual conditions for gPPI are main effects and should not be interpreted
-                # since there is an interaction term in the model
-                beta_names = get_beta_names(
-                    first_level_glt_label,
-                    create_sub_conditions=(analysis_type == "glm"),
-                )
-
+            # The individual conditions for gPPI are main effects and should not be interpreted
+            # since there is an interaction term in the model
+            beta_names = get_beta_names(
+                first_level_glt_label,
+                create_sub_conditions=(analysis_type == "glm"),
+            )
             for beta_name in beta_names:
                 subject_beta_filenames = get_subject_beta_filenames(
                     truncated_df,

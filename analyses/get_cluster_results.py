@@ -21,9 +21,6 @@ from _utils import (
     get_first_level_gltsym_codes,
     get_group_labels,
     get_second_level_glt_codes,
-    is_between_group_dose_code,
-    in_between_group_code,
-    get_between_group_code,
     resample_seed_img,
     save_binary_mask,
 )
@@ -158,57 +155,30 @@ def p_to_z(p_value, two_sided=True):
 def get_zscore_map_and_mask(
     analysis_dir,
     afni_img_path,
-    cohort,
     task,
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
 ):
-    is_between_group = is_between_group_dose_code(second_level_glt_code, cohort)
-    try:
-        if is_between_group or in_between_group_code(second_level_glt_code, cohort):
-            between_group_code = get_between_group_code(cohort)
-            stats_filename = next(
-                analysis_dir.rglob(
-                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{between_group_code}_desc-parametric_stats.nii.gz"
-                )
-            )
-            group_mask_filename = next(
-                analysis_dir.rglob(
-                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{between_group_code}_desc-parametric_group_mask.nii.gz"
-                )
-            )
-        else:
-            stats_filename = next(
-                analysis_dir.rglob(
-                    f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
-                )
-            )
-            group_mask_filename = next(
-                analysis_dir.rglob(
-                    f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_group_mask.nii.gz"
-                )
-            )
-    except StopIteration:
-        LGR.error("Stats or group mask files could not be obtained", exc_info=True)
-        return None, None
+    stats_filename = next(
+        analysis_dir.rglob(
+            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_stats.nii.gz"
+        )
+    )
+    group_mask_filename = next(
+        analysis_dir.rglob(
+            f"task-{task}_{entity_key}-{first_level_glt_label}_desc-parametric_group_mask.nii.gz"
+        )
+    )
 
     zcore_map_filename = str(stats_filename).replace(
         "_desc-parametric_stats",
         f"_gltcode-{second_level_glt_code}_desc-parametric_z_map",
     )
 
-    index_name = (
-        f"{second_level_glt_code} Z"
-        if not (
-            is_between_group or in_between_group_code(second_level_glt_code, cohort)
-        )
-        else f"{second_level_glt_code.replace('_vs_', '-')}_Zscr"
-    )
-
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
-        f"{stats_filename}'[{index_name}]' "
+        f"{stats_filename}'[{second_level_glt_code} Z]' "
         f"-prefix {zcore_map_filename} "
         "-overwrite"
     )
@@ -316,28 +286,16 @@ def identify_clusters(
         mask_pos = mask_primary & (peaks > 0)
         mask_neg = mask_primary & (peaks < 0)
 
-        positive_interpretation = (
-            "activation"
-            if analysis_type == "glm"
-            else "increased connectivity with seed ROI"
-        )
-        negative_interpretation = (
-            "deactivation"
-            if analysis_type == "glm"
-            else "decreased connectivity with seed ROI"
-        )
-
         if second_level_glt_code == "mean":
+            interpretation = (
+                "activation" if analysis_type == "glm" else "connectivity with seed ROI"
+            )
             clusters_table.loc[mask_pos, "Interpretation"] = (
-                f"mean {positive_interpretation.removeprefix('increased').lower()} across doses > 0"
+                f"mean {interpretation} across doses > 0"
             )
             clusters_table.loc[mask_neg, "Interpretation"] = (
-                f"mean {positive_interpretation.removeprefix('increased').lower()} across doses < 0"
+                f"mean {interpretation} across doses < 0"
             )
-        elif "_vs_" not in second_level_glt_code:
-            clusters_table["Group"] = f"Within {second_level_glt_code} only"
-            clusters_table.loc[mask_pos, "Interpretation"] = positive_interpretation
-            clusters_table.loc[mask_neg, "Interpretation"] = negative_interpretation
         else:
             first_label, second_label = get_group_labels(second_level_glt_code)
 
@@ -452,11 +410,6 @@ def plot_thresholded_img(
         title = (
             f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
             "INTERCEPT: Mean across doses"
-        )
-    elif "_vs_" not in second_level_glt_code:
-        title = (
-            f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
-            f"GROUP: Within {second_level_glt_code}{suffix}"
         )
     else:
         first_label, second_label = get_group_labels(second_level_glt_code)
@@ -588,7 +541,7 @@ def main(
     first_level_glt_label_list = list(
         itertools.product(
             first_level_glt_labels,
-            get_second_level_glt_codes(cohort, add_dose_mg_groups=(cohort == "adults")),
+            get_second_level_glt_codes(cohort),
         )
     )
 
@@ -606,17 +559,11 @@ def main(
             zcore_map_filename, group_mask_filename = get_zscore_map_and_mask(
                 analysis_dir,
                 afni_img_path,
-                cohort,
                 task,
                 entity_key,
                 first_level_glt_label,
                 second_level_glt_code,
             )
-            if not zcore_map_filename:
-                LGR.warning(
-                    f"Skipping the following glt code due to stats or group mask file not existing: {second_level_glt_code}"
-                )
-                continue
 
             cluster_correction_table = get_cluster_correction_table(
                 analysis_dir, task, entity_key, first_level_glt_label, connectivity
@@ -637,18 +584,12 @@ def main(
             LGR.info(f"Saving thresholded image to: {thresholded_filename}")
             nib.save(thresholded_img, thresholded_filename)
         else:
-            try:
-                thresholded_filename = next(
-                    analysis_dir.rglob(
-                        f"task-{task}_{entity_key}-{first_level_glt_label}"
-                        f"_gltcode-{second_level_glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
-                    )
+            thresholded_filename = next(
+                analysis_dir.rglob(
+                    f"task-{task}_{entity_key}-{first_level_glt_label}"
+                    f"_gltcode-{second_level_glt_code}_desc-nonparametric_thresholded_bisided.nii.gz"
                 )
-            except Exception:
-                LGR.warning(
-                    f"Skipping {second_level_glt_code}: no thresholded file found"
-                )
-                continue
+            )
 
             thresholded_img = nib.load(thresholded_filename)
 

@@ -57,48 +57,11 @@ TASK_CONTRASTS = {
     },
 }
 
+# For the kids data, its fully within crossover design so [10 - placebo] - [5 - placebo]) = 10 - 5
 CONTRAST_CODES = {
-    "kids": ("0", "5", "10", "5_vs_0", "10_vs_0", "10_vs_5", "mean"),
-    "adults": ("mph", "placebo", "mph_vs_placebo", "15_vs_10", "mean"),
+    "kids": ("5_vs_0", "10_vs_0", "10_vs_5", "mean"),
+    "adults": ("mph_vs_placebo", "mean"),
 }
-
-BETWEEN_GROUP_DOSE_CODES = {
-    "adults": {"15_vs_10": "dose_mg"},
-}
-
-
-def get_between_group_code(cohort):
-    return list(BETWEEN_GROUP_DOSE_CODES.get(cohort))[0]
-
-
-def is_between_group_dose_code(second_level_glt_code, cohort):
-    """
-    The between contrast is only for the adult cohort. For the kids cohort,
-    the design is purely within, every subject receives the 0, 5, and 10 mg,
-    randomized for each visit. The adult cohort came for two visits, all adults
-    received placebo; however, half the adults received 10 mg mph and the other
-    half 15 mg mph. To assess dose dependent differences, each adult's mph
-    data is subtracted from their placebo, to identify the BOLD differences
-    that can be reasonably attributed to mph, then the difference maps
-    are subjected to a between group analysis. This is not done for the kids
-    because the placebo (0 mg), cancels in the contrast (e.g. for each kid
-    [10 - placebo] - [5 - placebo])
-    """
-    if cohort != "adults":
-        return False
-
-    return second_level_glt_code in BETWEEN_GROUP_DOSE_CODES.get(cohort, {})
-
-
-def in_between_group_code(second_level_glt_code, cohort):
-    if cohort != "adults":
-        return False
-
-    return second_level_glt_code in list(BETWEEN_GROUP_DOSE_CODES.get(cohort, ""))[0]
-
-
-def get_between_group_column(second_level_glt_code, cohort):
-    return BETWEEN_GROUP_DOSE_CODES.get(cohort, {}).get(second_level_glt_code)
 
 
 def get_first_level_gltsym_codes(cohort, task, analysis_type, caller):
@@ -113,11 +76,7 @@ def get_first_level_gltsym_codes(cohort, task, analysis_type, caller):
     )
 
 
-def get_second_level_glt_codes(cohort, add_dose_mg_groups=False):
-    if cohort == "adults" and add_dose_mg_groups:
-        codes = list(CONTRAST_CODES[cohort]) + ["10", "15"]
-        return codes
-
+def get_second_level_glt_codes(cohort):
     return CONTRAST_CODES[cohort]
 
 
@@ -180,9 +139,6 @@ def resample_seed_img(seed_img, subject_nifti_img):
 
 
 def get_coordinate_from_filename(seed_mask_path, replace_underscore=True):
-    if not seed_mask_path:
-        return ""
-
     seed_mask_path = Path(seed_mask_path)
     possible_coordinate = ""
     if "_sphere_mask_" in seed_mask_path.name:
@@ -362,9 +318,6 @@ def get_nontarget_dose(second_level_glt_code, cohort):
     if second_level_glt_code == "mean":
         return None
 
-    if is_between_group_dose_code(second_level_glt_code, cohort):
-        return ["placebo"]
-
     doses = {"kids": {"0", "5", "10"}, "adults": {"mph", "placebo"}}
 
     return list(doses[cohort].difference(second_level_glt_code.split("_vs_")))
@@ -431,7 +384,7 @@ def _get_dataframe(filename):
 
 
 def skip_denoising(nifti_filename, exclude_nifti_files):
-    if not exclude_nifti_files:
+    if not exclude_nifti_files or not Path(exclude_nifti_files).exists():
         return False
 
     excluded_niftis_prefixes = _get_dataframe(exclude_nifti_files)[
