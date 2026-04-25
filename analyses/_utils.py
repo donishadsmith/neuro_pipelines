@@ -206,7 +206,7 @@ def estimate_noise_smoothness(
     entity_key = get_contrast_entity_key(group_mask_filename)
     acf_parameters_filename = (
         dst_dir
-        / "second_level_outputs"
+        / "second_level"
         / "parametric"
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-acf_parameters.txt"
     )
