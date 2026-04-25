@@ -498,7 +498,7 @@ def main(
                             parent_path=glm_dir,
                         )
 
-                        beta_coefficient_df[f"GLM Individual Cluster Beta"] = (
+                        beta_coefficient_df["GLM Individual Cluster Beta"] = (
                             compute_average_betas(
                                 beta_coefficient_df,
                                 glm_subject_beta_filenames,
@@ -507,7 +507,7 @@ def main(
                         )
 
                         beta_coefficient_df[
-                            f"GLM Individual Cluster Beta Interpretation"
+                            "GLM Individual Cluster Beta Interpretation"
                         ] = get_individual_interpretations(
                             beta_coefficient_df,
                             beta_name,
@@ -521,7 +521,7 @@ def main(
                                 seed_mask_path
                             )
                             if possible_coordinate:
-                                beta_coefficient_df[f"Seed MNI Coordinate"] = (
+                                beta_coefficient_df["Seed MNI Coordinate"] = (
                                     possible_coordinate
                                 )
 
@@ -529,7 +529,7 @@ def main(
                                 f"Using the following seed mask path: {seed_mask_path}"
                             )
 
-                            beta_coefficient_df[f"GLM Individual Seed Beta"] = (
+                            beta_coefficient_df["GLM Individual Seed Beta"] = (
                                 compute_average_betas(
                                     beta_coefficient_df,
                                     glm_subject_beta_filenames,
@@ -538,7 +538,7 @@ def main(
                                 )
                             )
                             beta_coefficient_df[
-                                f"GLM Individual Seed Beta Interpretation"
+                                "GLM Individual Seed Beta Interpretation"
                             ] = get_individual_interpretations(
                                 beta_coefficient_df,
                                 beta_name,
@@ -547,9 +547,15 @@ def main(
                                 remove_PPI_prefix=True,
                             )
 
-                    beta_coefficient_df["Units of Beta Coefficient"] = (
-                        "percent (percent_signal_change)"
-                    )
+                    if analysis_type == "gPPI":
+                        beta_coefficient_df["GPPI Units of Beta Coefficient"] = (
+                            "unitless"
+                        )
+
+                    if "GLM Individual Cluster Beta" in beta_coefficient_df.columns:
+                        beta_coefficient_df["GLM Units of Beta Coefficient"] = (
+                            "percent (percent signal change)"
+                        )
 
                     if "InputFile" in beta_coefficient_df.columns:
                         beta_coefficient_df = beta_coefficient_df.drop(
