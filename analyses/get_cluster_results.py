@@ -532,6 +532,8 @@ def main(
     dst_dir = Path(dst_dir)
 
     delete_dir(dst_dir / "cluster_results" / method)
+    delete_dir(dst_dir / "cluster_masks" / method)
+    delete_dir(dst_dir / "stat_plots" / method)
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
