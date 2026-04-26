@@ -101,7 +101,7 @@ if [[ $COHORT == "kids" ]]; then
     export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_desc-brain_mask.nii.gz"
     export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
     # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
-    export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.0"
+    export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.01"
 
     if [[ $TASKS == "all" ]]; then
         TASKS=("nback" "flanker" "mtle" "mtlr" "princess")
