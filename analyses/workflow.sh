@@ -73,10 +73,13 @@ export GM_MASK_THRESHOLD=0.20                           # Choose a float between
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
 export EXCLUDE_NIFTI_FILES=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
                                                         # should contain a single column named 'nifti_prefix_filename'
-export VOXEL_CORRECTION_P=0.001                         # Cluster forming threshold for parametric method
-export CLUSTER_CORRECTION_P=0.05                        # Cluster correction threshold for parametric method
+export PARAMETRIC_VOXEL_CORRECTION_P=0.001              # Cluster forming threshold for parametric method
+export PARAMETRIC_CLUSTER_CORRECTION_P=0.05             # Cluster correction threshold for parametric method
+export PARAMETRIC_CONNECTIVITY="NN1"                    # The connectivity for parametric
+
 export TFCE_H=2                                         # The height power for nonparametric method
 export TFCE_E=0.5                                       # The extent power for nonparametric method
+export NONPARAMETRIC_CONNECTIVITY=6                     # The connectivity for parametric
 
 # ------------------------------------------------
 # PARAMETERS USED WHEN GETTING THE CLUSTER RESULTS
