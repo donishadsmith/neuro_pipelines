@@ -497,3 +497,5 @@ def plot_signal(
     LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
     plt.savefig(save_filename)
     plt.clf()
+
+    return save_filename

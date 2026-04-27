@@ -1160,7 +1160,9 @@ def main(
             afni_img_path,
         )
         plot_title = "Seed Timeseries"
-        plot_signal(seed_timeseries_file, tr, plot_title)
+        seed_timeseries_plot_filename = plot_signal(
+            seed_timeseries_file, tr, plot_title
+        )
 
         denoised_seed_timeseries_file = denoise_seed_timeseries(
             seed_timeseries_file,
@@ -1169,7 +1171,9 @@ def main(
             afni_img_path,
         )
         plot_title = "Denoised Seed Timeseries"
-        plot_signal(denoised_seed_timeseries_file, tr, plot_title)
+        denoised_seed_timeseries_plot_filename = plot_signal(
+            denoised_seed_timeseries_file, tr, plot_title
+        )
 
         upsampled_seed_timeseries_file = resample_data(
             denoised_seed_timeseries_file,
@@ -1179,7 +1183,9 @@ def main(
             method="upsample",
         )
         plot_title = "Upsampled Seed Timeseries"
-        plot_signal(upsampled_seed_timeseries_file, nifti_file, tr, upsample_dt)
+        upsampled_seed_timeseries_plot_filename = plot_signal(
+            upsampled_seed_timeseries_file, nifti_file, tr, upsample_dt
+        )
 
         deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
             upsampled_seed_timeseries_file,
@@ -1189,20 +1195,20 @@ def main(
             afni_img_path,
         )
         plot_title = "Deconvolved Seed Timeseries"
-        plot_signal(deconvolved_seed_timeseries_file, tr, plot_title, upsample_dt)
+        deconvolved_seed_timeseries_plot_filename = plot_signal(
+            deconvolved_seed_timeseries_file, tr, plot_title, upsample_dt
+        )
 
         report.add_context(
-            seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "seed_timeseries.png"
-            ),
+            seed_timeseries_plot=embed_image(seed_timeseries_plot_filename),
             denoised_seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "denoised_seed_timeseries.png"
+                denoised_seed_timeseries_plot_filename
             ),
             upsampled_seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "upsampled_seed_timeseries.png"
+                upsampled_seed_timeseries_plot_filename
             ),
             deconvolved_seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "deconvolved_seed_timeseries.png"
+                deconvolved_seed_timeseries_plot_filename
             ),
         )
 
@@ -1237,7 +1243,9 @@ def main(
                 afni_img_path,
             )
             plot_title = f"{cond_name.capitalize()} Upsampled Condition Regressor"
-            plot_signal(upsampled_condition_regressor_file, tr, plot_title, upsample_dt)
+            upsampled_condition_regressor_plot_filename = plot_signal(
+                upsampled_condition_regressor_file, tr, plot_title, upsample_dt
+            )
 
             ppi_regressor_file = create_convolved_ppi_term(
                 ppi_dir,
@@ -1247,28 +1255,27 @@ def main(
                 upsample_dt,
             )
             plot_title = f"{cond_name.capitalize()} Upsampled PPI Timeseries"
-            plot_signal(ppi_regressor_file, tr, plot_title, upsample_dt)
+            upsampled_ppi_plot_filename = plot_signal(
+                ppi_regressor_file, tr, plot_title, upsample_dt
+            )
 
             downsampled_ppi_regressor_file = resample_data(
                 ppi_regressor_file, tr, afni_img_path, upsample_dt, method="downsample"
             )
             plot_title = f"{cond_name.capitalize()} Downsampled PPI Timeseries"
-            plot_signal(downsampled_ppi_regressor_file, tr, plot_title)
+            downsampled_ppi_regressor_plot_filename = plot_signal(
+                downsampled_ppi_regressor_file, tr, plot_title
+            )
 
             condition_plots.append(
                 {
                     "name": cond_name,
                     "upsampled_regressor_plot": embed_image(
-                        upsampled_condition_regressor_file.parent
-                        / f"{cond_name.lower()}_upsampled_condition_regressor.png"
+                        upsampled_condition_regressor_plot_filename
                     ),
-                    "upsampled_ppi_plot": embed_image(
-                        ppi_regressor_file.parent
-                        / f"{cond_name.lower()}_upsampled_ppi_timeseries.png"
-                    ),
+                    "upsampled_ppi_plot": embed_image(upsampled_ppi_plot_filename),
                     "downsampled_ppi_plot": embed_image(
-                        downsampled_ppi_regressor_file.parent
-                        / f"{cond_name.lower()}_downsampled_ppi_timeseries.png"
+                        downsampled_ppi_regressor_plot_filename
                     ),
                 }
             )
