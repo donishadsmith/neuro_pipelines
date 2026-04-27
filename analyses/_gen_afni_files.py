@@ -47,31 +47,24 @@ def create_nuisance_regressor_file(
     data = np.column_stack(valid_arrays)
 
     rank = np.linalg.matrix_rank(data)
-    collinear_regressor_names = []
     if rank < data.shape[1]:
         LGR.warning(f"Regressor matrix is rank deficient: {rank}")
 
-        data, regressor_positions, collinear_regressor_names = remove_collinear_columns(
-            data, regressor_positions
-        )
+        data, regressor_positions = remove_collinear_columns(data, regressor_positions)
         LGR.warning(f"New regressor names and positions: {regressor_positions}")
 
     # To stop errors and warnings
     drop_columns = np.where(np.var(data, axis=0) == 0)[0].tolist()
     if drop_columns:
-        constant_col_names = [
-            get_col_name(indx, regressor_positions) for indx in drop_columns
-        ]
+        col_names = [get_col_name(indx, regressor_positions) for indx in drop_columns]
 
-        LGR.warning(f"The following have constant variance: {constant_col_names}")
+        LGR.warning(f"The following have constant variance: {col_names}")
 
         data, regressor_positions = get_new_matrix_and_names(
             drop_columns, data, regressor_positions
         )
 
         LGR.warning(f"New regressor names and positions: {regressor_positions}")
-    else:
-        constant_col_names = []
 
     censored_volumes = np.where(censor_mask == 0)[0].tolist()
     LGR.info(f"The following volume indices will be censored: {censored_volumes}")
@@ -83,12 +76,7 @@ def create_nuisance_regressor_file(
 
     np.savetxt(regressor_file, data, fmt="%.6f")
 
-    report_info = {
-        "collinear_regressor_names": collinear_regressor_names,
-        "constant_column_names": constant_col_names,
-    }
-
-    return regressor_file, report_info
+    return regressor_file
 
 
 def is_timing_file_empty(timing_file):

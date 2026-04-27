@@ -220,7 +220,7 @@ def estimate_noise_smoothness(
         if curr_filename.exists():
             curr_filename.unlink()
 
-    # Use -acf for more accurate false positive rate
+    # Use -acf for more accurate false positive rate center for fMRI data
     cmd = (
         f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dFWHMx "
         f"-mask {group_mask_filename} "
@@ -258,8 +258,6 @@ def perform_cluster_simulation(
 
     LGR.info(f"Running 3dClustSim: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
-
-    return acf_parameters_filename
 
 
 def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correction_p):
@@ -325,9 +323,7 @@ def get_nontarget_dose(second_level_glt_code, cohort):
     return list(doses[cohort].difference(second_level_glt_code.split("_vs_")))
 
 
-def drop_dose_rows(
-    data_table, dose_list, only_paired_data=False, return_removed_subjects=False
-):
+def drop_dose_rows(data_table, dose_list, only_paired_data=False):
     if not dose_list:
         return data_table
 
@@ -348,14 +344,9 @@ def drop_dose_rows(
                 f"A total of {total_subjects} unique subjects with two timepoints remain."
             )
 
-        data_table = data_table[duplicated_mask]
-    else:
-        removed_subjects = []
+        return data_table[duplicated_mask]
 
-    if return_removed_subjects:
-        return data_table, removed_subjects
-    else:
-        return data_table
+    return data_table
 
 
 def get_group_labels(second_level_glt_code):

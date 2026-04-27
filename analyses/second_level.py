@@ -14,7 +14,6 @@ from bidsaid.io import compress_image
 from bidsaid.qc import get_n_censored_volumes
 
 from _denoising import remove_collinear_columns
-from _report import HTMLReport
 from _utils import (
     _get_dataframe,
     drop_dose_rows,
@@ -231,8 +230,8 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--nonparametric_cluster_correction_p",
-        dest="nonparametric_cluster_correction_p",
+        "--cluster_correction_p",
+        dest="cluster_correction_p",
         default=0.05,
         type=float,
         required=False,
@@ -260,44 +259,6 @@ def _get_cmd_args():
             "Can list the fill name of the file (no parent directories) to exlude that specific file "
             "or can include the prefix (i.e., 'sub-101_task-nback_ses-01_space-MNI' or 'sub-101') to exclude all files starting "
             "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
-        ),
-    )
-    parser.add_argument(
-        "--parametric_connectivity",
-        dest="parametric_connectivity",
-        required=False,
-        default="NN1",
-        help="Connectivity to use for parametric. Will always use 2-sided/bisided version. Just used in this script for reporting.",
-    )
-    parser.add_argument(
-        "--parametric_voxel_correction_p",
-        dest="parametric_voxel_correction_p",
-        required=False,
-        default=0.001,
-        type=float,
-        help=(
-            "P-value for voxel correction. Only used for the parametric approach. Just used in this script for reporting."
-        ),
-    )
-    parser.add_argument(
-        "--parametric_cluster_correction_p",
-        dest="parametric_cluster_correction_p",
-        required=False,
-        default=0.05,
-        type=float,
-        help="P-value for cluster correction. Only used for the parametric approach. Just used in this script for reporting.",
-    )
-    parser.add_argument(
-        "--sphere_radius",
-        dest="sphere_radius",
-        required=False,
-        default=5,
-        help=(
-            "The radius of the sphere for the MNI coordinate. If `analysis_type` is 'glm', "
-            "seed masks are only created for the mean `second_level_glt_code`, which "
-            "are the maps denoting activation and deactivation for all subjects. "
-            "This is done so that seeds are not deliberately biased towards a specific group. "
-            "Just used in this script for reporting."
         ),
     )
 
@@ -418,7 +379,7 @@ def drop_constant_columns(data_table):
 
     LGR.info(f"Dropping the following constant columns: {constant_columns}")
 
-    return data_table.drop(columns=constant_columns), constant_columns
+    return data_table.drop(columns=constant_columns)
 
 
 def replace_whitespace_with_underscores(data_table):
@@ -427,7 +388,6 @@ def replace_whitespace_with_underscores(data_table):
             data_table[column] = data_table[column].str.replace(" ", "_")
 
     return data_table
-
 
 def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     bids_dir = Path(bids_dir)
@@ -497,7 +457,7 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
     data_table = replace_whitespace_with_underscores(data_table)
-
+    
     return drop_constant_columns(data_table)
 
 
@@ -679,9 +639,9 @@ def generate_matrices_filenames(
 
 def prioritize_regressors(design_matrix, datacontainer):
     has_dof = lambda design_matrix: design_matrix.shape[0] > design_matrix.shape[1]
-    dropped_dof_regressors = []
+
     if has_dof(design_matrix):
-        return design_matrix, dropped_dof_regressors
+        return design_matrix
 
     for regressor in datacontainer.deprioritized_regressors_order:
         if drop_columns := [
@@ -689,7 +649,6 @@ def prioritize_regressors(design_matrix, datacontainer):
         ]:
             LGR.info(f"Dropping the following regressor(s) to save dof: {drop_columns}")
             design_matrix = design_matrix.drop(columns=drop_columns)
-            dropped_dof_regressors.extend(drop_columns)
 
         LGR.info(
             f"N OBSERVATIONS: {design_matrix.shape[0]}; N COLUMNS: {design_matrix.shape[0]}"
@@ -697,7 +656,7 @@ def prioritize_regressors(design_matrix, datacontainer):
         if has_dof(design_matrix):
             break
 
-    return design_matrix, dropped_dof_regressors
+    return design_matrix
 
 
 def get_col_from_data_table(data_table, datacontainer, col_type):
@@ -777,22 +736,17 @@ def create_design_matrix(
         )
 
     design_matrix = pd.DataFrame(design_components)
-    collinear_column_names = []
     if design_matrix.shape[1] > 1:
         regressor_positions = {
             index: col for index, col in enumerate(design_matrix.columns)
         }
-        design_arr, regressor_positions, collinear_column_names = (
-            remove_collinear_columns(design_matrix.to_numpy(), regressor_positions)
+        design_arr, regressor_positions = remove_collinear_columns(
+            design_matrix.to_numpy(), regressor_positions
         )
         design_matrix = pd.DataFrame(
             design_arr, columns=list(regressor_positions.values())
         )
-        design_matrix, dropped_dof_regressors = prioritize_regressors(
-            design_matrix, datacontainer
-        )
-    else:
-        dropped_dof_regressors = []
+        design_matrix = prioritize_regressors(design_matrix, datacontainer)
 
     if include_intercept:
         # Using row shape of original table for case where design matrix is empty
@@ -813,7 +767,7 @@ def create_design_matrix(
             axis=1,
         )
 
-    return design_matrix, collinear_column_names, dropped_dof_regressors
+    return design_matrix
 
 
 def create_contrast_matrix(design_matrix, contrast_matrix_filename):
@@ -879,13 +833,11 @@ def create_mean_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    design_matrix, collinear_column_names, dropped_dof_regressors = (
-        create_design_matrix(
-            glt_data_table,
-            datacontainer,
-            include_intercept=True,
-            average_within_subjects=(second_level_glt_code == "mean"),
-        )
+    design_matrix = create_design_matrix(
+        glt_data_table,
+        datacontainer,
+        include_intercept=True,
+        average_within_subjects=(second_level_glt_code == "mean"),
     )
     design_matrix.to_csv(
         matrices_filenames_dict["design_matrix_file"],
@@ -902,13 +854,7 @@ def create_mean_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    report_info = {
-        "constant_column_names": [],
-        "collinear_column_names": collinear_column_names,
-        "dropped_dof_regressor_names": dropped_dof_regressors,
-    }
-
-    return matrices_filenames_dict, report_info
+    return matrices_filenames_dict
 
 
 def create_comparison_matrices(
@@ -934,20 +880,18 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    glt_data_table, constant_columns_names = drop_within_subject_constant_regressors(
+    glt_data_table = drop_within_subject_constant_regressors(
         datacontainer, glt_data_table
     )
 
     eb_data = glt_data_table["Subj"].factorize()[0] + 1
     np.savetxt(matrices_filenames_dict["eb_file"], eb_data, delimiter=",", fmt="%d")
 
-    design_matrix, collinear_column_names, dropped_dof_regressors = (
-        create_design_matrix(
-            glt_data_table,
-            datacontainer,
-            include_intercept=False,
-            second_level_glt_code=second_level_glt_code,
-        )
+    design_matrix = create_design_matrix(
+        glt_data_table,
+        datacontainer,
+        include_intercept=False,
+        second_level_glt_code=second_level_glt_code,
     )
     design_matrix.to_csv(
         matrices_filenames_dict["design_matrix_file"],
@@ -964,13 +908,7 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    report_info = {
-        "constant_column_names": constant_columns_names,
-        "collinear_column_names": collinear_column_names,
-        "dropped_dof_regressor_names": dropped_dof_regressors,
-    }
-
-    return matrices_filenames_dict, report_info
+    return matrices_filenames_dict
 
 
 def set_permutations(max_permutation):
@@ -986,7 +924,7 @@ def compute_n_permutation(glt_data_table):
     max_permutation = 2**n_subjects
     LGR.info(f"Maximum permutations possible = {max_permutation}")
 
-    return set_permutations(max_permutation), max_permutation
+    return set_permutations(max_permutation)
 
 
 def create_concatenated_image(
@@ -1079,7 +1017,7 @@ def drop_within_subject_constant_regressors(datacontainer, glt_data_table):
             if col in glt_data_table.columns:
                 glt_data_table = glt_data_table.drop(col, axis=1)
 
-    return glt_data_table, constant_columns
+    return glt_data_table
 
 
 def perform_palm(
@@ -1169,7 +1107,7 @@ def perform_palm(
     LGR.info(f"Running PALM for {second_level_glt_code}: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
-    return str(output_prefix), cmd
+    return str(output_prefix)
 
 
 def perform_3dlmer(
@@ -1219,7 +1157,7 @@ def perform_3dlmer(
     LGR.info(f"Running 3dLMEr: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
-    return residual_filename, cmd
+    return residual_filename
 
 
 def main(
@@ -1243,11 +1181,7 @@ def main(
     tfce_H,
     tfce_E,
     tfce_C,
-    nonparametric_cluster_correction_p,
-    parametric_connectivity,
-    parametric_voxel_correction_p,
-    parametric_cluster_correction_p,
-    sphere_radius,
+    cluster_correction_p,
     n_cores,
     exclude_nifti_files,
     excluded_covariates,
@@ -1258,39 +1192,6 @@ def main(
     dst_dir = Path(dst_dir)
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
-
-    report_dir = Path(analysis_dir) / "reports" / "second_level"
-    report_dir.mkdir(parents=True, exist_ok=True)
-    report = HTMLReport(
-        subject=None,
-        session=None,
-        task=task,
-        analysis_type=analysis_type,
-        method=method,
-    )
-    report.add_context(
-        cohort=cohort,
-        space=space,
-        group_mask_threshold=group_mask_threshold,
-        gm_probseg_img_path=gm_probseg_img_path or None,
-        gm_mask_threshold=gm_mask_threshold,
-        apriori_img_path=apriori_img_path or None,
-        excluded_covariates=excluded_covariates,
-    )
-    if method == "parametric":
-        report.add_context(
-            n_cores=n_cores,
-            parametric_voxel_correction_p=parametric_voxel_correction_p,
-            parametric_cluster_correction_p=parametric_cluster_correction_p,
-            parametric_connectivity=parametric_connectivity,
-        )
-    else:
-        report.add_context(
-            tfce_H=tfce_H,
-            tfce_E=tfce_E,
-            tfce_C=tfce_C,
-            cluster_correction_p=nonparametric_cluster_correction_p,
-        )
 
     if first_level_glt_label:
         first_level_glt_labels = (first_level_glt_label,)
@@ -1305,13 +1206,11 @@ def main(
     for first_level_glt_label in first_level_glt_labels:
         entity_key = get_contrast_entity_key(first_level_glt_label)
         LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_glt_label}")
-
-        beta_files = get_beta_files(analysis_dir, task, first_level_glt_label)
-        all_subjects = set(get_subjects(beta_files))
         beta_files = exclude_beta_files(
-            beta_files,
+            get_beta_files(analysis_dir, task, first_level_glt_label),
             exclude_nifti_files,
         )
+
         if not beta_files:
             LGR.warning(f"No beta files found for {first_level_glt_label}")
             continue
@@ -1321,20 +1220,9 @@ def main(
             f"Found {len(beta_files)} files from {len(set(subject_list))} subjects"
         )
 
-        data_table, drop_constant_column_names = create_data_table(
+        data_table = create_data_table(
             bids_dir, datacontainer, subject_list, beta_files
         )
-        retained_subjects = set(data_table["Subj"].unique())
-        excluded_subjects = sorted(all_subjects - retained_subjects)
-
-        report.add_context(
-            first_level_glt_label=first_level_glt_label,
-            n_beta_files=len(beta_files),
-            n_subjects=len(set(subject_list)),
-            excluded_subjects=excluded_subjects,
-            dropped_constant_columns=drop_constant_column_names,
-        )
-
         data_table_filename = (
             dst_dir
             / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-data_table.txt"
@@ -1370,7 +1258,7 @@ def main(
             model_str = get_model_str(data_table, datacontainer)
             center_str = get_centering_str(data_table, datacontainer)
 
-            residual_filename, lmer_cmd = perform_3dlmer(
+            residual_filename = perform_3dlmer(
                 task,
                 entity_key,
                 first_level_glt_label,
@@ -1383,14 +1271,6 @@ def main(
                 glt_str,
                 n_cores,
             )
-
-            report.add_context(
-                model_str=model_str,
-                centering_str=center_str,
-                glt_str=glt_str,
-                lmer_cmd=lmer_cmd,
-            )
-
             acf_parameters_filename = estimate_noise_smoothness(
                 dst_dir,
                 afni_img_path,
@@ -1404,14 +1284,6 @@ def main(
                 acf_parameters_filename,
                 first_level_glt_label,
             )
-
-            try:
-                acf_lines = acf_parameters_filename.read_text().strip().splitlines()
-                if len(acf_lines) >= 2:
-                    acf_parameters = acf_lines[1].split()[:3]
-                    report.add_context(acf_parameters=acf_parameters)
-            except Exception:
-                pass
         else:
             # Nonparametric (PALM)
             use_native_palm = shutil.which("palm") is not None
@@ -1426,18 +1298,16 @@ def main(
 
             output_dir = dst_dir / "second_level" / "nonparametric"
             output_dir.mkdir(parents=True, exist_ok=True)
-            second_level_contrasts = []
             for second_level_glt_code in get_second_level_glt_codes(cohort):
                 LGR.info(f"Processing the following glt code: {second_level_glt_code}")
 
                 vs_in_code = "_vs_" in second_level_glt_code
-                glt_data_table, removed_subjects = drop_dose_rows(
+                glt_data_table = drop_dose_rows(
                     data_table,
                     get_nontarget_dose(second_level_glt_code, cohort),
                     only_paired_data=vs_in_code,
-                    return_removed_subjects=True,
                 )
-                glt_data_table, constant_columns = drop_constant_columns(glt_data_table)
+                glt_data_table = drop_constant_columns(glt_data_table)
                 if glt_data_table.empty:
                     LGR.info(
                         f"Skipping the following second level glt code: {second_level_glt_code}"
@@ -1469,7 +1339,7 @@ def main(
                 matrix_creation_func = (
                     create_comparison_matrices if vs_in_code else create_mean_matrices
                 )
-                matrices_output_dict, matrix_report_info = matrix_creation_func(
+                matrices_output_dict = matrix_creation_func(
                     glt_data_table,
                     datacontainer,
                     output_dir,
@@ -1494,7 +1364,7 @@ def main(
                     first_level_glt_label,
                     second_level_glt_code,
                 )
-                output_prefix, palm_cmd = perform_palm(
+                output_prefix = perform_palm(
                     concatenated_filename,
                     group_mask_filename,
                     matrices_output_dict["design_matrix_file"],
@@ -1519,54 +1389,8 @@ def main(
                 threshold_palm_output(
                     output_prefix,
                     second_level_glt_code,
-                    nonparametric_cluster_correction_p,
+                    cluster_correction_p,
                 )
-
-                design_columns = pd.read_csv(
-                    matrices_output_dict["design_matrix_file"], header=None
-                ).columns.tolist()
-
-                matrix_report_info["constant_column_names"] = list(
-                    set(matrix_report_info["constant_column_names"] + constant_columns)
-                )
-                contrast_info = {
-                    "glt_code": second_level_glt_code,
-                    "n_files": len(glt_data_table["InputFile"].tolist()),
-                    "n_subjects": len(glt_data_table["Subj"].unique()),
-                    "n_permutations": max_permutations,
-                    "is_comparison": vs_in_code,
-                    "design_columns": design_columns,
-                    "removed_subjects": removed_subjects,
-                    "dropped_within_subject_columns": matrix_report_info.get(
-                        "constant_column_names", []
-                    ),
-                    "dropped_collinear_columns": matrix_report_info.get(
-                        "collinear_column_names", []
-                    ),
-                    "dropped_dof_columns": matrix_report_info.get(
-                        "dropped_dof_regressor_names", []
-                    ),
-                    "palm_cmd": palm_cmd,
-                }
-                if vs_in_code:
-                    labels = get_group_labels(second_level_glt_code)
-                    contrast_info["positive_label"] = f"{labels[0]} > {labels[1]}"
-                    contrast_info["negative_label"] = f"{labels[1]} > {labels[0]}"
-                else:
-                    contrast_info["positive_label"] = "above mean of 0"
-                    contrast_info["negative_label"] = "below mean of 0"
-
-                second_level_contrasts.append(contrast_info)
-
-            report.add_context(second_level_contrasts=second_level_contrasts)
-
-        report.add_context(sphere_radius=sphere_radius)
-
-        report_path = (
-            report_dir
-            / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_report.html"
-        )
-        report.create_report(report_path, "second_level.html")
 
 
 if __name__ == "__main__":

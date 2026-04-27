@@ -115,7 +115,6 @@ def get_col_name(indx, regressor_positions):
 def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999):
     # To remove errors and warnings
     drop_columns = []
-    collinear_regressor_names = []
     for i in range(regressor_arr.shape[1]):
         for j in range(i + 1, regressor_arr.shape[1]):
             r = np.corrcoef(regressor_arr[:, i], regressor_arr[:, j])[0, 1]
@@ -124,17 +123,12 @@ def remove_collinear_columns(regressor_arr, regressor_positions, threshold=0.999
                 col1 = get_col_name(i, regressor_positions)
                 col2 = get_col_name(j, regressor_positions)
                 drop_columns.append(j)
-                collinear_regressor_names.append(col2)
 
                 LGR.warning(
                     f"Columns {col1} and {col2} are collinear ({r}), dropping {col2}."
                 )
 
-    regressor_arr, regressor_positions = get_new_matrix_and_names(
-        drop_columns, regressor_arr, regressor_positions
-    )
-
-    return regressor_arr, regressor_positions, collinear_regressor_names
+    return get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions)
 
 
 def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):

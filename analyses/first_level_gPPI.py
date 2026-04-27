@@ -72,7 +72,7 @@ remove a significant amount of frames resulting in either suboptimal estimated b
 or too little retainerd participants. There is no optimal denoising strategy for all datasets.
 """
 
-import argparse, base64, json, subprocess, sys
+import argparse, subprocess, json, subprocess, sys
 from pathlib import Path
 
 import nibabel as nib, numpy as np, matplotlib.pyplot as plt
@@ -102,7 +102,6 @@ from _gen_afni_files import (
 )
 from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
-from _report import HTMLReport
 from _utils import (
     VALID_TASK_NAMES,
     create_beta_files,
@@ -825,13 +824,6 @@ def create_convolved_ppi_term(
     return ppi_regressor_file
 
 
-def embed_image(image_path):
-    data = Path(image_path).read_bytes()
-    b64 = base64.b64encode(data).decode("utf-8")
-
-    return f"data:image/png;base64,{b64}"
-
-
 def main(
     bids_dir,
     afni_img_path,
@@ -855,9 +847,6 @@ def main(
     faltung_penalty_syntax,
     exclude_nifti_files,
 ):
-    report_dir = Path(dst_dir) / "reports" / "first_level"
-    report_dir.mkdir(parents=True, exist_ok=True)
-
     if task not in VALID_TASK_NAMES[cohort]:
         LGR.warning(
             f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
@@ -966,19 +955,9 @@ def main(
                 "Denoising of the following file will be skipped due to the prefix being found in "
                 f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}"
             )
-            report.mark_excluded(
-                f"Skipped due to prefix being found in {exclude_nifti_files} "
-            )
-            report_path = (
-                report_dir
-                / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
-            )
-            report.create_report(report_path, "first_level.html")
             continue
 
         subject_dir.mkdir(parents=True, exist_ok=True)
-
-        report = HTMLReport(subject, session, task, analysis_type="gPPI")
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
@@ -1003,29 +982,12 @@ def main(
             f" {percent_censored}"
         )
 
-        report.add_context(
-            fd_threshold=fd_threshold,
-            exclusion_criteria=exclusion_criteria,
-            n_censored_volumes=int(n_censored),
-            n_total_volumes=int(kept.size),
-            percent_censored=float(percent_censored),
-        )
-
         if percent_censored > exclusion_criteria:
             LGR.warning(
                 f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
                 "run excluded because the percent censored is greater than the "
                 f"exclusion criteria: {exclusion_criteria}"
             )
-            report.mark_excluded(
-                f"Proportion of flagged volumes ({percent_censored:.1%}) "
-                f"exceeded threshold ({exclusion_criteria:.0%})."
-            )
-            report_path = (
-                report_dir
-                / f"sub-{subject}_ses-{session}_task-{task}_desc-gPPI_report.html"
-            )
-            report.create_report(report_path, "first_level.html")
             continue
 
         censor_file = create_censor_file(
@@ -1051,17 +1013,6 @@ def main(
                 copy=True
             )
 
-        report.add_context(
-            n_motion_parameters=n_motion_parameters,
-            motion_regressor_names=motion_regressor_names,
-            acompcor_strategy=acompcor_strategy,
-            n_acompcor=n_acompcor,
-            acompcor_component_names=acompcor_regressor_names or [],
-            cosine_parameter_names=cosine_regressor_names,
-            fwhm=fwhm,
-            filter_correct_trials=filter_correct_trials,
-        )
-
         regressor_names_nested_list = filter(
             None,
             [
@@ -1075,7 +1026,7 @@ def main(
             for regressor_list in regressor_names_nested_list
             for regressor in regressor_list
         ]
-        nuisance_regressors_file, report_info = create_nuisance_regressor_file(
+        nuisance_regressors_file = create_nuisance_regressor_file(
             subject_dir,
             subject,
             session,
@@ -1089,38 +1040,12 @@ def main(
             analysis_type="gPPI",
         )
 
-        dropped_regressors = (
-            report_info["collinear_regressor_names"]
-            + report_info["constant_column_names"]
-        )
-        if dropped_regressors:
-            report.add_context(dropped_regressors=dropped_regressors)
-
         timing_dir = create_timing_files(
             subject_dir,
             event_file,
             task=task,
             filter_correct_trials=filter_correct_trials,
             append_task_name=False,
-        )
-
-        timing_conditions = []
-        for tf in sorted(timing_dir.glob("*.1D")):
-            data = np.loadtxt(tf, delimiter=" ")
-            timing_conditions.append(
-                {
-                    "name": tf.stem,
-                    "n_events": int(data.size) if data.size > 0 else 0,
-                }
-            )
-
-        report.add_context(
-            timing_conditions=timing_conditions,
-            event_type=(
-                "blocks"
-                if task not in ["flanker", "simplegng", "complexgng"]
-                else "events"
-            ),
         )
 
         percent_change_nifti_file = percent_signal_change(
@@ -1132,16 +1057,6 @@ def main(
 
         tr = get_tr(nifti_file)
         n_volumes = get_n_volumes(nifti_file)
-
-        report.add_context(
-            seed_mask_path=str(seed_mask_path),
-            seed_coordinate=get_coordinate_from_filename(seed_mask_path),
-            upsample_dt=upsample_dt,
-            pad_seconds=pad_seconds,
-            pad_length=int(pad_seconds / upsample_dt),
-            faltung_penalty_syntax=faltung_penalty_syntax,
-            tr=tr,
-        )
 
         ppi_dir = timing_dir / "ppi"
         ppi_dir.mkdir(parents=True, exist_ok=True)
@@ -1186,21 +1101,6 @@ def main(
             deconvolved_seed_timeseries_file, nifti_file, plot_title, upsample_dt
         )
 
-        report.add_context(
-            seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "seed_timeseries.png"
-            ),
-            denoised_seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "denoised_seed_timeseries.png"
-            ),
-            upsampled_seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "upsampled_seed_timeseries.png"
-            ),
-            deconvolved_seed_timeseries_plot=embed_image(
-                seed_timeseries_file.parent / "deconvolved_seed_timeseries.png"
-            ),
-        )
-
         first_level_gltsym_codes = get_first_level_gltsym_codes(
             cohort, task, analysis_type="glm", caller="gPPI"
         )
@@ -1212,15 +1112,9 @@ def main(
         condition_filenames = get_instruction_name(
             timing_dir, cohort, task, condition_filenames
         )
-
-        condition_names = []
-        condition_plots = []
         for condition_filename in condition_filenames:
             if is_timing_file_empty(condition_filename):
                 continue
-
-            cond_name = condition_filename.name.removesuffix(".1D")
-            condition_names.append(cond_name)
 
             upsampled_condition_regressor_file = upsample_condition_regressor(
                 condition_filename,
@@ -1231,7 +1125,7 @@ def main(
                 upsample_dt,
                 afni_img_path,
             )
-            plot_title = f"{cond_name.capitalize()} Upsampled Condition Regressor"
+            plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Upsampled Condition Regressor"
             plot_signal(
                 upsampled_condition_regressor_file, nifti_file, plot_title, upsample_dt
             )
@@ -1243,37 +1137,14 @@ def main(
                 afni_img_path,
                 upsample_dt,
             )
-            plot_title = f"{cond_name.capitalize()} Upsampled PPI Timeseries"
+            plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Upsampled PPI Timeseries"
             plot_signal(ppi_regressor_file, nifti_file, plot_title, upsample_dt)
 
             downsampled_ppi_regressor_file = resample_data(
                 ppi_regressor_file, tr, afni_img_path, upsample_dt, method="downsample"
             )
-            plot_title = f"{cond_name.capitalize()} Downsampled PPI Timeseries"
+            plot_title = f"{condition_filename.name.removesuffix('.1D').capitalize()} Downsampled PPI Timeseries"
             plot_signal(downsampled_ppi_regressor_file, nifti_file, plot_title)
-
-            condition_plots.append(
-                {
-                    "name": cond_name,
-                    "upsampled_regressor_plot": embed_image(
-                        upsampled_condition_regressor_file.parent
-                        / f"{cond_name.lower()}_upsampled_condition_regressor.png"
-                    ),
-                    "upsampled_ppi_plot": embed_image(
-                        ppi_regressor_file.parent
-                        / f"{cond_name.lower()}_upsampled_ppi_timeseries.png"
-                    ),
-                    "downsampled_ppi_plot": embed_image(
-                        downsampled_ppi_regressor_file.parent
-                        / f"{cond_name.lower()}_downsampled_ppi_timeseries.png"
-                    ),
-                }
-            )
-
-        report.add_context(
-            condition_names=condition_names,
-            condition_plots=condition_plots,
-        )
 
         smoothed_nifti_file = perform_spatial_smoothing(
             subject_dir.parent,
@@ -1291,11 +1162,6 @@ def main(
         deconvolve_cmd = get_task_deconvolve_cmd[cohort](
             task, timing_dir, nuisance_regressors_file, seed_timeseries_file, ppi_dir
         )
-
-        report.add_context(
-            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}",
-        )
-
         design_matrix_file = create_design_matrix(
             subject_dir.parent,
             afni_img_path,
@@ -1325,12 +1191,6 @@ def main(
             task,
             analysis_type="gPPI",
         )
-
-        report_path = (
-            report_dir
-            / f"sub-{subject}_ses-{session}_task-{task}_desc-gPPI_report.html"
-        )
-        report.create_report(report_path, "first_level.html")
 
 
 if __name__ == "__main__":

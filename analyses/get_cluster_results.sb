@@ -33,9 +33,8 @@ ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
 TEMPLATE_MASK_PATH=${TEMPLATE_MASK_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz"}
 TEMPLATE_IMG_PATH=${TEMPLATE_IMG_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz"}
 
-PARAMETRAIAC_VOXEL_CORRECTION_P=${PARAMETRAIAC_VOXEL_CORRECTION_P:-0.001}
-PARAMETRAIAC_CLUSTER_CORRECTION_P=${PARAMETRAIAC_CLUSTER_CORRECTION_P:-0.05}
-PARAMETRIC_CONNECTIVITY=${PARAMETRIC_CONNECTIVITY:"NN1"}
+VOXEL_CORRECTION_P=${VOXEL_CORRECTION_P:-0.001}
+CLUSTER_CORRECTION_P=${CLUSTER_CORRECTION_P:-0.05}
 
 SEED_MASK_PATH=${SEED_MASK_PATH:-""}
 
@@ -50,7 +49,7 @@ CMD="$PYTHON get_cluster_results.py \
     --template_img_path $TEMPLATE_IMG_PATH"
 
 if [[ $METHOD == "parametric" ]]; then
-	CMD+=" --afni_img_path $AFNI_IMG_PATH --parametric_voxel_correction_p $PARAMETRAIAC_VOXEL_CORRECTION_P --parametric_cluster_correction_p $PARAMETRAIAC_CLUSTER_CORRECTION_P --parametric_connectivity $PARAMETRIC_CONNECTIVITY"
+	CMD+=" --afni_img_path $AFNI_IMG_PATH --voxel_correction_p $VOXEL_CORRECTION_P --cluster_correction_p $CLUSTER_CORRECTION_P"
 fi
 
 if [[ $ANALYSIS_TYPE == "gPPI" && -n $SEED_MASK_PATH ]]; then
