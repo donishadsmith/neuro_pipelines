@@ -36,6 +36,7 @@ from _gen_afni_files import (
 )
 from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
+from _report import HTMLReport
 from _utils import VALID_TASK_NAMES, delete_dir, create_beta_files, skip_denoising
 
 LGR = setup_logger(__name__)
@@ -364,6 +365,9 @@ def main(
     fwhm,
     exclude_nifti_files,
 ):
+    report_dir = Path(dst_dir) / "reports" / "first_level"
+    report_dir.mkdir(parents=True, exist_ok=True)
+
     if task not in VALID_TASK_NAMES[cohort]:
         LGR.warning(
             f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
@@ -470,9 +474,19 @@ def main(
                 "Denoising of the following file will be skipped due to the prefix being found in "
                 f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}"
             )
+            report.mark_excluded(
+                f"Skipped due to prefix being found in {exclude_nifti_files} "
+            )
+            report_path = (
+                report_dir
+                / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
+            )
+            report.create_report(report_path, "first_level.html")
             continue
 
         subject_dir.mkdir(parents=True, exist_ok=True)
+
+        report = HTMLReport(subject, session, task, analysis_type="glm")
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
@@ -497,12 +511,29 @@ def main(
             f" {percent_censored}"
         )
 
+        report.add_context(
+            fd_threshold=fd_threshold,
+            exclusion_criteria=exclusion_criteria,
+            n_censored_volumes=int(n_censored),
+            n_total_volumes=int(kept.size),
+            percent_censored=float(percent_censored),
+        )
+
         if percent_censored > exclusion_criteria:
             LGR.warning(
                 f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
                 "run excluded because the percent censored is greater than the "
                 f"exclusion criteria: {exclusion_criteria}"
             )
+            report.mark_excluded(
+                f"Proportion of flagged volumes ({percent_censored:.1%}) "
+                f"exceeded threshold ({exclusion_criteria:.0%})."
+            )
+            report_path = (
+                report_dir
+                / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
+            )
+            report.create_report(report_path, "first_level.html")
             continue
 
         censor_file = create_censor_file(
@@ -528,6 +559,17 @@ def main(
                 copy=True
             )
 
+        report.add_context(
+            n_motion_parameters=n_motion_parameters,
+            motion_regressor_names=motion_regressor_names,
+            acompcor_strategy=acompcor_strategy,
+            n_acompcor=n_acompcor,
+            acompcor_component_names=acompcor_regressor_names or [],
+            cosine_parameter_names=cosine_regressor_names,
+            fwhm=fwhm,
+            filter_correct_trials=filter_correct_trials,
+        )
+
         regressor_names_nested_list = filter(
             None,
             [
@@ -541,7 +583,7 @@ def main(
             for regressor_list in regressor_names_nested_list
             for regressor in regressor_list
         ]
-        nuisance_regressors_file = create_nuisance_regressor_file(
+        nuisance_regressors_file, report_info = create_nuisance_regressor_file(
             subject_dir,
             subject,
             session,
@@ -554,8 +596,33 @@ def main(
             acompcor_regressors,
         )
 
+        dropped_regressors = (
+            report_info["collinear_regressor_names"]
+            + report_info["constant_column_names"]
+        )
+        if dropped_regressors:
+            report.add_context(dropped_regressors=dropped_regressors)
+
         timing_dir = create_timing_files(
             subject_dir, event_file, task, filter_correct_trials
+        )
+
+        timing_conditions = []
+        for tf in sorted(timing_dir.glob("*.1D")):
+            data = np.loadtxt(tf, delimiter=" ")
+            timing_conditions.append(
+                {
+                    "name": tf.stem,
+                    "n_events": int(data.size) if data.size > 0 else 0,
+                }
+            )
+        report.add_context(
+            timing_conditions=timing_conditions,
+            event_type=(
+                "blocks"
+                if task not in ["flanker", "simplegng", "complexgng"]
+                else "events"
+            ),
         )
 
         percent_change_nifti_file = percent_signal_change(
@@ -574,6 +641,11 @@ def main(
         deconvolve_cmd = get_task_deconvolve_cmd[cohort](
             task, timing_dir, nuisance_regressors_file
         )
+
+        report.add_context(
+            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}",
+        )
+
         design_matrix_file = create_design_matrix(
             subject_dir,
             afni_img_path,
@@ -598,6 +670,11 @@ def main(
         create_beta_files(
             stats_file_relm, betas_dir, afni_img_path, cohort, task, analysis_type="glm"
         )
+
+        report_path = (
+            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
+        )
+        report.create_report(report_path, "first_level.html")
 
 
 if __name__ == "__main__":

@@ -96,23 +96,23 @@ def _get_cmd_args():
         help="Whether parametric (3dlmer) or nonparametric (Palm) was used.",
     )
     parser.add_argument(
-        "--connectivity",
-        dest="connectivity",
+        "--parametric_connectivity",
+        dest="parametric_connectivity",
         required=False,
         default="NN1",
         help="Connectivity to use for parametric. Will always use 2-sided/bisided version.",
     )
     parser.add_argument(
-        "--voxel_correction_p",
-        dest="voxel_correction_p",
+        "--parametric_voxel_correction_p",
+        dest="parametric_voxel_correction_p",
         required=False,
         default=0.001,
         type=float,
         help=("P-value for voxel correction. Only used for the parametric approach."),
     )
     parser.add_argument(
-        "--cluster_correction_p",
-        dest="cluster_correction_p",
+        "--parametric_cluster_correction_p",
+        dest="parametric_cluster_correction_p",
         required=False,
         default=0.05,
         type=float,
@@ -193,12 +193,12 @@ def get_zscore_map_and_mask(
 
 
 def get_cluster_correction_table(
-    analysis_dir, task, entity_key, first_level_glt_label, connectivity
+    analysis_dir, task, entity_key, first_level_glt_label, parametric_connectivity
 ):
     cluster_correction_filename = next(
         analysis_dir.rglob(
             f"task-{task}_{entity_key}-{first_level_glt_label}"
-            f"_desc-cluster_correction.{connectivity}_bisided.1D"
+            f"_desc-cluster_correction.{parametric_connectivity}_bisided.1D"
         )
     )
     cluster_correction_table = pd.DataFrame(
@@ -210,28 +210,35 @@ def get_cluster_correction_table(
 
 
 def get_cluster_size(
-    cluster_correction_table, voxel_correction_p, cluster_correction_p
+    cluster_correction_table,
+    parametric_voxel_correction_p,
+    parametric_cluster_correction_p,
+    verbose=True,
 ):
     cluster_p_values = list(map(float, cluster_correction_table.columns[1:]))
     cluster_p_values_arr = np.array(cluster_p_values)
     clust_p_index = (
-        np.where((cluster_p_values_arr == cluster_correction_p) == True)[0][0] + 1
+        np.where((cluster_p_values_arr == parametric_cluster_correction_p) == True)[0][
+            0
+        ]
+        + 1
     )
     cluster_p_str = cluster_correction_table.columns[clust_p_index]
 
     cluster_size = int(
         np.ceil(
             cluster_correction_table.loc[
-                cluster_correction_table["pthr"] == voxel_correction_p,
+                cluster_correction_table["pthr"] == parametric_voxel_correction_p,
                 cluster_p_str,
             ].to_numpy(copy=True)[0]
         )
     )
 
-    LGR.info(
-        "Cluster side for bisided using cluster-forming threshold "
-        f"{voxel_correction_p} and cluster correction {cluster_correction_p}: {cluster_size}"
-    )
+    if verbose:
+        LGR.info(
+            "Cluster side for bisided using cluster-forming threshold "
+            f"{parametric_voxel_correction_p} and cluster correction {parametric_cluster_correction_p}: {cluster_size}"
+        )
 
     return cluster_size
 
@@ -521,9 +528,9 @@ def main(
     analysis_type,
     seed_mask_path,
     method,
-    connectivity,
-    voxel_correction_p,
-    cluster_correction_p,
+    parametric_connectivity,
+    parametric_voxel_correction_p,
+    parametric_cluster_correction_p,
     template_mask_path,
     template_img_path,
     sphere_radius,
@@ -568,16 +575,22 @@ def main(
             )
 
             cluster_correction_table = get_cluster_correction_table(
-                analysis_dir, task, entity_key, first_level_glt_label, connectivity
+                analysis_dir,
+                task,
+                entity_key,
+                first_level_glt_label,
+                parametric_connectivity,
             )
             cluster_size = get_cluster_size(
-                cluster_correction_table, voxel_correction_p, cluster_correction_p
+                cluster_correction_table,
+                parametric_voxel_correction_p,
+                parametric_cluster_correction_p,
             )
 
             thresholded_img = threshold_img(
                 nib.load(zcore_map_filename),
                 mask_img=nib.load(group_mask_filename),
-                threshold=p_to_z(voxel_correction_p),
+                threshold=p_to_z(parametric_voxel_correction_p),
                 cluster_threshold=cluster_size,
             )
             thresholded_filename = str(zcore_map_filename).replace(
@@ -601,7 +614,11 @@ def main(
             analysis_type,
             seed_mask_path,
             method,
-            voxel_correction_p if method == "parametric" else ZERO_STAT_THRESHOLD,
+            (
+                parametric_voxel_correction_p
+                if method == "parametric"
+                else ZERO_STAT_THRESHOLD
+            ),
             cluster_size if method == "parametric" else ZERO_CLUSTER_SIZE,
             task,
             entity_key,

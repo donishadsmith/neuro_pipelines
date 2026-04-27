@@ -52,6 +52,14 @@ GM_MASK_THRESHOLD=${GM_MASK_THRESHOLD:-0.20}
 APRIORI_IMG_PATH=${APRIORI_IMG_PATH:-""}
 TFCE_H=${TFCE_H:-2}
 TFCE_E=${TFCE_E:-0.5}
+TFCE_C=${NONPARAMETRIC_CONNECTIVITY:-6}
+NONPARAMETRIC_CLUSTER_CORRECTION_P=${NONPARAMETRIC_CLUSTER_CORRECTION_P:-0.05}
+
+PARAMETRIC_VOXEL_CORRECTION_P=${PARAMETRIC_VOXEL_CORRECTION_P:-0.001}
+PARAMETRIC_CLUSTER_CORRECTION_P=${PARAMETRIC_CLUSTER_CORRECTION_P:-0.05}
+PARAMETRIC_CONNECTIVITY=${PARAMETRIC_CONNECTIVITY:"NN1"}
+
+SPHERE_RADIUS=${SPHERE_RADIUS:"NN1"}
 # Path to native Palm
 export PATH=$PATH:/projects/bigos_lab/software/PALM
 export FSLOUTPUTTYPE="NIFTI_GZ"
@@ -81,7 +89,8 @@ CMD="$PYTHON second_level.py \
 	--space $TEMPLATE_SPACE \
 	--excluded_covariates $EXCLUDED_COVARIATES \
 	--analysis_type $ANALYSIS_TYPE \
-    --n_cores $SLURM_CPUS_PER_TASK"
+    --n_cores $SLURM_CPUS_PER_TASK \
+	--sphere_radius $SPHERE_RADIUS"
 
 if [[ -n $FIRST_LEVEL_GLT_LABEL ]]; then
 	CMD+=" --first_level_glt_label $FIRST_LEVEL_GLT_LABEL"
@@ -92,11 +101,13 @@ if [[ -n $EXCLUDE_NIFTI_FILES ]]; then
 fi
 
 if [[ $METHOD == "nonparametric" ]]; then
-	CMD+=" --tfce_H $TFCE_H --tfce_E $TFCE_E"
+	CMD+=" --tfce_H $TFCE_H --tfce_E $TFCE_E --tfce_C $TFCE_C --nonparametric_cluster_correction_p $NONPARAMETRIC__CLUSTER_CORRECTION_P"
 
 	if [[ -n $FSL_IMG_PATH ]]; then
 		CMD+=" --fsl_img_path $FSL_IMG_PATH"
 	fi
+else
+	CMD+=" --parametric_voxel_correction_p $PARAMETRIC_VOXEL_CORRECTION_P --parametric_cluster_correction_p $PARAMETRIC_CLUSTER_CORRECTION_P --parametric_connectivity $PARAMETRIC_CONNECTIVITY"
 fi
 
 if [[ $METHOD == "parametric" && -n $AFNI_IMG_PATH ]]; then
