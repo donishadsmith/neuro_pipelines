@@ -653,25 +653,29 @@ def main(
 
         diagnostic_condition_plots = []
         for cond_name, cond_vector_files in condition_filenames_dict.items():
-            noncensored_condition_plotname = plot_signal(
+            noncensored_condition_plot_filename = plot_signal(
                 cond_vector_files["noncensored_binary_vector"],
                 tr,
                 plot_title=f"{cond_name} No Motion Censoring",
+                base_filename=f"{cond_name}_desc-noncensored_binary_vector.png",
             )
 
-            censored_condition_plotname = plot_signal(
+            censored_condition_plot_filename = plot_signal(
                 cond_vector_files["censored_binary_vector"],
                 tr,
                 plot_title=f"{cond_name} Censored (FD = {fd_threshold})",
+                base_filename=f"{cond_name}_desc-censored_binary_vector.png",
             )
 
             diagnostic_condition_plots.append(
                 {
                     "name": cond_name,
                     "noncensored_condition_plot": embed_image(
-                        noncensored_condition_plotname
+                        noncensored_condition_plot_filename
                     ),
-                    "censored_condition_plot": embed_image(censored_condition_plotname),
+                    "censored_condition_plot": embed_image(
+                        censored_condition_plot_filename
+                    ),
                 }
             )
 

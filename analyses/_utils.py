@@ -472,7 +472,12 @@ def embed_image(image_path):
 
 
 def plot_signal(
-    signal_regressor_file, tr, plot_title, upsample_dt=None, figsize=(12, 8)
+    signal_regressor_file,
+    tr,
+    plot_title,
+    upsample_dt=None,
+    figsize=(12, 8),
+    base_filename=None,
 ):
     dt = upsample_dt or tr
 
@@ -486,7 +491,7 @@ def plot_signal(
     plt.ylabel("Amplitude", fontsize=15)
     plt.title(plot_title)
 
-    filename = plot_title.replace(" ", "_").lower() + ".png"
+    filename = base_filename or plot_title.replace(" ", "_").lower() + ".png"
     save_filename = signal_regressor_file.parent / filename
 
     LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
