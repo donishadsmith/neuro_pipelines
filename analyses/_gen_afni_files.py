@@ -16,6 +16,7 @@ def create_censor_file(subject_dir, subject, session, task, space, censor_mask):
         subject_dir
         / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-censor.1D"
     )
+
     np.savetxt(censor_file, censor_mask, fmt="%d")
 
     return censor_file
@@ -117,10 +118,11 @@ def create_binary_condition(
     for timing_file in timing_dir.glob("*.1D"):
         condition_name = timing_file.name.removesuffix(".1D")
 
+        base_dir = timing_dir / "censored"
+        base_dir.mkdir(parents=True, exist_ok=True)
+
         noncensored_condition_filename = (
-            timing_dir
-            / "censored"
-            / f"{condition_name}_desc-noncensored_binary_vector.1D"
+            base_dir / f"{condition_name}_desc-noncensored_binary_vector.1D"
         )
         censored_condition_filename = (
             noncensored_condition_filename.parent
@@ -135,8 +137,6 @@ def create_binary_condition(
                 }
             }
         )
-
-        censored_condition_filename.mkdir(parents=True, exist_ok=True)
 
         duration = (
             CONDITION_DURATIONS[cohort][task]
@@ -163,7 +163,7 @@ def create_binary_condition(
         condition_vector[censor_vector == 0] = 0
 
         np.savetxt(
-            censored_condition_filename, condition_vector.reshape(-1, 1), fmt="%f"
+            censored_condition_filename, condition_vector.reshape(-1, 1), fmt="%d"
         )
 
     return condition_filenames_dict

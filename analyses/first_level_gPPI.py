@@ -802,6 +802,7 @@ def main(
     faltung_penalty_syntax,
     exclude_nifti_files,
 ):
+    report = HTMLReport(subject, session, task, analysis_type="gPPI")
     report_dir = Path(dst_dir) / "reports" / "first_level"
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -925,8 +926,6 @@ def main(
             continue
 
         subject_dir.mkdir(parents=True, exist_ok=True)
-
-        report = HTMLReport(subject, session, task, analysis_type="gPPI")
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 

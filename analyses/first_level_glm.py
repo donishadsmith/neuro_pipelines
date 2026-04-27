@@ -374,6 +374,7 @@ def main(
     fwhm,
     exclude_nifti_files,
 ):
+    report = HTMLReport(subject, session, task, analysis_type="glm")
     report_dir = Path(dst_dir) / "reports" / "first_level"
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -495,8 +496,6 @@ def main(
             continue
 
         subject_dir.mkdir(parents=True, exist_ok=True)
-
-        report = HTMLReport(subject, session, task, analysis_type="glm")
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
