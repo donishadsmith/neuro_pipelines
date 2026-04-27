@@ -20,6 +20,7 @@ import bids, numpy as np, pandas as pd
 from bidsaid._helpers import iterable_to_str
 from bidsaid.logging import setup_logger
 from bidsaid.qc import compute_n_dummy_scans, create_censor_mask
+from bidsaid.metadata import get_tr, get_n_volumes
 
 from _denoising import (
     get_acompcor_component_names,
@@ -30,6 +31,7 @@ from _denoising import (
 )
 from _gen_afni_files import (
     create_censor_file,
+    create_binary_condition,
     create_timing_files,
     create_nuisance_regressor_file,
     is_timing_file_empty,
@@ -37,7 +39,14 @@ from _gen_afni_files import (
 from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
 from _report import HTMLReport
-from _utils import VALID_TASK_NAMES, delete_dir, create_beta_files, skip_denoising
+from _utils import (
+    VALID_TASK_NAMES,
+    embed_image,
+    create_beta_files,
+    delete_dir,
+    plot_signal,
+    skip_denoising,
+)
 
 LGR = setup_logger(__name__)
 
@@ -469,6 +478,7 @@ def main(
 
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
         delete_dir(subject_dir.parent)
+
         if skip_denoising(nifti_file, exclude_nifti_files):
             LGR.info(
                 "Denoising of the following file will be skipped due to the prefix being found in "
@@ -605,6 +615,41 @@ def main(
 
         timing_dir = create_timing_files(
             subject_dir, event_file, task, filter_correct_trials
+        )
+
+        tr = get_tr(nifti_file)
+        n_volumes = get_n_volumes(nifti_file)
+
+        condition_filenames_dict = create_binary_condition(
+            afni_img_path, timing_dir, cohort, task, tr, n_volumes, censor_file
+        )
+
+        diagnostic_condition_plots = []
+        for cond_name, cond_vector_files in condition_filenames_dict.items():
+            noncensored_condition_plotname = plot_signal(
+                cond_vector_files["noncensored_binary_vector"],
+                tr,
+                plot_title=f"{cond_name} No Motion Censoring",
+            )
+
+            censored_condition_plotname = plot_signal(
+                cond_vector_files["censored_binary_vector"],
+                tr,
+                plot_title=f"{cond_name} Censored (FD = {fd_threshold})",
+            )
+
+            diagnostic_condition_plots.append(
+                {
+                    "name": cond_name,
+                    "noncensored_condition_plot": embed_image(
+                        noncensored_condition_plotname
+                    ),
+                    "censored_condition_plot": embed_image(censored_condition_plotname),
+                }
+            )
+
+        report.add_context(
+            diagnostic_condition_plots=diagnostic_condition_plots,
         )
 
         timing_conditions = []

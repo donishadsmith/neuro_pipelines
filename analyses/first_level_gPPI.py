@@ -72,10 +72,10 @@ remove a significant amount of frames resulting in either suboptimal estimated b
 or too little retainerd participants. There is no optimal denoising strategy for all datasets.
 """
 
-import argparse, base64, json, subprocess, sys
+import argparse, json, subprocess, sys
 from pathlib import Path
 
-import nibabel as nib, numpy as np, matplotlib.pyplot as plt
+import nibabel as nib, numpy as np
 
 import bids, numpy as np, pandas as pd
 
@@ -96,6 +96,7 @@ from _denoising import (
 )
 from _gen_afni_files import (
     create_censor_file,
+    create_binary_condition,
     create_timing_files,
     create_nuisance_regressor_file,
     is_timing_file_empty,
@@ -104,44 +105,20 @@ from _argparse_typing import n_dummy_type, boolean_flags
 from _models import create_design_matrix, perform_first_level
 from _report import HTMLReport
 from _utils import (
+    CONDITION_DURATIONS,
     VALID_TASK_NAMES,
     create_beta_files,
+    embed_image,
     delete_dir,
     get_beta_names,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
+    plot_signal,
     resample_seed_img,
     skip_denoising,
 )
 
 LGR = setup_logger(__name__)
-
-# Using constant durations instead of BIDS one, which have small
-# stimulus presentation delays
-# Instruction has the same duration for all three tasks but in the
-# code for clarity
-CONDITION_DURATIONS = {
-    "kids": {
-        "flanker": 0.8,
-        "nback": 32,
-        "princess": 52,
-        "mtle": 18,
-        "mtlr": 18,
-        "instruction_nback": 2,
-        "instruction_mtle": 2,
-        "instruction_mtlr": 2,
-    },
-    "adults": {
-        "flanker": 0.8,
-        "nback": 30,
-        "mtle": 18,
-        "mtlr": 18,
-        "simplegng": 0.3,
-        "complexgng": 0.3,
-        "instruction_mtle": 2,
-        "instruction_mtlr": 2,
-    },
-}
 
 
 def _get_cmd_args():
@@ -356,29 +333,6 @@ def extract_seed_timeseries(
     resampled_seed_file.unlink()
 
     return seed_timeseries_file
-
-
-def plot_signal(
-    signal_regressor_file, nifti_file, plot_title, upsample_dt=None, figsize=(12, 8)
-):
-    dt = upsample_dt or get_tr(nifti_file)
-
-    Y = np.loadtxt(signal_regressor_file).flatten()
-    max_time = len(Y) * dt
-    X = np.linspace(0, max_time, len(Y))
-
-    plt.figure(figsize=figsize)
-    plt.plot(X, Y)
-    plt.xlabel(f"Time (seconds) | dt = {dt}", fontsize=15)
-    plt.ylabel("Signal Amplitude", fontsize=15)
-    plt.title(plot_title)
-
-    filename = plot_title.replace(" ", "_").lower() + ".png"
-    save_filename = signal_regressor_file.parent / filename
-
-    LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
-    plt.savefig(save_filename)
-    plt.clf()
 
 
 def denoise_seed_timeseries(
@@ -825,22 +779,6 @@ def create_convolved_ppi_term(
     return ppi_regressor_file
 
 
-def embed_image(image_path):
-    """
-    Reads the bytes from the image, then converts to base64,
-    its binary-to-text encoding that uses 64 printable characters
-    to represent each 6-bit segment of a sequence of byte values
-    (https://en.wikipedia.org/wiki/Base64)
-
-    It allows an image to be embedded in an html file, which will be
-    completely self-contained and won't the file path to the image.
-    """
-    data = Path(image_path).read_bytes()
-    b64 = base64.b64encode(data).decode("utf-8")
-
-    return f"data:image/png;base64,{b64}"
-
-
 def main(
     bids_dir,
     afni_img_path,
@@ -970,6 +908,7 @@ def main(
             Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
         )
         delete_dir(subject_dir.parent)
+
         if skip_denoising(nifti_file, exclude_nifti_files):
             LGR.info(
                 "Denoising of the following file will be skipped due to the prefix being found in "
@@ -1113,6 +1052,41 @@ def main(
             append_task_name=False,
         )
 
+        tr = get_tr(nifti_file)
+        n_volumes = get_n_volumes(nifti_file)
+
+        condition_filenames_dict = create_binary_condition(
+            afni_img_path, timing_dir, cohort, task, tr, n_volumes, censor_file
+        )
+
+        diagnostic_condition_plots = []
+        for cond_name, cond_vector_files in condition_filenames_dict.items():
+            noncensored_condition_plotname = plot_signal(
+                cond_vector_files["noncensored_binary_vector"],
+                tr,
+                plot_title=f"{cond_name} No Motion Censoring",
+            )
+
+            censored_condition_plotname = plot_signal(
+                cond_vector_files["censored_binary_vector"],
+                tr,
+                plot_title=f"{cond_name} Censored (FD = {fd_threshold})",
+            )
+
+            diagnostic_condition_plots.append(
+                {
+                    "name": cond_name,
+                    "noncensored_condition_plot": embed_image(
+                        noncensored_condition_plotname
+                    ),
+                    "censored_condition_plot": embed_image(censored_condition_plotname),
+                }
+            )
+
+        report.add_context(
+            diagnostic_condition_plots=diagnostic_condition_plots,
+        )
+
         timing_conditions = []
         for tf in sorted(timing_dir.glob("*.1D")):
             data = np.loadtxt(tf, delimiter=" ")
@@ -1139,9 +1113,6 @@ def main(
         # gPPI preparation
         seed_mask_path = Path(seed_mask_path)
 
-        tr = get_tr(nifti_file)
-        n_volumes = get_n_volumes(nifti_file)
-
         report.add_context(
             seed_mask_path=str(seed_mask_path),
             seed_coordinate=get_coordinate_from_filename(seed_mask_path),
@@ -1162,7 +1133,7 @@ def main(
             afni_img_path,
         )
         plot_title = "Seed Timeseries"
-        plot_signal(seed_timeseries_file, nifti_file, plot_title)
+        plot_signal(seed_timeseries_file, tr, plot_title)
 
         denoised_seed_timeseries_file = denoise_seed_timeseries(
             seed_timeseries_file,
@@ -1171,7 +1142,7 @@ def main(
             afni_img_path,
         )
         plot_title = "Denoised Seed Timeseries"
-        plot_signal(denoised_seed_timeseries_file, nifti_file, plot_title)
+        plot_signal(denoised_seed_timeseries_file, tr, plot_title)
 
         upsampled_seed_timeseries_file = resample_data(
             denoised_seed_timeseries_file,
@@ -1181,7 +1152,7 @@ def main(
             method="upsample",
         )
         plot_title = "Upsampled Seed Timeseries"
-        plot_signal(upsampled_seed_timeseries_file, nifti_file, plot_title, upsample_dt)
+        plot_signal(upsampled_seed_timeseries_file, nifti_file, tr, upsample_dt)
 
         deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
             upsampled_seed_timeseries_file,
@@ -1191,9 +1162,7 @@ def main(
             afni_img_path,
         )
         plot_title = "Deconvolved Seed Timeseries"
-        plot_signal(
-            deconvolved_seed_timeseries_file, nifti_file, plot_title, upsample_dt
-        )
+        plot_signal(deconvolved_seed_timeseries_file, tr, plot_title, upsample_dt)
 
         report.add_context(
             seed_timeseries_plot=embed_image(
@@ -1241,9 +1210,7 @@ def main(
                 afni_img_path,
             )
             plot_title = f"{cond_name.capitalize()} Upsampled Condition Regressor"
-            plot_signal(
-                upsampled_condition_regressor_file, nifti_file, plot_title, upsample_dt
-            )
+            plot_signal(upsampled_condition_regressor_file, tr, plot_title, upsample_dt)
 
             ppi_regressor_file = create_convolved_ppi_term(
                 ppi_dir,
@@ -1253,13 +1220,13 @@ def main(
                 upsample_dt,
             )
             plot_title = f"{cond_name.capitalize()} Upsampled PPI Timeseries"
-            plot_signal(ppi_regressor_file, nifti_file, plot_title, upsample_dt)
+            plot_signal(ppi_regressor_file, tr, plot_title, upsample_dt)
 
             downsampled_ppi_regressor_file = resample_data(
                 ppi_regressor_file, tr, afni_img_path, upsample_dt, method="downsample"
             )
             plot_title = f"{cond_name.capitalize()} Downsampled PPI Timeseries"
-            plot_signal(downsampled_ppi_regressor_file, nifti_file, plot_title)
+            plot_signal(downsampled_ppi_regressor_file, tr, plot_title)
 
             condition_plots.append(
                 {

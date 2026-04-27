@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import numpy as np, pandas as pd
@@ -5,6 +6,7 @@ import numpy as np, pandas as pd
 from bidsaid.logging import setup_logger
 
 from _denoising import get_col_name, get_new_matrix_and_names, remove_collinear_columns
+from _utils import CONDITION_DURATIONS
 
 LGR = setup_logger(__name__)
 
@@ -103,6 +105,68 @@ def save_event_file(timing_dir, trial_type, timing_data):
     timing_str = " ".join(timing_data)
     with open(filename, "w") as f:
         f.write(f"{timing_str}")
+
+
+def create_binary_condition(
+    afni_img_path, timing_dir, cohort, task, tr, n_volumes, censor_file
+):
+
+    censor_vector = np.loadtxt(censor_file, dtype=int)
+
+    condition_filenames_dict = {}
+    for timing_file in timing_dir.glob("*.1D"):
+        condition_name = timing_file.name.removesuffix(".1D")
+
+        noncensored_condition_filename = (
+            timing_dir
+            / "censored"
+            / f"{condition_name}_desc-noncensored_binary_vector.1D"
+        )
+        censored_condition_filename = (
+            noncensored_condition_filename.parent
+            / f"{condition_name}_desc-censored_binary_vector.1D"
+        )
+
+        condition_filenames_dict.update(
+            {
+                condition_name: {
+                    "noncensored_binary_vector": noncensored_condition_filename,
+                    "censored_binary_vector": censored_condition_filename,
+                }
+            }
+        )
+
+        censored_condition_filename.mkdir(parents=True, exist_ok=True)
+
+        duration = (
+            CONDITION_DURATIONS[cohort][task]
+            if not condition_name.startswith("instruction")
+            else CONDITION_DURATIONS[cohort][f"{condition_name}_{task}"]
+        )
+
+        cmd = (
+            f"apptainer exec -B /projects:/projects {afni_img_path} timing_tool.py "
+            f"-timing {timing_file} "
+            f"-tr {tr} "
+            f"-stim_dur {duration} "
+            f"-run_len {tr * n_volumes} "
+            f"-timing_to_1D {noncensored_condition_filename}"
+        )
+
+        LGR.info(
+            f"Creating binary vector for diagnostic plotting: {condition_name}: {cmd}"
+        )
+        subprocess.run(cmd, shell=True, check=True)
+
+        # Now add censoring
+        condition_vector = np.loadtxt(noncensored_condition_filename)
+        condition_vector[censor_vector == 0] = 0
+
+        np.savetxt(
+            censored_condition_filename, condition_vector.reshape(-1, 1), fmt="%f"
+        )
+
+    return condition_filenames_dict
 
 
 def create_timing_files(

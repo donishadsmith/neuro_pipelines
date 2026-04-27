@@ -1,9 +1,9 @@
 "Shared utilities"
 
+import base64, shutil, subprocess
 from pathlib import Path
-import shutil, subprocess
 
-import nibabel as nib, numpy as np, pandas as pd
+import nibabel as nib, numpy as np, matplotlib.pyplot as plt, pandas as pd
 from nilearn.image import new_img_like, resample_to_img
 
 from bidsaid.files import get_entity_value
@@ -61,6 +61,33 @@ TASK_CONTRASTS = {
 CONTRAST_CODES = {
     "kids": ("5_vs_0", "10_vs_0", "10_vs_5", "mean"),
     "adults": ("mph_vs_placebo", "mean"),
+}
+
+# Using constant durations instead of BIDS one, which have small
+# stimulus presentation delays
+# Instruction has the same duration for all three tasks but in the
+# code for clarity
+CONDITION_DURATIONS = {
+    "kids": {
+        "flanker": 0.8,
+        "nback": 32,
+        "princess": 52,
+        "mtle": 18,
+        "mtlr": 18,
+        "instruction_nback": 2,
+        "instruction_mtle": 2,
+        "instruction_mtlr": 2,
+    },
+    "adults": {
+        "flanker": 0.8,
+        "nback": 30,
+        "mtle": 18,
+        "mtlr": 18,
+        "simplegng": 0.3,
+        "complexgng": 0.3,
+        "instruction_mtle": 2,
+        "instruction_mtlr": 2,
+    },
 }
 
 
@@ -426,3 +453,42 @@ def create_condition_label_str(beta_name):
         condition_label = f"{beta_name} only"
 
     return condition_label
+
+
+def embed_image(image_path):
+    """
+    Reads the bytes from the image, then converts to base64,
+    its binary-to-text encoding that uses 64 printable characters
+    to represent each 6-bit segment of a sequence of byte values
+    (https://en.wikipedia.org/wiki/Base64)
+
+    It allows an image to be embedded in an html file, which will be
+    completely self-contained and won't the file path to the image.
+    """
+    data = Path(image_path).read_bytes()
+    b64 = base64.b64encode(data).decode("utf-8")
+
+    return f"data:image/png;base64,{b64}"
+
+
+def plot_signal(
+    signal_regressor_file, tr, plot_title, upsample_dt=None, figsize=(12, 8)
+):
+    dt = upsample_dt or tr
+
+    Y = np.loadtxt(signal_regressor_file).flatten()
+    max_time = len(Y) * dt
+    X = np.linspace(0, max_time, len(Y))
+
+    plt.figure(figsize=figsize)
+    plt.plot(X, Y)
+    plt.xlabel(f"Time (seconds) | dt = {dt}", fontsize=15)
+    plt.ylabel("Amplitude", fontsize=15)
+    plt.title(plot_title)
+
+    filename = plot_title.replace(" ", "_").lower() + ".png"
+    save_filename = signal_regressor_file.parent / filename
+
+    LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
+    plt.savefig(save_filename)
+    plt.clf()
