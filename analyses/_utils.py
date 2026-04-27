@@ -476,7 +476,7 @@ def plot_signal(
     tr,
     plot_title,
     upsample_dt=None,
-    figsize=(12, 8),
+    figsize=(8, 6),
     base_filename=None,
 ):
     dt = upsample_dt or tr
@@ -495,7 +495,7 @@ def plot_signal(
     save_filename = signal_regressor_file.parent / filename
 
     LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
-    plt.savefig(save_filename)
+    plt.savefig(save_filename, dpi=120, bbox_inches="tight")
     plt.clf()
 
     return save_filename
