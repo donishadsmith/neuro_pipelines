@@ -374,7 +374,6 @@ def main(
     fwhm,
     exclude_nifti_files,
 ):
-    report = HTMLReport(subject, session, task, analysis_type="glm")
     report_dir = Path(dst_dir) / "reports" / "first_level"
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -390,10 +389,25 @@ def main(
         subject=subject, task=task, target="session", return_type="id"
     )
     if not sessions:
-        LGR.warning(f"No sessions for {subject} for {task}.")
+        session = "NaN"
+        report = HTMLReport(subject, session, task, analysis_type="gPPI")
+        report_path = (
+            report_dir / f"sub-{subject}_ses-NaN_task-{task}_desc-glm_report.html"
+        )
+        msg = f"No sessions for {subject} for {task}."
+        LGR.warning(msg)
+
+        report.mark_excluded(msg)
+        report.create_report(report_path, "first_level.html")
+
         sys.exit(status=1)
 
     for session in sessions:
+        report = HTMLReport(subject, session, task, analysis_type="gPPI")
+        report_path = (
+            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
+        )
+
         confounds_tsv_files = layout.get(
             scope="derivatives",
             subject=subject,
@@ -404,7 +418,11 @@ def main(
             return_type="file",
         )
         if not confounds_tsv_files:
-            LGR.info(f"No confound files TSV found for session: {session}")
+            msg = f"No confound files TSV found for session: {session}"
+            LGR.info(msg)
+
+            report.mark_excluded(msg)
+            report.create_report(report_path, "first_level.html")
             continue
         else:
             confounds_tsv_file = confounds_tsv_files[0]
@@ -420,7 +438,11 @@ def main(
                 return_type="file",
             )
             if not confounds_json_file:
-                LGR.info(f"No confound files JSON found for session: {session}")
+                msg = f"No confound files JSON found for session: {session}"
+                LGR.info(msg)
+
+                report.mark_excluded(msg)
+                report.create_report(report_path, "first_level.html")
                 continue
             else:
                 confounds_json_file = confounds_json_file[0]
@@ -435,7 +457,11 @@ def main(
             return_type="file",
         )
         if not event_file:
-            LGR.info(f"No event files found for session: {session}")
+            msg = f"No event files found for session: {session}"
+            LGR.info(msg)
+
+            report.mark_excluded(msg)
+            report.create_report(report_path, "first_level.html")
             continue
         else:
             event_file = event_file[0]
@@ -451,7 +477,11 @@ def main(
             return_type="file",
         )
         if not mask_files:
-            LGR.info(f"No mask files found for session: {session}")
+            msg = f"No mask files found for session: {session}"
+            LGR.info(msg)
+
+            report.mark_excluded(msg)
+            report.create_report(report_path, "first_level.html")
             continue
         else:
             mask_file = [file for file in mask_files if space in str(Path(file).name)][
@@ -469,7 +499,11 @@ def main(
             return_type="file",
         )
         if not nifti_files:
-            LGR.info(f"No nifti files found for session: {session}")
+            msg = f"No nifti files found for session: {session}"
+            LGR.info(msg)
+
+            report.mark_excluded(msg)
+            report.create_report(report_path, "first_level.html")
             continue
         else:
             nifti_file = [
@@ -485,12 +519,9 @@ def main(
                 "Denoising of the following file will be skipped due to the prefix being found in "
                 f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}"
             )
+
             report.mark_excluded(
                 f"Skipped due to prefix being found in {exclude_nifti_files} "
-            )
-            report_path = (
-                report_dir
-                / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
             )
             report.create_report(report_path, "first_level.html")
             continue
@@ -534,13 +565,10 @@ def main(
                 "run excluded because the percent censored is greater than the "
                 f"exclusion criteria: {exclusion_criteria}"
             )
+
             report.mark_excluded(
                 f"Proportion of flagged volumes ({percent_censored:.1%}) "
                 f"exceeded threshold ({exclusion_criteria:.0%})."
-            )
-            report_path = (
-                report_dir
-                / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
             )
             report.create_report(report_path, "first_level.html")
             continue
@@ -715,9 +743,6 @@ def main(
             stats_file_relm, betas_dir, afni_img_path, cohort, task, analysis_type="glm"
         )
 
-        report_path = (
-            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
-        )
         report.create_report(report_path, "first_level.html")
 
 
