@@ -1,0 +1,16 @@
+<div class="section">
+    <h2>Cluster Correction (Parametric)</h2>
+    <table>
+        <tr><th>Parameter</th><th></th></tr>
+        <tr><td>Voxel-level threshold (cluster-forming)</td><td>p &lt; {{ parametric_voxel_correction_p }}</td></tr>
+        <tr><td>Cluster-level threshold</td><td>p &lt; {{ parametric_cluster_correction_p }}</td></tr>
+        <tr><td>Connectivity</td><td>{{ parametric_connectivity }} (bisided)</td></tr>parametric_cluster_size_threshold
+        <tr><td>Minimum cluster size for significance (voxels)</td><td>{{ parametric_cluster_size_threshold }}</td></tr>
+    </table>
+
+    <p>
+        Voxels were thresholded at p &lt; {{ parametric_voxel_correction_p }}
+        and clusters were considered significant at p &lt; {{ parametric_cluster_correction_p }}
+        using {{ parametric_connectivity }} (bisided) connectivity.
+    </p>
+</div>

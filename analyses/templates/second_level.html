@@ -71,6 +71,7 @@
     <h2>Covariates</h2>
     <table>
         <tr><th>Parameter</th><th></th></tr>
+        <tr><td>Included covariates</td><td>{{ included_covariates | join(", ") if included_covariates else "None" }}</td></tr>
         <tr><td>Excluded covariates</td><td>{{ excluded_covariates | join(", ") if excluded_covariates else "None" }}</td></tr>
         {% if dropped_constant_columns %}
         <tr><td>Dropped (constant)</td><td>{{ dropped_constant_columns | join(", ") }}</td></tr>
@@ -130,27 +131,16 @@
     <h3>3dLMEr command</h3>
     <pre>{{ lmer_cmd }}</pre>
     {% endif %}
-</div>
 
-<div class="section">
-    <h2>Cluster Correction (Parametric)</h2>
-    <table>
-        <tr><th>Parameter</th><th></th></tr>
-        <tr><td>Voxel-level threshold (cluster-forming)</td><td>p < {{ parametric_voxel_correction_p }}</td></tr>
-        <tr><td>Cluster-level threshold</td><td>p < {{ parametric_cluster_correction_p }}</td></tr>
-        <tr><td>Connectivity</td><td>{{ parametric_connectivity }} (bisided)</td></tr>
-    </table>
-
+    {% if acf_parameters %}
+    <h3>ACF-Based Cluster Simulation</h3>
     <p>
         Spatial autocorrelation of the residuals was estimated using AFNI's
         <code>3dFWHMx</code> with the <code>-acf</code> option. The resulting ACF
         parameters were used with <code>3dClustSim</code> to determine the minimum
         cluster size required for significance via Monte Carlo simulations within the
-        group mask. Voxels were thresholded at p &lt; {{ parametric_voxel_correction_p }}
-        and clusters were considered significant at p &lt; {{ parametric_cluster_correction_p }}
-        using {{ parametric_connectivity }} (bisided) connectivity.
+        group mask.
     </p>
-    {% if acf_parameters %}
     <table>
         <tr><th>ACF Parameter</th><th>Value</th></tr>
         <tr><td>a</td><td>{{ acf_parameters[0] }}</td></tr>
@@ -178,7 +168,7 @@
         <tr><td>TFCE height power (H)</td><td>{{ tfce_H }}</td></tr>
         <tr><td>TFCE extent power (E)</td><td>{{ tfce_E }}</td></tr>
         <tr><td>TFCE connectivity (C)</td><td>{{ tfce_C }}</td></tr>
-        <tr><td>Cluster correction p</td><td>{{ cluster_correction_p }}</td></tr>
+        <tr><td>Cluster correction p</td><td>{{ nonparametric_cluster_correction_p }}</td></tr>
     </table>
 </div>
 
@@ -231,18 +221,6 @@
 </div>
 {% endfor %}
 {% endif %}
-{% endif %}
-
-{% if analysis_type == "glm" %}
-<div class="section">
-    <h2>Sphere Radius</h2>
-    <p>
-        Cluster masks of significant clusters identified by the GLM were generated only for the mean
-        contrast to ensure that the clusters selected for further downstream analyses (e.g., gPPI) are
-        not biased toward a specific group. For each cluster, a sphere mask with a radius of
-        {{ sphere_radius }} mm was created around the peak MNI coordinate.
-    </p>
-</div>
 {% endif %}
 
 </body>

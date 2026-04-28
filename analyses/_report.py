@@ -41,3 +41,21 @@ class HTMLReport:
         output_path.write_text(html, encoding="utf-8")
 
         LGR.info(f"Report saved to {output_path}")
+
+    @staticmethod
+    def append_section(report_path, template_name, context):
+        if not report_path.exists():
+            return
+        
+        section = (
+            Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
+            .get_template(template_name)
+            .render(**context)
+        )
+
+        html = report_path.read_text(encoding="utf-8").replace(
+            "</body>", f"\n{section}\n</body>"
+        )
+        report_path.write_text(html, encoding="utf-8")
+
+        LGR.info(f"Appended {template_name} to {report_path}")

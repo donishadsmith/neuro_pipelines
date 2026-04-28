@@ -262,44 +262,6 @@ def _get_cmd_args():
             "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
         ),
     )
-    parser.add_argument(
-        "--parametric_connectivity",
-        dest="parametric_connectivity",
-        required=False,
-        default="NN1",
-        help="Connectivity to use for parametric. Will always use 2-sided/bisided version. Just used in this script for reporting.",
-    )
-    parser.add_argument(
-        "--parametric_voxel_correction_p",
-        dest="parametric_voxel_correction_p",
-        required=False,
-        default=0.001,
-        type=float,
-        help=(
-            "P-value for voxel correction. Only used for the parametric approach. Just used in this script for reporting."
-        ),
-    )
-    parser.add_argument(
-        "--parametric_cluster_correction_p",
-        dest="parametric_cluster_correction_p",
-        required=False,
-        default=0.05,
-        type=float,
-        help="P-value for cluster correction. Only used for the parametric approach. Just used in this script for reporting.",
-    )
-    parser.add_argument(
-        "--sphere_radius",
-        dest="sphere_radius",
-        required=False,
-        default=5,
-        help=(
-            "The radius of the sphere for the MNI coordinate. If `analysis_type` is 'glm', "
-            "seed masks are only created for the mean `second_level_glt_code`, which "
-            "are the maps denoting activation and deactivation for all subjects. "
-            "This is done so that seeds are not deliberately biased towards a specific group. "
-            "Just used in this script for reporting."
-        ),
-    )
 
     return parser
 
@@ -323,6 +285,20 @@ class DataContainer:
             "n_censored_volumes",
         ],
     )
+    # May expand in future, but these are the available covariates at this time
+    # Added for more accurate reporting of the availble covariates in the BIDS participants.tsv file
+    adults_cohort_covariates: set[str] = field(
+        default_factory=lambda: {"sex", "age", "n_censored_volumes"}
+    )
+    kids_cohort_covariates: set[str] = field(
+        default_factory=lambda: {
+            "sex",
+            "age",
+            "n_censored_volumes",
+            "race",
+            "ethnicity",
+        }
+    )
 
     @staticmethod
     def get_glt_codes(cohort: str) -> str:
@@ -341,7 +317,9 @@ class DataContainer:
 
         return glt_codes[cohort]
 
-    def update_excluded_regressors(self, excluded_covariates: list[str]) -> None:
+    def update_excluded_regressors(
+        self, cohort, excluded_covariates: list[str]
+    ) -> None:
         excluded_covariates = [
             item for cov in excluded_covariates for item in cov.split() if cov
         ]
@@ -349,17 +327,26 @@ class DataContainer:
             return
 
         if "all" in excluded_covariates:
-            self.excluded_regressors.extend(self.deprioritized_regressors_order)
+            self.excluded_regressors.extend(self.get_cohort_covariates(cohort))
             LGR.info(
                 "Added the following variables to be excluded, if available: "
                 f"{self.deprioritized_regressors_order}"
             )
         else:
+            excluded_covariates = self.get_cohort_covariates(cohort).intersection(
+                excluded_covariates
+            )
             self.excluded_regressors.extend(excluded_covariates)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
                 f"{excluded_covariates}"
             )
+
+    def get_cohort_covariates(self, cohort) -> set[str]:
+        if cohort == "kids":
+            return self.kids_cohort_covariates
+        else:
+            return self.adults_cohort_covariates
 
     @property
     def non_continuous_cols(self) -> list[str]:
@@ -1244,10 +1231,6 @@ def main(
     tfce_E,
     tfce_C,
     nonparametric_cluster_correction_p,
-    parametric_connectivity,
-    parametric_voxel_correction_p,
-    parametric_cluster_correction_p,
-    sphere_radius,
     n_cores,
     exclude_nifti_files,
     excluded_covariates,
@@ -1275,21 +1258,13 @@ def main(
         gm_probseg_img_path=gm_probseg_img_path or None,
         gm_mask_threshold=gm_mask_threshold,
         apriori_img_path=apriori_img_path or None,
-        excluded_covariates=excluded_covariates,
     )
-    if method == "parametric":
-        report.add_context(
-            n_cores=n_cores,
-            parametric_voxel_correction_p=parametric_voxel_correction_p,
-            parametric_cluster_correction_p=parametric_cluster_correction_p,
-            parametric_connectivity=parametric_connectivity,
-        )
-    else:
+    if method == "nonparametric":
         report.add_context(
             tfce_H=tfce_H,
             tfce_E=tfce_E,
             tfce_C=tfce_C,
-            cluster_correction_p=nonparametric_cluster_correction_p,
+            nonparametric_cluster_correction_p=nonparametric_cluster_correction_p,
         )
 
     if first_level_glt_label:
@@ -1300,7 +1275,15 @@ def main(
         )
 
     datacontainer = DataContainer()
-    datacontainer.update_excluded_regressors(excluded_covariates)
+    datacontainer.update_excluded_regressors(cohort, excluded_covariates)
+    report.add_context(
+        included_covariates=list(
+            datacontainer.get_cohort_covariates(cohort).difference(
+                datacontainer.excluded_regressors
+            )
+        ),
+        excluded_covariates=datacontainer.excluded_regressors,
+    )
 
     for first_level_glt_label in first_level_glt_labels:
         entity_key = get_contrast_entity_key(first_level_glt_label)
@@ -1559,8 +1542,6 @@ def main(
                 second_level_contrasts.append(contrast_info)
 
             report.add_context(second_level_contrasts=second_level_contrasts)
-
-        report.add_context(sphere_radius=sphere_radius)
 
         report_path = (
             report_dir

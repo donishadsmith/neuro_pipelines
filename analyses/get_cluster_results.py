@@ -13,6 +13,7 @@ from scipy.stats import norm
 from bidsaid.logging import setup_logger
 from bidsaid.parsers import _is_float
 
+from _report import HTMLReport
 from _utils import (
     create_condition_label_str,
     delete_dir,
@@ -555,6 +556,13 @@ def main(
     )
 
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
+        report_path = (
+            Path(analysis_dir)
+            / "reports"
+            / "second_level"
+            / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_report.html"
+        )
+
         entity_key = get_contrast_entity_key(first_level_glt_label)
         LGR.info(
             f"FIRST LEVEL GLTLABEL: {first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
@@ -586,6 +594,18 @@ def main(
                 parametric_voxel_correction_p,
                 parametric_cluster_correction_p,
             )
+
+            HTMLReport.append_section(
+                report_path,
+                "sections/parametric_cluster_correction.html",
+                {
+                    "parametric_voxel_correction_p": parametric_voxel_correction_p,
+                    "parametric_cluster_correction_p": parametric_cluster_correction_p,
+                    "parametric_connectivity": parametric_connectivity,
+                    "parametric_cluster_size_threshold": cluster_size
+                },
+            )
+
 
             thresholded_img = threshold_img(
                 nib.load(zcore_map_filename),
@@ -656,6 +676,11 @@ def main(
                 template_img_path,
                 thresholded_img,
                 sphere_radius,
+            )
+            HTMLReport.append_section(
+                report_path,
+                "sections/sphere_radius.html",
+                {"sphere_radius": sphere_radius},
             )
 
 

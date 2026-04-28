@@ -1184,7 +1184,7 @@ def main(
         )
         plot_title = "Upsampled Seed Timeseries"
         upsampled_seed_timeseries_plot_filename = plot_signal(
-            upsampled_seed_timeseries_file, nifti_file, tr, upsample_dt
+            upsampled_seed_timeseries_file, tr, plot_title, upsample_dt
         )
 
         deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
