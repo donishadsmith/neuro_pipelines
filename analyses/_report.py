@@ -47,7 +47,7 @@ class HTMLReport:
         if not report_path.exists():
             return
 
-        section_name = template_name.stem
+        section_name = Path(template_name).stem
         section = (
             Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
             .get_template(template_name)
