@@ -50,6 +50,15 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
+        "--analysis_dir",
+        dest="analysis_dir",
+        required=True,
+        help=(
+            "Root path to directory containing second level stats "
+            "and cluster correction tables."
+        ),
+    )
+    parser.add_argument(
         "--dst_dir",
         dest="dst_dir",
         required=True,
