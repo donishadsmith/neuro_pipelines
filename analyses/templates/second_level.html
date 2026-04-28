@@ -160,7 +160,7 @@
         Models) with threshold-free cluster enhancement (TFCE). TFCE eliminates the need
         to select an arbitrary cluster-forming threshold by integrating over all possible
         thresholds, weighting each voxel by a combination of local signal height and
-        spatial extent. Family-wise error rate was controlled across both contrast
+        spatial extent <a href="https://doi.org/10.1016/j.neuroimage.2008.03.061">Smith & Nichols (2009)</a>. Family-wise error rate was controlled across both contrast
         directions using the <code>-corrcon</code> flag.
     </p>
 
@@ -181,7 +181,8 @@
         <tr><th>Parameter</th><th></th></tr>
         <tr><td>Number of files</td><td>{{ contrast.n_files }}</td></tr>
         <tr><td>Unique subjects</td><td>{{ contrast.n_subjects }}</td></tr>
-        <tr><td>Permutations</td><td>{{ contrast.n_permutations }}</td></tr>
+        <tr><td>Number of permutations used (capped at 10,000)</td><td>{{ contrast.max_permutations }}</td></tr>
+        <tr><td>Max possible permutations</td><td>{{ contrast.true_max_permutations }}</td></tr>
         <tr><td>Design type</td><td>{{ "Paired (within-subject)" if contrast.is_comparison else "One-sample (mean)" }}</td></tr>
         <tr><td>Design matrix columns</td><td>{{ contrast.design_columns | join(", ") }}</td></tr>
         {% if contrast.removed_subjects %}
@@ -221,8 +222,17 @@
     {% endif %}
 </div>
 {% endfor %}
-{% endif %}
-{% endif %}
 
+<div class="section">
+    <h2>References</h2>
+
+    <ul>
+    <li>Smith, S., & Nichols, T. (2009). Threshold-free cluster enhancement: Addressing problems of smoothing, threshold dependence and localisation in cluster inference. NeuroImage, 44(1), 83–98. <a href="https://doi.org/10.1016/j.neuroimage.2008.03.061">https://doi.org/10.1016/j.neuroimage.2008.03.061</a>
+    </ul>
+
+</div>
+
+{% endif %}
+{% endif %}
 </body>
 </html>
