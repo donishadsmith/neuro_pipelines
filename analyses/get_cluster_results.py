@@ -42,12 +42,11 @@ def _get_cmd_args():
         )
     )
     parser.add_argument(
-        "--analysis_dir",
-        dest="analysis_dir",
+        "--second_level_report_dir",
+        dest="second_level_report_dir",
         required=True,
         help=(
-            "Root path to directory containing second level stats "
-            "and cluster correction tables."
+            "Path to the report directory containing the second level html."
         ),
     )
     parser.add_argument(
@@ -137,7 +136,8 @@ def _get_cmd_args():
         "--sphere_radius",
         dest="sphere_radius",
         required=False,
-        default=5,
+        type=float,
+        default=5.0,
         help=(
             "The radius of the sphere for the MNI coordinate. If `analysis_type` is 'glm', "
             "seed masks are only created for the mean `second_level_glt_code`, which "
@@ -521,6 +521,7 @@ def create_seed_masks(
 
 
 def main(
+    second_level_report_dir,
     analysis_dir,
     dst_dir,
     afni_img_path,
@@ -536,6 +537,7 @@ def main(
     template_img_path,
     sphere_radius,
 ):
+    second_level_report_dir = Path(second_level_report_dir)
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
 
@@ -557,9 +559,7 @@ def main(
 
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
         report_path = (
-            Path(analysis_dir)
-            / "reports"
-            / "second_level"
+            second_level_report_dir
             / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_report.html"
         )
 

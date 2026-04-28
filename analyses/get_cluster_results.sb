@@ -28,6 +28,7 @@ else
 	TASK=${TASKS[${SLURM_ARRAY_TASK_ID}]}
 fi
 
+SECOND_LEVEL_REPORT_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/reports/second_level"
 ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE/$TASK"
 
 TEMPLATE_MASK_PATH=${TEMPLATE_MASK_PATH:-"/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz"}
@@ -36,11 +37,12 @@ TEMPLATE_IMG_PATH=${TEMPLATE_IMG_PATH:-"/projects/bigos_lab/templateflow/tpl-MNI
 PARAMETRAIAC_VOXEL_CORRECTION_P=${PARAMETRAIAC_VOXEL_CORRECTION_P:-0.001}
 PARAMETRAIAC_CLUSTER_CORRECTION_P=${PARAMETRAIAC_CLUSTER_CORRECTION_P:-0.05}
 PARAMETRIC_CONNECTIVITY=${PARAMETRIC_CONNECTIVITY:-"NN1"}
-SPHERE_RADIUS=${SPHERE_RADIUS:-5}
+SPHERE_RADIUS=${SPHERE_RADIUS:-5.0}
 
 SEED_MASK_PATH=${SEED_MASK_PATH:-""}
 
 CMD="$PYTHON get_cluster_results.py \
+    --second_level_report_dir $SECOND_LEVEL_REPORT_DIR \
     --analysis_dir $ANALYSIS_DIR \
     --dst_dir $ANALYSIS_DIR \
     --method $METHOD \

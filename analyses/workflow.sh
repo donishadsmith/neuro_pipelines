@@ -84,7 +84,7 @@ export NONPARAMETRIC_CONNECTIVITY=6                     # The connectivity for p
 # ------------------------------------------------
 # PARAMETERS USED WHEN GETTING THE CLUSTER RESULTS
 # ------------------------------------------------
-export SPHERE_RADIUS=5                                  # Used to create masks, choose integer
+export SPHERE_RADIUS=5.0                                # Used to create masks, choose integer
 
 # -------------------------------------------------------
 # PARAMETER USED FOR IDENTIFYING MNI LOCATION OF CLUSTERS
