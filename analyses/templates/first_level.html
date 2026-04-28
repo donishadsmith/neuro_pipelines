@@ -123,14 +123,16 @@
     </table>
 
     <p>
-        Both the seed timeseries and the condition regressors were upsampled to {{ upsample_dt }} s.
+        Both the seed timeseries and the condition regressors were upsampled to {{ upsample_dt }} s
+        <a href="https://doi.org/10.1038/s42003-024-07088-3">(Masharipov, 2024)</a>.
         A binary condition vector (1 = condition active, 0 = condition inactive) was generated for
         each condition within the {{ task }} task (i.e., {{ condition_names | join(", ") }}). Each
         binary condition vector was mean centered so that the subsequent PPI interaction term would
         not be highly correlated with the main effect of the seed timeseries, which could otherwise
         result in spurious results that attribute shared variance with the seed to the interaction
-        term. Prior to deconvolution, the upsampled seed timeseries was padded at both edges using
-        reflect padding with a pad length of {{ pad_length }} samples
+        term <a href="https://doi.org/10.1162/IMAG.a.989">(He, 2025)</a>.
+        Prior to deconvolution, the upsampled seed timeseries was padded at both edges
+        using reflect padding with a pad length of {{ pad_length }} samples
         (<code>pad_seconds / upsample_dt</code>) to minimize sharp boundary artifacts; the padding was
         removed immediately after deconvolution. The seed timeseries was then deconvolved using
         AFNI's <code>3dTfitter -FALTUNG</code> with the GAM impulse response function
@@ -218,6 +220,18 @@
     <p><em>Only correct trials were included for this task's contrast of interest.</em></p>
     {% endif %}
 </div>
+
+{% if analysis_type == "gPPI" %}
+<div class="section">
+    <h2>References</h2>
+
+    <ul>
+    <li>Masharipov, R., Knyazeva, I., Korotkov, A., Cherednichenko, D., & Kireev, M. (2024). Comparison of whole-brain task-modulated functional connectivity methods for fMRI task connectomics. Communications Biology, 7(1). <a href=https://doi.org/10.1038/s42003-024-07088-3>https://doi.org/10.1038/s42003-024-07088-3</a></li>
+    <li>He, V., Tahayori, B., Vaughan, D. N., Pardoe, H. R., Jackson, G. D., Tailby, C., & Abbott, D. F. (2025). Common pitfalls during model specification in psychophysiological interaction analysis. Imaging Neuroscience, 3. <a href=https://doi.org/10.1162/imag.a.989>https://doi.org/10.1162/imag.a.989</a></li>
+    </ul>
+
+</div>
+{% endif %}
 {% endif %}
 </body>
 </html>
