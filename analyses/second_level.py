@@ -287,10 +287,7 @@ class DataContainer:
     )
     # May expand in future, but these are the available covariates at this time
     # Added for more accurate reporting of the availble covariates in the BIDS participants.tsv file
-    adults_cohort_covariates: set[str] = field(
-        default_factory=lambda: {"sex", "age", "n_censored_volumes"}
-    )
-    kids_cohort_covariates: set[str] = field(
+    available_covariates: set[str] = field(
         default_factory=lambda: {
             "sex",
             "age",
@@ -317,9 +314,7 @@ class DataContainer:
 
         return glt_codes[cohort]
 
-    def update_excluded_regressors(
-        self, cohort, excluded_covariates: list[str]
-    ) -> None:
+    def update_excluded_regressors(self, excluded_covariates: list[str]) -> None:
         excluded_covariates = [
             item for cov in excluded_covariates for item in cov.split() if cov
         ]
@@ -327,13 +322,13 @@ class DataContainer:
             return
 
         if "all" in excluded_covariates:
-            self.excluded_regressors.extend(self.get_cohort_covariates(cohort))
+            self.excluded_regressors.extend(self.available_covariates)
             LGR.info(
                 "Added the following variables to be excluded, if available: "
                 f"{self.deprioritized_regressors_order}"
             )
         else:
-            excluded_covariates = self.get_cohort_covariates(cohort).intersection(
+            excluded_covariates = self.available_covariates.intersection(
                 excluded_covariates
             )
             self.excluded_regressors.extend(excluded_covariates)
@@ -341,12 +336,6 @@ class DataContainer:
                 "Added the following variables to be excluded, if available: "
                 f"{excluded_covariates}"
             )
-
-    def get_cohort_covariates(self, cohort) -> set[str]:
-        if cohort == "kids":
-            return self.kids_cohort_covariates
-        else:
-            return self.adults_cohort_covariates
 
     @property
     def non_continuous_cols(self) -> list[str]:
@@ -1275,10 +1264,10 @@ def main(
         )
 
     datacontainer = DataContainer()
-    datacontainer.update_excluded_regressors(cohort, excluded_covariates)
+    datacontainer.update_excluded_regressors(excluded_covariates)
     report.add_context(
         included_covariates=list(
-            datacontainer.get_cohort_covariates(cohort).difference(
+            datacontainer.available_covariates.difference(
                 datacontainer.excluded_regressors
             )
         ),
@@ -1466,7 +1455,7 @@ def main(
                     first_level_glt_label,
                     second_level_glt_code,
                 )
-                max_permutations = (
+                max_permutations, true_max_permutations = (
                     compute_n_permutation(glt_data_table)
                     if n_permutations == "auto"
                     else n_permutations
@@ -1521,7 +1510,7 @@ def main(
                     "glt_code": second_level_glt_code,
                     "n_files": len(glt_data_table["InputFile"].tolist()),
                     "n_subjects": len(glt_data_table["Subj"].unique()),
-                    "n_permutations": max_permutations,
+                    "n_permutations": true_max_permutations,
                     "is_comparison": vs_in_code,
                     "design_columns": design_columns,
                     "removed_subjects": removed_subjects,

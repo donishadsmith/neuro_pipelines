@@ -15,16 +15,11 @@ LGR = setup_logger(__name__)
 
 def _create_or_append_participants_tsv(
     bids_dir: Path,
-    early_return: bool = True,
-    save_df: bool = True,
-    return_df: bool = False,
-) -> None | pd.DataFrame:
+) -> None:
     if not (tsv_file := list(bids_dir.glob("participants.tsv"))):
         participants_df = create_participant_tsv(
             bids_dir, save_df=False, return_df=True
         )
-        if early_return:
-            return None
     else:
         participants_df = pd.read_csv(tsv_file[0], sep="\t")
 
@@ -48,12 +43,7 @@ def _create_or_append_participants_tsv(
     else:
         combined_participants_df = participants_df
 
-    if save_df:
-        combined_participants_df.to_csv(
-            bids_dir / "participants.tsv", sep="\t", index=None
-        )
-
-    return combined_participants_df if return_df else None
+    combined_participants_df.to_csv(bids_dir / "participants.tsv", sep="\t", index=None)
 
 
 def _standardize_dates(dates: list[str | int | float], fmt: str) -> list[str | float]:

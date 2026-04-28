@@ -16,23 +16,6 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         required=True,
         help="The BIDS directory.",
     )
-    parser.add_argument(
-        "--demographics_file",
-        dest="demographics_file",
-        required=False,
-        default=None,
-        help=(
-            "Path to a demographics file. " "Must contain a 'participant_id' column."
-        ),
-    )
-    parser.add_argument(
-        "--covariates_to_add",
-        dest="covariates_to_add",
-        required=False,
-        default=None,
-        nargs="+",
-        help="Column names from the demographics file to add to the participants TSV.",
-    )
 
     return parser
 

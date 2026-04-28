@@ -16,6 +16,7 @@ st.divider()
 
 st.markdown("""**Note:**\n
 - Run 'Participants TSV Pipeline' and 'Add Dosages Pipeline' after conversion.\n
+- The subjects visits file must have the following columns: "participant_id" and "date".
 - If the BIDS directory has a participants TSV file, it will not be overwritten, the new subjects will be appended.\n
 
 **Date Format Cheatsheet:**\n

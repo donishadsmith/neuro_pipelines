@@ -21,7 +21,7 @@ st.title("\U0001f9e0 Neuro Pipelines")
 
 st.divider()
 
-col1, col2, col3 = st.columns(3, border=True, gap="medium")
+col1, col2 = st.columns(2, border=True, gap="medium")
 
 with col1:
     st.page_link(
@@ -35,6 +35,12 @@ with col1:
         label="**Participants TSV**",
     )
     st.caption("Create or update the participants TSV file.")
+
+    st.page_link(
+        "bids_conversion_pipeline/streamlit/participants_demographics_app.py",
+        label="**Participants Demographics**",
+    )
+    st.caption(" Add or update demographic data in the participants TSV file.")
 
     st.page_link(
         "bids_conversion_pipeline/streamlit/add_dosages_app.py", label="**Add Dosages**"
@@ -51,6 +57,5 @@ with col2:
     st.page_link("move_files/move_files_app.py", label="**Move BIDS Files**")
     st.caption("Move BIDS files to a BIDS-compliant directory.")
 
-with col3:
     st.page_link("connors/connors_app.py", label="**Connors 4**")
     st.caption("Extract Connors 4 scores from PDF files.")

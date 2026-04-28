@@ -16,6 +16,12 @@ st.page_link(
     label=("2. **Participants TSV** - Create or update the participants TSV file."),
 )
 st.page_link(
+    "bids_conversion_pipeline/streamlit/participants_demographics_app.py",
+    label=(
+        "3. **Participants Demographics** - Add or update demographic data in the participants TSV file."
+    ),
+)
+st.page_link(
     "bids_conversion_pipeline/streamlit/add_dosages_app.py",
-    label=("3. **Add Dosages** - Add dosage information to sessions TSV files."),
+    label=("4. **Add Dosages** - Add dosage information to sessions TSV files."),
 )
