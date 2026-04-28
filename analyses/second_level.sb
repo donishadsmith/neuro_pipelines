@@ -95,7 +95,7 @@ if [[ -n $EXCLUDE_NIFTI_FILES ]]; then
 fi
 
 if [[ $METHOD == "nonparametric" ]]; then
-	CMD+=" --tfce_H $TFCE_H --tfce_E $TFCE_E --tfce_C $TFCE_C --nonparametric_cluster_correction_p $NONPARAMETRIC__CLUSTER_CORRECTION_P"
+	CMD+=" --tfce_H $TFCE_H --tfce_E $TFCE_E --tfce_C $TFCE_C --nonparametric_cluster_correction_p $NONPARAMETRIC_CLUSTER_CORRECTION_P"
 
 	if [[ -n $FSL_IMG_PATH ]]; then
 		CMD+=" --fsl_img_path $FSL_IMG_PATH"
