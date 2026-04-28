@@ -46,16 +46,27 @@ class HTMLReport:
     def append_section(report_path, template_name, context):
         if not report_path.exists():
             return
-        
+
+        section_name = template_name.stem
         section = (
             Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
             .get_template(template_name)
             .render(**context)
         )
+        
+        # Double double sections
+        start_marker = f"<!-- section:{section_name} -->"
+        end_marker = f"<!-- /section:{section_name} -->"
+        wrapped_text = f"{start_marker}\n{section}\n{end_marker}"
 
-        html = report_path.read_text(encoding="utf-8").replace(
-            "</body>", f"\n{section}\n</body>"
-        )
+        html = report_path.read_text(encoding="utf-8")
+        if start_marker in html:
+            before_text = html.split(start_marker)[0]
+            after_text = html.split(end_marker)[1]
+            html = f"{before_text}{wrapped_text}{after_text}"
+        else:
+            html = html.replace("</body>", f"\n{wrapped_text}\n</body>")
+
         report_path.write_text(html, encoding="utf-8")
 
         LGR.info(f"Appended {template_name} to {report_path}")

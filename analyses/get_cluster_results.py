@@ -45,9 +45,7 @@ def _get_cmd_args():
         "--second_level_report_dir",
         dest="second_level_report_dir",
         required=True,
-        help=(
-            "Path to the report directory containing the second level html."
-        ),
+        help=("Path to the report directory containing the second level html."),
     )
     parser.add_argument(
         "--analysis_dir",
@@ -611,10 +609,9 @@ def main(
                     "parametric_voxel_correction_p": parametric_voxel_correction_p,
                     "parametric_cluster_correction_p": parametric_cluster_correction_p,
                     "parametric_connectivity": parametric_connectivity,
-                    "parametric_cluster_size_threshold": cluster_size
+                    "parametric_cluster_size_threshold": cluster_size,
                 },
             )
-
 
             thresholded_img = threshold_img(
                 nib.load(zcore_map_filename),
