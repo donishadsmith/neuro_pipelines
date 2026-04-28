@@ -1391,7 +1391,7 @@ def main(
             try:
                 acf_lines = acf_parameters_filename.read_text().strip().splitlines()
                 if len(acf_lines) >= 2:
-                    acf_parameters = acf_lines[1].split()[:3]
+                    acf_parameters = acf_lines[1].split()[:4]
                     report.add_context(acf_parameters=acf_parameters)
             except Exception:
                 pass

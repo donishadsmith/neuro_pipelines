@@ -53,7 +53,7 @@ class HTMLReport:
             .get_template(template_name)
             .render(**context)
         )
-        
+
         # Double double sections
         start_marker = f"<!-- section:{section_name} -->"
         end_marker = f"<!-- /section:{section_name} -->"
