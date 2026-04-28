@@ -8,7 +8,19 @@ bids_conversion = st.Page(
 participants_tsv = st.Page(
     "streamlit/participants_tsv_app.py", title="Participants TSV Pipeline"
 )
+participants_demographics = st.Page(
+    "streamlit/participants_demographics_app.py",
+    title="Participants Demographics Pipeline",
+)
 add_dosages = st.Page("streamlit/add_dosages_app.py", title="Add Dosages Pipeline")
 
-pg = st.navigation([homepage, bids_conversion, participants_tsv, add_dosages])
+pg = st.navigation(
+    [
+        homepage,
+        bids_conversion,
+        participants_tsv,
+        participants_demographics,
+        add_dosages,
+    ]
+)
 pg.run()
