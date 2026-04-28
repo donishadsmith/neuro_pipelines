@@ -1414,12 +1414,17 @@ def main(
                 LGR.info(f"Processing the following glt code: {second_level_glt_code}")
 
                 vs_in_code = "_vs_" in second_level_glt_code
-                glt_data_table, removed_subjects = drop_dose_rows(
-                    data_table,
-                    get_nontarget_dose(second_level_glt_code, cohort),
-                    only_paired_data=vs_in_code,
-                    return_removed_subjects=True,
-                )
+                if cohort == "kids" and vs_in_code:
+                    glt_data_table, removed_subjects = drop_dose_rows(
+                        data_table,
+                        get_nontarget_dose(second_level_glt_code, cohort),
+                        only_paired_data=True,
+                        return_removed_subjects=True,
+                    )
+                else:
+                    glt_data_table = data_table
+                    removed_subjects = []
+
                 glt_data_table, constant_columns = drop_constant_columns(glt_data_table)
                 if glt_data_table.empty:
                     LGR.info(

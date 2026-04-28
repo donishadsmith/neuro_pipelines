@@ -358,6 +358,7 @@ def drop_dose_rows(
     if not dose_list:
         return data_table
 
+    removed_subjects = []
     data_table = data_table[~data_table["dose"].astype(str).isin(dose_list)]
     if only_paired_data:
         # Keep only subjects who have both remaining doses (i.e., appear more than once)
@@ -376,8 +377,6 @@ def drop_dose_rows(
             )
 
         data_table = data_table[duplicated_mask]
-    else:
-        removed_subjects = []
 
     if return_removed_subjects:
         return data_table, removed_subjects
