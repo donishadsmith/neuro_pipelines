@@ -781,6 +781,9 @@ def create_design_matrix(
         subject_regressors = pd.get_dummies(
             glt_data_table["Subj"], prefix="", prefix_sep="", dtype=int
         )
+        subject_regressors.columns = [
+            f"{col}_intercept" for col in subject_regressors.columns
+        ]
         design_matrix = pd.concat(
             [
                 design_matrix.reset_index(drop=True),
@@ -1499,9 +1502,11 @@ def main(
                     nonparametric_cluster_correction_p,
                 )
 
-                design_columns = pd.read_csv(
-                    matrices_output_dict["design_matrix_file"], header=None
-                ).columns.tolist()
+                header_names_filename = matrices_output_dict[
+                    "design_matrix_file"
+                ].replace("-design_matrix.csv", "-header_names.txt")
+                with open(header_names_filename, "r") as f:
+                    design_columns = f.read().split(",")
 
                 matrix_report_info["constant_column_names"] = list(
                     set(matrix_report_info["constant_column_names"] + constant_columns)
@@ -1515,14 +1520,20 @@ def main(
                     "is_comparison": vs_in_code,
                     "design_columns": design_columns,
                     "removed_subjects": removed_subjects,
-                    "dropped_within_subject_columns": matrix_report_info.get(
-                        "constant_column_names", []
+                    "dropped_within_subject_columns": list(
+                        set(
+                            matrix_report_info.get("constant_column_names", [])
+                        ).difference(datacontainer.excluded_regressors)
                     ),
-                    "dropped_collinear_columns": matrix_report_info.get(
-                        "collinear_column_names", []
+                    "dropped_collinear_columns": list(
+                        set(
+                            matrix_report_info.get("collinear_column_names", [])
+                        ).difference(datacontainer.excluded_regressors)
                     ),
-                    "dropped_dof_columns": matrix_report_info.get(
-                        "dropped_dof_regressor_names", []
+                    "dropped_dof_columns": list(
+                        set(
+                            matrix_report_info.get("dropped_dof_regressor_names", [])
+                        ).difference(datacontainer.excluded_regressors)
                     ),
                     "palm_cmd": palm_cmd,
                 }
