@@ -357,7 +357,7 @@ def denoise_seed_timeseries(
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "
         f"-input {seed_timeseries_file}\\' "
         f"-ort {nuisance_regressors_file} "
-        f"-polort 0 "
+        f"-polort {polort} "
         f"-censor {censor_file} "
         "-cenmode ZERO "
         f"-prefix {denoised_seed_timeseries_file}"
