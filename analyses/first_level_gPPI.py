@@ -340,7 +340,12 @@ def denoise_seed_timeseries(
     nuisance_regressors_file,
     censor_file,
     afni_img_path,
+    cosine_regressor_names,
 ):
+
+    polort = 0 if cosine_regressor_names else "A"
+    LGR.info(f"Using polort {polort} for 3dTproject.")
+
     denoised_seed_timeseries_file = (
         seed_timeseries_file.parent
         / seed_timeseries_file.name.replace("_desc-timeseries", "_desc-denoised")
@@ -352,7 +357,7 @@ def denoise_seed_timeseries(
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "
         f"-input {seed_timeseries_file}\\' "
         f"-ort {nuisance_regressors_file} "
-        f"-polort A "
+        f"-polort 0 "
         f"-censor {censor_file} "
         "-cenmode ZERO "
         f"-prefix {denoised_seed_timeseries_file}"
@@ -1169,6 +1174,7 @@ def main(
             nuisance_regressors_file,
             censor_file,
             afni_img_path,
+            cosine_regressor_names,
         )
         plot_title = "Denoised Seed Timeseries"
         denoised_seed_timeseries_plot_filename = plot_signal(
