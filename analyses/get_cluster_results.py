@@ -409,7 +409,11 @@ def plot_thresholded_img(
     second_level_glt_code,
     method,
 ):
-    kwargs = {"stat_map_img": thresholded_img, "draw_cross": False}
+    max_stat = np.max(np.abs(thresholded_img.get_fdata()))
+    vmax = max_stat
+    vmin = max_stat * -1
+
+    kwargs = {"stat_map_img": thresholded_img, "draw_cross": False, "vmax": vmax, "vmin": vmin}
     if template_img_path:
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
@@ -438,22 +442,26 @@ def plot_thresholded_img(
     for mode in ["ortho", "x", "y", "z", "mosaic"]:
         display = plot_stat_map(**kwargs, display_mode=mode)
 
-        display.title(title, bgcolor="black", color="white", size=10)
         statistic = "Z-score" if method == "parametric" else "T-score"
         display._cbar.set_label(f"{statistic} Intensity")
 
-        plot_filename = (
+        plot_filename_1 = (
             dst_dir
             / "stat_plots"
             / method
             / (
                 f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
-                f"_displaymode-{mode}_desc-{method}_cluster_plot.png"
+                f"_displaymode-{mode}_desc-{method}_cluster_plot_no_title.png"
             )
         )
-        plot_filename.parent.mkdir(parents=True, exist_ok=True)
+        plot_filename_1.parent.mkdir(parents=True, exist_ok=True)
+        display.savefig(plot_filename_1, dpi=720)
 
-        display.savefig(plot_filename, dpi=720)
+        display.title(title, bgcolor="black", color="white", size=10)
+
+        plot_filename_2 = str(plot_filename_1).replace("_no_title", "_with_title")
+
+        display.savefig(plot_filename_2, dpi=720)
 
         display.close()
 
