@@ -27,7 +27,7 @@ def create_design_matrix(
         f"-input {smoothed_nifti_file} "
         f"-mask {mask_file} "
         f"-censor {censor_file} "
-        f"-polort 0 "
+        f"-polort {polort} "
         "-local_times "
         f"{deconvolve_cmd['num_stimts']} "
         f"{deconvolve_cmd['args']} "
