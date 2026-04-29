@@ -413,7 +413,12 @@ def plot_thresholded_img(
     vmax = max_stat
     vmin = max_stat * -1
 
-    kwargs = {"stat_map_img": thresholded_img, "draw_cross": False, "vmax": vmax, "vmin": vmin}
+    kwargs = {
+        "stat_map_img": thresholded_img,
+        "draw_cross": False,
+        "vmax": vmax,
+        "vmin": vmin,
+    }
     if template_img_path:
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
