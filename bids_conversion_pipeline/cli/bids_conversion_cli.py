@@ -84,7 +84,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         "--create_dataset_metadata",
         dest="create_dataset_metadata",
         required=False,
-        default=False,
+        default=True,
         type=_convert_to_bool,
         help=(
             "Create the participants TSV and dataset description JSON. "

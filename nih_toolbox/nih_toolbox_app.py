@@ -1,0 +1,104 @@
+import logging, sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "nih_toolbox"))
+
+import streamlit as st
+
+from _streamlit_utils import StreamlitLogHandler, _select_content
+
+from organize_toolbox_data import run_pipeline
+
+st.title("NIH Toolbox Pipeline")
+
+st.divider()
+
+st.markdown("**Required Arguments**")
+
+if st.button(
+    "Browse for source (NIH toolbox) file",
+    help="The unorganized NIH toolbox file.",
+):
+    file = _select_content("file")
+    if file:
+        st.session_state.unorganized_nih_toolbox_file = file
+
+if st.session_state.get("unorganized_nih_toolbox_file"):
+    st.success(f"NIH Toolbox file: {st.session_state.unorganized_nih_toolbox_file}")
+
+st.divider()
+st.markdown("**Optional Arguments**")
+
+prefix_filename = st.text_input(
+    "Prefix filename",
+    help=" prefix to add to the filename for the organized NIH toolbox data.",
+)
+if prefix_filename:
+    prefix_filename = prefix_filename.strip()
+
+if st.button(
+    "Browse for output directory",
+    help=(
+        "Path to the output directory for the organized NIH toolbox data. "
+        "If None, saves to the same directory as input data"
+    ),
+):
+    folder = _select_content("directory")
+    if folder:
+        st.session_state.dst_dir = folder
+
+if st.session_state.get("dst_dir"):
+    st.success(f"Output directory: {st.session_state.dst_dir}")
+
+if st.button(
+    "Browse for pre-existing organized (NIH toolbox) file",
+    help="Directory containing a pre-existing organized NIH toolbox file.",
+):
+    file = _select_content("file")
+    if file:
+        st.session_state.preexisting_nih_toolbox_file = file
+
+if st.session_state.get("preexisting_nih_toolbox_file"):
+    st.success(
+        f"Pre-existing NIH Toolbox file: {st.session_state.preexisting_nih_toolbox_file}"
+    )
+
+drop_dates = st.checkbox(
+    "Remove assessment dates",
+    value=False,
+    help="Removes the assessment dates from the data.",
+)
+
+kwargs = {
+    "unorganized_nih_toolbox_file": st.session_state.get(
+        "unorganized_nih_toolbox_file"
+    ),
+    "dst_dir": st.session_state.get("dst_dir"),
+    "prefix_filename": prefix_filename,
+    "preexisting_nih_toolbox_file": st.session_state.get(
+        "preexisting_nih_toolbox_file"
+    ),
+    "drop_dates": drop_dates,
+}
+
+st.divider()
+if st.button("Run Pipeline", type="primary"):
+    if not st.session_state.get("unorganized_nih_toolbox_file"):
+        st.error("Please select a source (NIH toolbox file) file before running.")
+    else:
+        status_container = st.empty()
+        with status_container.status("Running pipeline...", expanded=True) as status:
+            handler = StreamlitLogHandler(status)
+            logging.getLogger().addHandler(handler)
+
+            output_path = run_pipeline(**kwargs)
+
+            logging.getLogger().removeHandler(handler)
+
+            if output_path:
+                status.update(
+                    label=f"Data saved to: {output_path}",
+                    state="complete",
+                    expanded=False,
+                )

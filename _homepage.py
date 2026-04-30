@@ -21,7 +21,7 @@ st.title("\U0001f9e0 Neuro Pipelines")
 
 st.divider()
 
-col1, col2 = st.columns(2, border=True, gap="medium")
+col1, col2, col3 = st.columns(3, border=True, gap="medium")
 
 with col1:
     st.page_link(
@@ -42,20 +42,25 @@ with col1:
     )
     st.caption(" Add or update demographic data in the participants TSV file.")
 
+
+with col2:
     st.page_link(
         "bids_conversion_pipeline/streamlit/add_dosages_app.py", label="**Add Dosages**"
     )
     st.caption("Add dosage information to sessions TSV files.")
 
-with col2:
     st.page_link("events/bids_events_app.py", label="**BIDS Events**")
     st.caption("Create BIDS-compliant events TSV files.")
 
-    st.page_link("events/behavioral_data_app.py", label="**Behavioral Data Pipeline**")
+    st.page_link("events/behavioral_data_app.py", label="**Task Behavioral Data**")
     st.caption("Create CSV files containing task accuracy and reaction times.")
 
+with col3:
     st.page_link("move_files/move_files_app.py", label="**Move BIDS Files**")
     st.caption("Move BIDS files to a BIDS-compliant directory.")
 
     st.page_link("connors/connors_app.py", label="**Connors 4**")
     st.caption("Extract Connors 4 scores from PDF files.")
+
+    st.page_link("nih_toolbox/nih_toolbox_app.py", label="**NIH Toolbox**")
+    st.caption("Convert NIH Toolbox from long form to wide form.")

@@ -120,7 +120,7 @@ delete_temp_dir = st.checkbox(
 
 create_dataset_metadata = st.checkbox(
     "Create dataset metadata",
-    value=False,
+    value=True,
     help=(
         "Create the participants TSV and dataset description JSON. "
         "Appends to an existing participants TSV if one is found. "

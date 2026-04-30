@@ -11,10 +11,12 @@ Neuroimaging pipelines tailored for specific tasks and scan protocols in a multi
 ## Available Tools
 
 - BIDS conversion
-- Event (timing) file creation
+- Event (timing) file creation and task accuracy/reaction time calculations
 - Preprocessing
 - First and second level analyses (GLM and gPPI)
 - Miscellaneous utilities
+- Extracting Conners 4 data
+- Organizing NIH toolbox data
 
 ## Installation
 

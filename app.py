@@ -23,6 +23,7 @@ behavioral_data = st.Page(
     "events/behavioral_data_app.py", title="Behavioral Data Pipeline"
 )
 connors = st.Page("connors/connors_app.py", title="Connors 4 Pipeline")
+nih_toolbox = st.Page("nih_toolbox/nih_toolbox_app.py", title="NIH Toolbox Pipeline")
 
 pg = st.navigation(
     [
@@ -35,6 +36,7 @@ pg = st.navigation(
         events,
         behavioral_data,
         connors,
+        nih_toolbox,
     ],
     position="top",
 )
