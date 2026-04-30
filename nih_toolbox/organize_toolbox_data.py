@@ -110,16 +110,15 @@ def run_pipeline(
             )
 
         if "Assessment Date" not in preexisting_organized_df.columns:
-            organized_df.drop(columns=["Assessment Date"])
+            organized_df = organized_df.drop(columns=["Assessment Date"])
 
         organized_df = pd.concat(
             [preexisting_organized_df, organized_df], axis=0, ignore_index=True
         )
         organized_df = organized_df.drop_duplicates()
 
-    drop_dates = False
     if drop_dates and "Assessment Date" in organized_df.columns:
-        organized_df.drop(columns=["Assessment Date"])
+        organized_df = organized_df.drop(columns=["Assessment Date"])
 
     prefix_filename = f"{prefix_filename}_" if prefix_filename else ""
     output_dir = Path(dst_dir) if dst_dir else unorganized_nih_toolbox_file.parent
