@@ -54,7 +54,8 @@ class HTMLReport:
             .render(**context)
         )
 
-        # Double double sections
+        # Use comment as section markers to allow reran sections to be replaced
+        # instead of being repeatedly appended to end of file
         start_marker = f"<!-- section:{section_name} -->"
         end_marker = f"<!-- /section:{section_name} -->"
         wrapped_text = f"{start_marker}\n{section}\n{end_marker}"
