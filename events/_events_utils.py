@@ -17,7 +17,7 @@ def _get_cmd_args(caller):
         help="Directory containing the neurobehavioral log files.",
     )
 
-    default_dir = "~/BIDS_Events" if caller == "BIDS Events" else "~/Behavioral_Data"
+    default_dir = "~/BIDS_Events" if caller == "BIDS Events" else "~/Behavioral_Data."
     parser.add_argument(
         "--dst_dir",
         dest="dst_dir",
@@ -174,6 +174,14 @@ def _app(caller, pipeline):
     st.divider()
     st.markdown("**Optional Arguments**")
 
+    if st.button("Browse for output directory"):
+        folder = _select_content("directory")
+        if folder:
+            st.session_state.dst_dir = folder
+
+    if st.session_state.get("dst_dir"):
+        st.success(f"Output: {st.session_state.dst_dir}")
+
     if caller == "Behavioral Data" and st.button(
         "Browse behavioral data file",
         help="The path to the behavioral data (if exists) to append new data to.",
@@ -184,14 +192,6 @@ def _app(caller, pipeline):
 
     if st.session_state.get("behavioral_data_file"):
         st.success(f"Behavioral File: {st.session_state.behavioral_data_file}")
-
-    if caller == "BIDS Events" and st.button("Browse for output directory"):
-        folder = _select_content("directory")
-        if folder:
-            st.session_state.dst_dir = folder
-
-    if st.session_state.get("dst_dir"):
-        st.success(f"Output: {st.session_state.dst_dir}")
 
     if st.button("Browse for temporary directory"):
         folder = _select_content("directory")

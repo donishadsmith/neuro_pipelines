@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "events"))
+
 from _events_utils import _get_cmd_args
 
 from get_behavioral_data import run_pipeline
