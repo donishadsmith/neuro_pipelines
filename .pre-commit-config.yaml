@@ -28,4 +28,4 @@ repos:
     hooks:
         - id: ruff
           entry: ruff check --select T201
-          files: '(^nifti2bids/.*\.py$|^tests/.*\.py$)'
+          files: '.*.py$'
