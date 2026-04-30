@@ -225,7 +225,6 @@ def get_subject_ids(
         for file in reformatted_pdf_files
     ]
 
-    print(all_subjects_list)
     return zip(*all_subjects_list)
 
 

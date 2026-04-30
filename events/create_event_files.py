@@ -168,7 +168,6 @@ def map_date_to_session(subject_id, subjects_visits_df, curr_log_date):
     else:
         date_in_map = False
 
-    print(visit_session_map)
     if not date_in_map:
         LGR.warning(
             f"Subject {subject_id} does not have the following date: {curr_log_date}. "
