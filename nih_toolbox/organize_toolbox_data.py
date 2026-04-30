@@ -5,6 +5,8 @@ import pandas as pd
 
 SCORE_COLUMNS = [
     "RawScore",
+    "Theta",
+    "SE",
     "TScore",
     "Computed Score",
     "Uncorrected Standard Score",
