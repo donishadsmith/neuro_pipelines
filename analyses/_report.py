@@ -20,7 +20,6 @@ class HTMLReport:
             "method": method,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        self.sections = []
 
     def add_context(self, **kwargs):
         self.context.update(kwargs)
@@ -34,7 +33,7 @@ class HTMLReport:
             loader=FileSystemLoader(str(TEMPLATE_DIR)),
         ).get_template(template_name)
 
-        html = template.render(sections=self.sections, **self.context)
+        html = template.render(**self.context)
 
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
