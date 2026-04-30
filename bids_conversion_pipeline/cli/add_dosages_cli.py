@@ -1,7 +1,7 @@
 import argparse, sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from add_dosages import run_pipeline
 
@@ -30,30 +30,12 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         required=True,
         help=(
             "Path to a CSV or Excel file mapping subjects to visit dates. "
-            "Must contain 'participant_id', 'date', and 'dose' columns. "
-            "Dates should be listed in chronological order per subject. "
-            "Use NaN for missing sessions. "
-            "Do not include unwanted subject dates in order to skip them. "
+            "Must contain 'participant_id' and 'date' columns. "
+            "Include a 'dose' column to add dosages to the sessions TSV. "
+            "For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data."
             "If `dose_mg` (only relevant to adult cohort since the dose column is coded as 'mph' and 'placebo') "
             "is a column in the file, then that information will be included too."
         ),
-    )
-    parser.add_argument(
-        "--subjects_visits_date_fmt",
-        dest="subjects_visits_date_fmt",
-        required=False,
-        default=r"%m/%d/%Y",
-        help=(
-            "Date format used in the subjects visits file (e.g., %m/%d/%Y). "
-            "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
-        ),
-    )
-    parser.add_argument(
-        "--sessions_tsv_date_fmt",
-        dest="sessions_tsv_date_fmt",
-        required=False,
-        default=r"%y%m%d",
-        help="Date format used in the sessions TSV files (e.g., %y%m%d).",
     )
 
     return parser

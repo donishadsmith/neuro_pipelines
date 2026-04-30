@@ -1,9 +1,9 @@
 import logging, sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline")
+    0, str(Path(__file__).parent.parent.parent / "bids_conversion_pipeline")
 )
 
 import streamlit as st
@@ -14,22 +14,14 @@ from _streamlit_utils import StreamlitLogHandler, _select_content
 st.title("NIfTI to BIDS Conversion Pipeline")
 st.divider()
 
-st.markdown("""**Note:**\n
+st.markdown("""**Notes for MPH Study:**\n
+
+For MPH Study:
+
 - Run 'Participants TSV Pipeline' and 'Add Dosages Pipeline' after conversion.\n
 - The subjects visits file must have the following columns: "participant_id" and "date".
 - If the BIDS directory has a participants TSV file, it will not be overwritten, the new subjects will be appended.\n
-
-**Date Format Cheatsheet:**\n
-
-**% is a placeholder prefix and must be included when inputing the date format for the subject visits CSV or the source**
-**directory folders (copy and paste the relevant format after ->)**
-
-- 2025-01-02 -> %Y-%m-%d
-- 01/02/2025 -> %m/%d/%Y or %#m/%#d/%Y
-- 01/02/25 -> %m/%d/%y
-- 20250102 -> %y%m%d
-
-**If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**
+- For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data.\n
 """)
 
 st.divider()
@@ -67,24 +59,6 @@ if st.button(
 
 if st.session_state.get("subjects_visits_file"):
     st.success(f"Visits File: {st.session_state.subjects_visits_file}")
-
-
-subjects_visits_date_fmt = st.text_input(
-    "Date format in the subjects visits file",
-    r"%m/%d/%Y",
-    help=(
-        "The date format used in the subjects visits file (e.g., %m/%d/%Y). "
-        "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
-    ),
-)
-subjects_visits_date_fmt = rf"{subjects_visits_date_fmt.strip()}"
-
-src_data_date_fmt = st.text_input(
-    "Date format in the source folder names",
-    r"%y%m%d",
-    help="The date format used in the source directory folder names (e.g., %y%m%d).",
-)
-src_data_date_fmt = rf"{src_data_date_fmt.strip()}"
 
 st.divider()
 st.markdown("**Optional Arguments**")
@@ -156,7 +130,7 @@ create_dataset_metadata = st.checkbox(
 
 add_sessions_tsv = st.checkbox(
     "Add sessions TSV",
-    value=False,
+    value=True,
     help="Create a sessions TSV file containing the session and scan date for each subject.",
 )
 
@@ -176,8 +150,6 @@ kwargs = {
     "create_dataset_metadata": create_dataset_metadata,
     "add_sessions_tsv": add_sessions_tsv,
     "subjects_visits_file": st.session_state.get("subjects_visits_file"),
-    "subjects_visits_date_fmt": subjects_visits_date_fmt,
-    "src_data_date_fmt": src_data_date_fmt,
 }
 
 st.divider()

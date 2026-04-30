@@ -72,19 +72,8 @@ def _get_cmd_args(caller):
         help=(
             "Path to a CSV or Excel file mapping subjects to visit dates. "
             "Must contain 'participant_id' and 'date' columns. "
-            "Dates should be listed in chronological order per subject. "
-            "Use NaN for missing sessions. "
-            "Do not include unwanted subject dates in order to skip them."
-        ),
-    )
-    parser.add_argument(
-        "--subjects_visits_date_fmt",
-        dest="subjects_visits_date_fmt",
-        required=False,
-        default=r"%#m/%#d/%Y",
-        help=(
-            "Date format used in the subjects visits file (e.g., '%%#m/%%#d/%%Y'). "
-            "Note: Excel files may convert dates to '%%Y-%%m-%%d' regardless of the original format."
+            "Ensure all dates use the same format. "
+            "For data from unwanted dates, set to a null value (leave that cell empty) or exclude that row from the data."
         ),
     )
 
@@ -120,25 +109,17 @@ def _get_cmd_args(caller):
 def _app(caller, pipeline):
     if caller == "BIDS Events":
         st.title("BIDS Events File Pipeline")
+        note = (
+            "**Note:**\n"
+            "- For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data"
+        )
     else:
         st.title("Behavioral Data Pipeline")
+        note = ""
 
     st.divider()
 
-    st.markdown(
-        """
-    **Date Format Cheatsheet:**\n
-
-    **% is a placeholder prefix and must be included when inputing the date format for the subject visits CSV**
-    **(copy and paste the relevant format after ->).**
-
-    - 2025-01-02 -> %Y-%m-%d
-    - 01/02/2025 -> %m/%d/%Y or %#m/%#d/%Y
-    - 01/02/25 -> %m/%d/%y
-    - 20250102 -> %y%m%d
-
-    **If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**\n"""
-    )
+    st.markdown(note)
 
     if caller == "BIDS Events":
         st.markdown(
@@ -190,6 +171,9 @@ def _app(caller, pipeline):
     if st.session_state.get("subjects_visits_file"):
         st.success(f"Visits File: {st.session_state.subjects_visits_file}")
 
+    st.divider()
+    st.markdown("**Optional Arguments**")
+
     if caller == "Behavioral Data" and st.button(
         "Browse behavioral data file",
         help="The path to the behavioral data (if exists) to append new data to.",
@@ -200,19 +184,6 @@ def _app(caller, pipeline):
 
     if st.session_state.get("behavioral_data_file"):
         st.success(f"Behavioral File: {st.session_state.behavioral_data_file}")
-
-    subjects_visits_date_fmt = st.text_input(
-        "Date format in the subjects visits file",
-        r"%#m/%#d/%Y",
-        help=(
-            "The date format used in the subjects visits file (e.g., %#m/%#d/%Y). "
-            "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
-        ),
-    )
-    subjects_visits_date_fmt = subjects_visits_date_fmt.strip()
-
-    st.divider()
-    st.markdown("**Optional Arguments**")
 
     if caller == "BIDS Events" and st.button("Browse for output directory"):
         folder = _select_content("directory")
@@ -270,7 +241,6 @@ def _app(caller, pipeline):
         "task": task,
         "subjects": subjects if subjects else None,
         "subjects_visits_file": st.session_state.get("subjects_visits_file"),
-        "subjects_visits_date_fmt": subjects_visits_date_fmt,
         "behavioral_data_file": st.session_state.get("behavioral_data_file"),
         "minimum_file_size": minimum_file_size or None,
         "exclude_filenames": exclude_filenames if exclude_filenames else None,

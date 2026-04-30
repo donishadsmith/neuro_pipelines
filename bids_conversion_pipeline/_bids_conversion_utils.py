@@ -1,7 +1,4 @@
-import re
-from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -44,51 +41,6 @@ def _create_or_append_participants_tsv(
         combined_participants_df = participants_df
 
     combined_participants_df.to_csv(bids_dir / "participants.tsv", sep="\t", index=None)
-
-
-def _standardize_dates(dates: list[str | int | float], fmt: str) -> list[str | float]:
-    dates = [str(x).strip().split(" ")[0] for x in dates]
-    convert_date = lambda date: (
-        datetime.strptime(str(date), fmt).strftime(fmt)
-        if not str(date).lower() == "nan"  # Check for the NaN case
-        else float("NaN")
-    )
-
-    return list(map(convert_date, dates))
-
-
-def _extract_subjects_visits_data(
-    participant_id: str,
-    subjects_visits_df: pd.DataFrame,
-    column_name: int,
-    subjects_visits_date_fmt: Optional[str] = None,
-    scan_date: Optional[str] = None,
-):
-    subjects_visits_df.columns = [col.strip() for col in subjects_visits_df.columns]
-    subjects_visits_df[["participant_id", "date"]] = subjects_visits_df[
-        ["participant_id", "date"]
-    ].astype(str)
-
-    if (
-        subjects_visits_date_fmt
-        and bool(re.search(r"\s", subjects_visits_date_fmt)) is False
-    ):
-        subjects_visits_df["date"] = subjects_visits_df["date"].str.replace(
-            r"\s+", "", regex=True
-        )
-
-    mask = subjects_visits_df["participant_id"] == str(participant_id)
-
-    if scan_date:
-        mask &= subjects_visits_df["date"] == str(scan_date)
-
-    return (
-        subjects_visits_df[mask]
-        .loc[:, column_name]
-        .astype(str)
-        .to_numpy(copy=True)
-        .tolist()
-    )
 
 
 def _strip_entity(subjects: list[str | int]) -> list[str]:

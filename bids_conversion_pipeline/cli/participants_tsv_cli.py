@@ -1,7 +1,7 @@
 import argparse, sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from participants_tsv import run_pipeline
 

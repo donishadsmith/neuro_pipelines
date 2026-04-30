@@ -168,8 +168,6 @@ def run_pipeline(
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
     subjects_visits_file: str,
-    subjects_visits_date_fmt: str,
-    src_data_date_fmt: str,
 ) -> Path:
     try:
         if (cohort := cohort.lower()) not in ["kids", "adults"]:
@@ -207,8 +205,6 @@ def run_pipeline(
             add_sessions_tsv,
             delete_temp_dir,
             subjects_visits_file,
-            subjects_visits_date_fmt,
-            src_data_date_fmt,
         )
 
         LGR.info("Creating JSON ")

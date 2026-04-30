@@ -1,9 +1,9 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline")
+    0, str(Path(__file__).parent.parent.parent / "bids_conversion_pipeline")
 )
 
 import streamlit as st

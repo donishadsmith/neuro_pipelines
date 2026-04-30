@@ -1,7 +1,7 @@
 import argparse, sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bids_conversion import run_pipeline
 
@@ -96,7 +96,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         "--add_sessions_tsv",
         dest="add_sessions_tsv",
         required=False,
-        default=False,
+        default=True,
         type=_convert_to_bool,
         help="Create a sessions TSV file containing the session and scan date for each subject.",
     )
@@ -108,27 +108,9 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         help=(
             "Path to a CSV or Excel file mapping subjects to visit dates. "
             "Must contain 'participant_id' and 'date' columns. "
-            "Dates should be listed in chronological order per subject. "
-            "Use NaN for missing sessions. Include a 'dose' column to add dosages to the sessions TSV. "
-            "Do not include unwanted subject dates in order to skip them."
+            "Include a 'dose' column to add dosages to the sessions TSV. "
+            "For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data."
         ),
-    )
-    parser.add_argument(
-        "--subjects_visits_date_fmt",
-        dest="subjects_visits_date_fmt",
-        required=False,
-        default=r"%m/%d/%Y",
-        help=(
-            "Date format used in the subjects visits file (e.g., %m/%d/%Y). "
-            "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
-        ),
-    )
-    parser.add_argument(
-        "--src_data_date_fmt",
-        dest="src_data_date_fmt",
-        required=False,
-        default=r"%y%m%d",
-        help="Date format used in the source directory folder names (e.g., %y%m%d).",
     )
 
     return parser

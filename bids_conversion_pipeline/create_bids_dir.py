@@ -1,7 +1,8 @@
-import re, shutil
-from datetime import datetime
+import re, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 import pandas as pd
 
@@ -11,12 +12,16 @@ from bidsaid.files import (
     create_dataset_description,
     save_dataset_description,
 )
-from bidsaid.path_utils import is_valid_date
 from bidsaid.logging import setup_logger
+from bidsaid.path_utils import is_valid_date
 
 from _bids_conversion_utils import (
     _create_or_append_participants_tsv,
+)
+
+from _general_utils import (
     _extract_subjects_visits_data,
+    _get_subject_visits,
     _standardize_dates,
 )
 
@@ -40,7 +45,7 @@ def _get_task_name(nifti_file: Path, cohort: Literal["kids", "adults"]) -> str:
 
 def _rename_file(
     nifti_file: Path,
-    bids_dir: Path,
+    subject_dir: Path,
     participant_id: str,
     session_id: str,
     task_id: Optional[str] = None,
@@ -48,14 +53,14 @@ def _rename_file(
 ) -> None:
     kwargs = {
         "src_file": nifti_file,
-        "dst_dir": bids_dir,
+        "dst_dir": subject_dir,
         "sub_id": participant_id,
         "ses_id": session_id,
         "run_id": "01",
         "remove_src_file": remove_src_file,
     }
 
-    if bids_dir.name == "anat":
+    if subject_dir.name == "anat":
         create_bids_file(**kwargs, desc="T1w")
     else:
         create_bids_file(**kwargs, task_id=task_id, desc="bold")
@@ -84,7 +89,7 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
 
 
 def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
-    return sorted(
+    original_scan_dates = sorted(
         list(
             set(
                 [
@@ -94,54 +99,33 @@ def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
             )
         )
     )
+    # In the event a folder is missing a date:
+    converted_scan_dates = []
+    for scan_date, subject_nifti_file in zip(original_scan_dates, subject_nifti_files):
+        if not scan_date:
+            converted_scan_dates.append("NaN")
+        else:
+            try:
+                # KKI likely has a pipeline that automatically labels folders with the "%y%m%d" date format
+                new_dates = [
+                    (
+                        str(pd.to_datetime([scan_date], format=r"%y%m%d")[0]).split()[0]
+                        if is_valid_date(scan_date, r"%y%m%d")
+                        else str(pd.to_datetime([scan_date])[0]).split()[0]
+                    )
+                ]
+                converted_scan_dates.append(new_dates[0])
+            except:
+                LGR.warning(
+                    f"The following folder does not have a valid date: {subject_nifti_file.parent}"
+                )
+                converted_scan_dates.append("NaN")
 
-
-def _get_subject_visits(
-    participant_id: str,
-    subjects_visits_df: pd.DataFrame,
-    subjects_visits_date_fmt: str,
-    src_data_date_fmt: str,
-) -> dict[str, str]:
-    # Don't sort to keep the order of the NaNs
-    visit_dates = _extract_subjects_visits_data(
-        participant_id,
-        subjects_visits_df,
-        column_name="date",
-        subjects_visits_date_fmt=subjects_visits_date_fmt,
-    )
-    if not visit_dates or all(not pd.notna(date) for date in visit_dates):
-        LGR.warning(f"Subject {participant_id} has no visit dates.")
-
-        return None
-
-    check_dates = [date for date in visit_dates if not pd.notna(date)]
-    if not all(
-        is_valid_date(visit_date, subjects_visits_date_fmt)
-        for visit_date in check_dates
-    ):
-        LGR.warning(
-            f"Visit dates will be ignored for subject {participant_id} because "
-            f"not all dates have a consistent format: {check_dates}."
-        )
-
-        return None
-
-    visit_dates = _standardize_dates(visit_dates, subjects_visits_date_fmt)
-
-    convert_date = lambda date: (
-        datetime.strptime(date, subjects_visits_date_fmt).strftime(src_data_date_fmt)
-        if isinstance(date, str)
-        else float("NaN")
-    )
-
-    visit_dates = [
-        str(date) if not isinstance(date, float) else date for date in visit_dates
-    ]
-
-    return {
-        f"0{session_id}": date
-        for session_id, date in enumerate(list(map(convert_date, visit_dates)), start=1)
+    original_scan_date_map = {
+        k: v for k, v in zip(converted_scan_dates, original_scan_dates)
     }
+
+    return converted_scan_dates, original_scan_date_map
 
 
 def _get_subject_dosages(
@@ -177,7 +161,6 @@ def _combine_session_data(
             for session_id, date in visit_session_map.items()
             if date in scan_dates
         }
-
         missing_dates = {
             date: date
             for _, date in visit_session_map.items()
@@ -234,36 +217,24 @@ def _generate_bids_dir_pipeline(
     add_sessions_tsv: bool,
     delete_temp_dir: bool,
     subjects_visits_file: str,
-    subjects_visits_date_fmt: str,
-    src_data_date_fmt: str,
 ) -> None:
     nifti_files = list(regex_glob(temp_dir, pattern=r"^.*\.nii\.gz$", recursive=True))
 
-    if not bids_dir.exists():
-        bids_dir.mkdir()
+    bids_dir.mkdir(parents=True, exist_ok=True)
 
-    subjects_visits_df = _get_dataframe(subjects_visits_file)
+    subjects_visits_df = _standardize_dates(_get_dataframe(subjects_visits_file))
 
     participant_ids = sorted(
         list(set([nifti_file.parent.name.split("_")[0] for nifti_file in nifti_files]))
     )
+
     for participant_id in participant_ids:
         subject_nifti_files = _filter_nifti_files(nifti_files, participant_id)
-        scan_dates = _get_folder_scan_dates(subject_nifti_files)
-        if scan_dates:
-            scan_dates = _standardize_dates(scan_dates, src_data_date_fmt)
-
-        if not all(is_valid_date(date, src_data_date_fmt) for date in scan_dates):
-            LGR.warning(
-                f"Not all dates have the following format ({src_data_date_fmt}) "
-                f"for subject {participant_id}: {scan_dates}."
-            )
+        scan_dates, original_scan_date_map = _get_folder_scan_dates(subject_nifti_files)
 
         visit_session_map = _get_subject_visits(
             participant_id,
             subjects_visits_df,
-            subjects_visits_date_fmt,
-            src_data_date_fmt,
         )
         visit_dosage_map = _get_subject_dosages(participant_id, subjects_visits_df)
 
@@ -272,14 +243,17 @@ def _generate_bids_dir_pipeline(
         )
 
         sessions_dict = {"session_id": [], "acq_time": [], "dose": []}
-        for session_id, scan_date, dose in session_data_tuple:
+
+        for session_id, converted_scan_date, dose in session_data_tuple:
             sessions_dict["session_id"].append(session_id)
-            sessions_dict["acq_time"].append(scan_date)
+            sessions_dict["acq_time"].append(converted_scan_date)
             sessions_dict["dose"].append(dose)
-            session_nifti_files = _filter_nifti_files(subject_nifti_files, scan_date)
+            session_nifti_files = _filter_nifti_files(
+                subject_nifti_files, original_scan_date_map[converted_scan_date]
+            )
             for session_nifti_file in session_nifti_files:
 
-                dst_path = (
+                subject_dir = (
                     bids_dir
                     / f"sub-{participant_id}"
                     / f"ses-{session_id}"
@@ -292,12 +266,12 @@ def _generate_bids_dir_pipeline(
 
                 task_id = (
                     _get_task_name(session_nifti_file, cohort)
-                    if dst_path.name == "func"
+                    if subject_dir.name == "func"
                     else None
                 )
                 _rename_file(
                     session_nifti_file,
-                    dst_path,
+                    subject_dir,
                     participant_id,
                     session_id,
                     task_id,

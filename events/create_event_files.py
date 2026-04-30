@@ -1,6 +1,7 @@
-import os, re, shutil, tempfile
+import os, re, shutil, sys, tempfile
 from pathlib import Path
-from datetime import datetime
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 import numpy as np, pandas as pd
 
@@ -18,7 +19,8 @@ from bidsaid.events import (
 )
 from bidsaid.io import _copy_file
 from bidsaid.logging import setup_logger
-from bidsaid.path_utils import is_valid_date
+
+from _general_utils import _get_subject_visits, _standardize_dates
 
 LGR = setup_logger(__name__)
 
@@ -118,72 +120,23 @@ def _check_subjects_visits_file(subjects_visits_file: str | Path) -> None:
         )
 
 
-def _get_subjects_visits(subject_id, subjects_visits_df, subjects_visits_date_fmt):
-    # Don't sort to keep the order of the NaNs
-    subjects_visits_df["date"] = subjects_visits_df["date"].astype(str)
-    visit_dates = subjects_visits_df.loc[
-        subjects_visits_df["participant_id"].astype(str) == subject_id, "date"
-    ].tolist()
-
-    if not visit_dates or all(
-        isinstance(date, float) and np.isnan(date) for date in visit_dates
-    ):
-        LGR.warning(f"Subject {subject_id} has no visit dates.")
-        return None
-
-    check_dates = [
-        date for date in visit_dates if not (isinstance(date, float) and np.isnan(date))
-    ]
-
-    if not check_dates:
-        LGR.warning(f"No visit dates will be ignored for subject {subject_id}.")
-        return None
-
-    if not all(
-        is_valid_date(
-            visit_date, subjects_visits_date_fmt.replace("%#", "%").replace("%-", "%")
-        )
-        for visit_date in check_dates
-    ):
-        raise ValueError(
-            f"For subject {subject_id}, not all dates have a consistent format: "
-            f"{check_dates}."
-        )
-
-    return {date: session_id for session_id, date in enumerate(visit_dates, start=1)}
-
-
-def convert_log_date(log_date, subjects_visits_date_fmt):
-    try:
-        converted_date = datetime.strptime(log_date, "%m-%d-%Y").strftime(
-            subjects_visits_date_fmt
-        )
-    except ValueError:
-        converted_date = datetime.strptime(log_date, "%m/%d/%Y").strftime(
-            subjects_visits_date_fmt
-        )
-
-    return converted_date
-
-
 def _get_eprime_session(
     subject_id,
     edat_file,
     subjects_visits_df,
-    subjects_visits_date_fmt,
 ):
     dst_path = convert_edat3_to_text(edat_file)
     curr_log_date = load_eprime_log(dst_path)["SessionDate"].tolist()[0]
-    curr_log_date = convert_log_date(
-        curr_log_date,
-        subjects_visits_date_fmt=subjects_visits_date_fmt,
-    )
+    curr_log_date = str(
+        pd.to_datetime(
+            [curr_log_date],
+        )[0]
+    ).split()[0]
     dst_path.unlink()
 
     return map_date_to_session(
         subject_id,
         subjects_visits_df,
-        subjects_visits_date_fmt,
         curr_log_date,
     )
 
@@ -192,32 +145,30 @@ def _get_presentation_session(
     subject_id,
     log_file,
     subjects_visits_df,
-    subjects_visits_date_fmt,
 ):
-    curr_log_date = convert_log_date(
-        get_presentation_log_date(log_file),
-        subjects_visits_date_fmt=subjects_visits_date_fmt,
-    )
+    curr_log_date = curr_log_date = str(
+        pd.to_datetime(
+            [get_presentation_log_date(log_file)],
+        )[0]
+    ).split()[0]
 
     return map_date_to_session(
         subject_id,
         subjects_visits_df,
-        subjects_visits_date_fmt,
         curr_log_date,
     )
 
 
-def map_date_to_session(
-    subject_id, subjects_visits_df, subjects_visits_date_fmt, curr_log_date
-):
-    visit_session_map = _get_subjects_visits(
-        subject_id, subjects_visits_df, subjects_visits_date_fmt
-    )
+def map_date_to_session(subject_id, subjects_visits_df, curr_log_date):
+    visit_session_map = _get_subject_visits(subject_id, subjects_visits_df)
+    visit_session_map = {v: k for k, v in visit_session_map.items()}
+
     if visit_session_map:
         date_in_map = curr_log_date in visit_session_map
     else:
         date_in_map = False
 
+    print(visit_session_map)
     if not date_in_map:
         LGR.warning(
             f"Subject {subject_id} does not have the following date: {curr_log_date}. "
@@ -245,7 +196,6 @@ def _create_flanker_events_files(
     dst_dir,
     subjects,
     subjects_visits_df,
-    subjects_visits_date_fmt,
     exclude_filenames,
 ):
     excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects, exclude_filenames)
@@ -303,7 +253,6 @@ def _create_flanker_events_files(
             subject_id,
             excel_file,
             subjects_visits_df,
-            subjects_visits_date_fmt,
         )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="flanker")
@@ -355,7 +304,6 @@ def _create_gng_events_files(
     task,
     subjects,
     subjects_visits_df,
-    subjects_visits_date_fmt,
     exclude_filenames,
 ):
     task_name = "SimpleRepeatGNG" if task == "simplegng" else "RepeatSimpleGNG"
@@ -436,7 +384,6 @@ def _create_gng_events_files(
             subject_id,
             log_file,
             subjects_visits_df,
-            subjects_visits_date_fmt,
         )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
@@ -447,7 +394,6 @@ def _create_nback_eprime_events_files(
     dst_dir,
     subjects,
     subjects_visits_df,
-    subjects_visits_date_fmt,
     exclude_filenames,
 ):
     edat_files = _filter_log_files(
@@ -540,7 +486,6 @@ def _create_nback_eprime_events_files(
                 subject_id,
                 edat_file,
                 subjects_visits_df,
-                subjects_visits_date_fmt,
             )
 
             save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
@@ -553,7 +498,6 @@ def _create_nback_presentation_events_files(
     dst_dir,
     subjects,
     subjects_visits_df,
-    subjects_visits_date_fmt,
     exclude_filenames,
 ):
     text_files = _filter_log_files(temp_dir.glob("*.txt"), subjects, exclude_filenames)
@@ -602,7 +546,6 @@ def _create_nback_presentation_events_files(
             subject_id,
             text_file,
             subjects_visits_df,
-            subjects_visits_date_fmt,
         )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
@@ -615,7 +558,6 @@ def _create_mtl_events_files(
     cohort,
     task,
     subjects_visits_df,
-    subjects_visits_date_fmt,
     exclude_filenames,
 ):
     # MTLE and MTLR are separate tasks but can be processed in one function
@@ -677,7 +619,6 @@ def _create_mtl_events_files(
             subject_id,
             excel_file,
             subjects_visits_df,
-            subjects_visits_date_fmt,
         )
 
         if cohort == "adults":
@@ -698,7 +639,6 @@ def _create_princess_events_files(
     dst_dir,
     subjects,
     subjects_visits_df,
-    subjects_visits_date_fmt,
     exclude_filenames,
 ):
     edat_files = _filter_log_files(
@@ -808,7 +748,6 @@ def _create_princess_events_files(
                 subject_id,
                 edat_file,
                 subjects_visits_df,
-                subjects_visits_date_fmt,
             )
 
             # Note, duration of all trials in block without cue is 48-50 seconds and duration of cue is ~3
@@ -864,7 +803,6 @@ def run_pipeline(
     subjects,
     minimum_file_size,
     subjects_visits_file,
-    subjects_visits_date_fmt,
     exclude_filenames,
     caller,
 ):
@@ -887,8 +825,7 @@ def run_pipeline(
         "temp_dir": temp_dir,
         "dst_dir": dst_dir,
         "subjects": subjects,
-        "subjects_visits_df": _get_dataframe(subjects_visits_file),
-        "subjects_visits_date_fmt": subjects_visits_date_fmt,
+        "subjects_visits_df": _standardize_dates(_get_dataframe(subjects_visits_file)),
         "exclude_filenames": exclude_filenames,
     }
     if task in ["mtle", "mtlr", "simplegng", "complexgng"]:

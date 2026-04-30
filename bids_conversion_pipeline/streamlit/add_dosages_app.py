@@ -1,9 +1,9 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent.parent / "bids_conversion_pipeline")
+    0, str(Path(__file__).parent.parent.parent / "bids_conversion_pipeline")
 )
 
 import streamlit as st
@@ -14,19 +14,9 @@ from _streamlit_utils import _select_content
 st.title("Add Dosages Pipeline")
 st.divider()
 
-st.markdown("""
-**Date Format Cheatsheet:**\n
-
-**% is a placeholder prefix and must be included when inputing the date format for the subject visits CSV or the session**
-**TSV files (copy and paste the relevant format after ->).**
-
-- 2025-01-02 -> %Y-%m-%d
-- 01/02/2025 -> %m/%d/%Y or %#m/%#d/%Y
-- 01/02/25 -> %m/%d/%y
-- 20250102 -> %y%m%d
-
-**If the subjects visits CSV is an Excel file (.xlsx extension), use the following date format: %Y-%m-%d**
-""")
+st.markdown(
+    """**Note:** For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data"""
+)
 
 st.divider()
 st.markdown("**Required Arguments**")
@@ -59,23 +49,6 @@ if st.button(
 if st.session_state.get("subjects_visits_file"):
     st.success(f"Visits File: {st.session_state.subjects_visits_file}")
 
-subjects_visits_date_fmt = st.text_input(
-    "Date format in the subjects visits file",
-    r"%m/%d/%Y",
-    help=(
-        "The date format used in the subjects visits file (e.g., %m/%d/%Y). "
-        "Note: Excel files may convert dates to %Y-%m-%d regardless of the original format."
-    ),
-)
-subjects_visits_date_fmt = rf"{subjects_visits_date_fmt.strip()}"
-
-sessions_tsv_date_fmt = st.text_input(
-    "Date format in the sessions TSV files",
-    r"%y%m%d",
-    help="The date format used in existing sessions TSV files (e.g., %y%m%d).",
-)
-sessions_tsv_date_fmt = rf"{sessions_tsv_date_fmt.strip()}"
-
 st.divider()
 st.markdown("**Optional Arguments**")
 
@@ -90,8 +63,6 @@ kwargs = {
     "bids_dir": st.session_state.get("bids_dir"),
     "subjects_visits_file": st.session_state.get("subjects_visits_file"),
     "subjects": subjects if subjects else None,
-    "subjects_visits_date_fmt": subjects_visits_date_fmt,
-    "sessions_tsv_date_fmt": sessions_tsv_date_fmt,
 }
 
 st.divider()

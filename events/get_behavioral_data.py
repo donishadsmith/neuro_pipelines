@@ -30,26 +30,26 @@ def run_pipeline(
     subjects,
     minimum_file_size,
     subjects_visits_file,
-    subjects_visits_date_fmt,
     behavioral_data_file,
     exclude_filenames,
     caller,
 ):
 
-    dst_dir = run_events_pipeline(
-        log_dir,
-        dst_dir,
-        temp_dir,
-        delete_temp_dir,
-        task,
-        cohort,
-        subjects,
-        minimum_file_size,
-        subjects_visits_file,
-        subjects_visits_date_fmt,
-        exclude_filenames,
+    kwargs = dict(
+        log_dir=log_dir,
+        dst_dir=dst_dir,
+        temp_dir=temp_dir,
+        delete_temp_dir=delete_temp_dir,
+        task=task,
+        cohort=cohort,
+        subjects=subjects,
+        minimum_file_size=minimum_file_size,
+        subjects_visits_file=subjects_visits_file,
+        exclude_filenames=exclude_filenames,
         caller=caller,
     )
+
+    dst_dir = run_events_pipeline(**kwargs)
 
     is_event_task = task not in BLOCK_TASKS[cohort]
     behavioral_data_dict = {"participant_id": [], "session_id": []}
