@@ -97,7 +97,7 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path, cohort: str) -> None:
 
     if cohort == "adults":
         # Deal with case where files have {sub_id}{V\d+}_ instead of {sub_id}_
-        filename_participant_id = re.split(r"[vV]\d+", filename_participant_id)[
+        filename_participant_id = re.split(r"^[vV]\d+", filename_participant_id)[
             0
         ].strip()
 
