@@ -10,6 +10,7 @@ from bidsaid.io import regex_glob
 from bidsaid.files import (
     create_bids_file,
     create_dataset_description,
+    get_entity_value,
     save_dataset_description,
 )
 from bidsaid.logging import setup_logger
@@ -31,6 +32,36 @@ _TASK_NAMES = {
     "kids": "(mtlr|mtle|nback|princess|flanker)",
     "adults": "(mtlr|mtle|nback|flanker|simplegng|complexgng)",
 }
+
+
+def cross_validate_folders(bids_dir: Path, temp_dir: Path):
+    modalities = ["anat", "func"]
+    for subject_folder in bids_dir.glob("*"):
+        if not subject_folder.is_dir():
+            continue
+
+        sub_id = get_entity_value(subject_folder, "sub")
+        session_folders = [
+            content for content in subject_folder.glob("*") if content.is_dir()
+        ]
+        for session_folder in session_folders:
+            ses_id = get_entity_value(session_folder, "ses")
+            modalitiy_folders = session_folder.glob("*")
+            missing_modalities = [
+                x.name for x in modalitiy_folders if x.name not in modalities
+            ]
+            if missing_modalities:
+                LGR.warning(
+                    f"For session {ses_id}, subject {sub_id} is missing the following modality folders: {','.join(missing_modalities)}"
+                )
+
+        n_subject_sessions = len(session_folders)
+        n_subject_temp_folders = len(list(temp_dir.glob(f"*{sub_id}*")))
+        if n_subject_sessions != n_subject_temp_folders:
+            LGR.warning(
+                f"The number of BIDS sessions ({n_subject_sessions}) for subject {sub_id} does not equal the number of folders "
+                f"in the temporary directory containing the subject ID {n_subject_temp_folders}"
+            )
 
 
 def _filter_nifti_files(nifti_files: list[Path], target: str) -> list[Path]:
@@ -287,6 +318,8 @@ def _generate_bids_dir_pipeline(
 
     if create_dataset_metadata:
         _generate_dataset_metadata(bids_dir)
+
+    cross_validate_folders(bids_dir, temp_dir)
 
     if delete_temp_dir:
         shutil.rmtree(temp_dir)

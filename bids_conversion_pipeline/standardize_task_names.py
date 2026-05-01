@@ -65,6 +65,14 @@ def _infer_file_identity(temp_dir: Path, cohort: Literal["kids", "adults"]) -> N
             else:
                 desc = infer_task_from_image(nifti_file, _TASK_VOLUME_MAP[cohort])
 
+            if not desc:
+                LGR.info(
+                    f"The identity of the following file could not be identified: {nifti_file}. "
+                    "Removing file form temporary directory."
+                )
+                nifti_file.unlink()
+                continue
+
             # Special case since there are two mtl files for the kids dataset and the adult dataset
             # with the same number of volumes
             # Each mtl file has the acquisition number in the filename that preceeds "_1"

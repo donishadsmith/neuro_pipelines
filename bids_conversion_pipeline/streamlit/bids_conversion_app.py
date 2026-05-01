@@ -86,7 +86,9 @@ subjects = st.text_input(
 if subjects:
     subjects = [s.strip() for s in subjects.replace(",", " ").split() if s.strip()]
 
-exclude_src_folder_names = None
+if "exclude_src_folder_names" not in locals():
+    exclude_src_folder_names = None
+
 if st.session_state.get("src_dir"):
     subfolders = sorted(
         [x for x in Path(st.session_state.src_dir).glob("*") if x.is_dir()]
@@ -97,7 +99,9 @@ if st.session_state.get("src_dir"):
         help="Select any source folders to skip during conversion.",
     )
 
-exclude_nifti_filenames = None
+if "exclude_nifti_filenames" not in locals():
+    exclude_nifti_filenames = None
+
 if st.session_state.get("src_dir"):
     nifti_files = sorted(
         [

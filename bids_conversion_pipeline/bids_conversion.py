@@ -2,6 +2,7 @@ import tempfile, re, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
+import nibabel as nib
 from nibabel.filebasedimages import ImageFileError
 
 from bidsaid._decorators import check_nifti
@@ -114,11 +115,34 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path, cohort: str) -> None:
         try:
             compress_image(dst_file, dst_file.parent, remove_src_file=True)
         except OSError:
-            LGR.warning(
+            LGR.exception(
                 f"An OSError occured while compressing the following file: {dst_file}. "
-                "Removing file from the temporary directory."
+                "Attempting to compress directly with gzip.",
+                exc_info=True,
             )
-            dst_file.unlink()
+            compressed_file = dst_file
+            try:
+                compressed_file = compress_image(
+                    dst_file,
+                    dst_file.parent,
+                    remove_src_file=True,
+                    use_gzip=True,
+                    return_dst_file=True,
+                )
+                # File will likely compress but nibabel needs to be able to get functional data
+                nib.load(compressed_file).get_fdata()
+            except OSError:
+                LGR.exception(
+                    f"An OSError occured while compressing the following file with gzip and loading in the file: {dst_file}. "
+                    f"Issue is likely that the file is truncated and does not match the expected filesize in the header (data at the end is missing) "
+                    "Removing file from temporary directory.",
+                    exc_info=True,
+                )
+                if compressed_file.exists():
+                    compressed_file.unlink()
+
+                if dst_file.exists():
+                    dst_file.unlink()
 
 
 @check_nifti(nifti_param_name="nifti_file")
