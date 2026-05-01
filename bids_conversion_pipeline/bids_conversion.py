@@ -1,4 +1,4 @@
-import tempfile, shutil, sys
+import tempfile, re, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -62,7 +62,7 @@ def _filter_source_folders(
     return [folder for folder in folders if folder.name not in exclude_src_folder_names]
 
 
-def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
+def _copy_nifti_files(nifti_file: Path, temp_dir: Path, cohort: str) -> None:
     dst_file = temp_dir / nifti_file.parent.name / nifti_file.name
     _copy_file(
         src_file=nifti_file,
@@ -92,12 +92,20 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
         dst_file.unlink()
         return
 
-    participant_id = nifti_file.parent.name.split("_")[0]
-    if nifti_file.name.split("_")[0] != participant_id:
+    filename_participant_id = nifti_file.name.split("_")[0]
+    folder_participant_id = nifti_file.parent.name.split("_")[0]
+
+    if cohort == "adults":
+        # Deal with case where files have {sub_id}{V\d+}_ instead of {sub_id}_
+        filename_participant_id = re.split(r"[vV]\d+", filename_participant_id)[
+            0
+        ].strip()
+
+    if filename_participant_id != folder_participant_id:
         LGR.warning(
             "Deleting the following nifti file from the temporary directory "
             "since it is nested in a source directory with a different subject "
-            f"id ({participant_id}): {nifti_file}"
+            f"id ({folder_participant_id}): {nifti_file}"
         )
         dst_file.unlink()
         return
@@ -121,6 +129,7 @@ def _is_raw_nifti(nifti_file):
 def _copy_data_to_temp_dir(
     src_dir: Path,
     temp_dir: Path,
+    cohort: str,
     subjects: Optional[list[str | int]],
     exclude_src_folder_names: Optional[list[str]],
     exclude_nifti_filenames: Optional[list[str]],
@@ -146,14 +155,20 @@ def _copy_data_to_temp_dir(
 
         # Handle edge case where analyses related files placed in same folder as
         # original nifti which has the naming {subjectID}_{scan_date}_{acqusition_number}
-        nifti_files = regex_glob(
-            subject_folder, pattern=r"^\d+_(\d+)?.*\.(nii|nii.gz)$"
-        )
+        if cohort == "kids":
+            nifti_files = regex_glob(
+                subject_folder, pattern=r"^\d+_(\d+)?.*\.(nii|nii.gz)$"
+            )
+        else:
+            nifti_files = regex_glob(
+                subject_folder, pattern=r"^\d+([vV]\d+)?_(\d+)?.*\.(nii|nii.gz)$"
+            )
+
         for nifti_file in nifti_files:
             if nifti_file.name in exclude_nifti_filenames:
                 continue
 
-            _copy_nifti_files(nifti_file, temp_dir)
+            _copy_nifti_files(nifti_file, temp_dir, cohort)
 
 
 def run_pipeline(
@@ -186,6 +201,7 @@ def run_pipeline(
         _copy_data_to_temp_dir(
             Path(src_dir),
             temp_dir,
+            cohort,
             subjects,
             exclude_src_folder_names,
             exclude_nifti_filenames,
