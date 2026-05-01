@@ -272,6 +272,7 @@ class DataContainer:
         default_factory=lambda: ["Subj", "session_id", "InputFile", "dose", "dose_mg"],
     )
     excluded_regressors: list = field(default_factory=list)
+    included_covariates: list = field(default_factory=list)
     categorical_regressors: set = field(
         default_factory=lambda: set(["sex", "race", "ethnicity"])
     )
@@ -335,6 +336,9 @@ class DataContainer:
             LGR.info(
                 "Added the following variables to be excluded, if available: "
                 f"{excluded_covariates}"
+            )
+            self.included_covariates = self.available_covariates.difference(
+                self.excluded_regressors
             )
 
     @property
@@ -446,9 +450,8 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     # AFNI 26 requires first column to be named "Subj"
     data_table = data_table.rename(columns={"participant_id": "Subj"})
 
-    for col in ["acq_time"]:
-        if col in data_table.columns:
-            data_table = data_table.drop(col, axis=1)
+    if "acq_time" in data_table.columns:
+        data_table = data_table.drop("acq_time", axis=1)
 
     column_names = (
         ["Subj", "dose"]
@@ -460,7 +463,15 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
         + ["InputFile"]
     )
     data_table = data_table.loc[:, column_names]
-    data_table = data_table.dropna(how="all", axis=1).dropna(axis=0)
+    data_table = data_table.dropna(how="all", axis=1)
+    important_columns = [
+        "Subj",
+        "dose",
+        "InputFile",
+    ] + datacontainer.included_covariates
+    # Only drop na rows when na is in important columns
+    important_columns = [x for x in important_columns if x in df.columns]
+    df = dropna(subset=important_columns, axis=0)
     if pd.to_numeric(data_table["dose"], errors="coerce").notna().all():
         data_table["dose"] = data_table["dose"].astype(int).astype(str)
     else:
@@ -474,7 +485,7 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
 
     data_table = replace_whitespace_with_underscores(data_table)
 
-    return drop_constant_columns(data_table)
+    return drop_constant_columns(data_table), important_columns
 
 
 @lru_cache()
@@ -1269,11 +1280,7 @@ def main(
     datacontainer = DataContainer()
     datacontainer.update_excluded_regressors(excluded_covariates)
     report.add_context(
-        included_covariates=list(
-            datacontainer.available_covariates.difference(
-                datacontainer.excluded_regressors
-            )
-        ),
+        included_covariates=datacontainer.included_covariates,
         excluded_covariates=datacontainer.excluded_regressors,
     )
 
@@ -1296,7 +1303,7 @@ def main(
             f"Found {len(beta_files)} files from {len(set(subject_list))} subjects"
         )
 
-        data_table, drop_constant_column_names = create_data_table(
+        data_table, drop_constant_column_names, important_columns = create_data_table(
             bids_dir, datacontainer, subject_list, beta_files
         )
         retained_subjects = set(data_table["Subj"].unique())
@@ -1307,6 +1314,7 @@ def main(
             n_beta_files=len(beta_files),
             n_subjects=len(set(subject_list)),
             excluded_subjects=excluded_subjects,
+            important_columns=important_columns,
             dropped_constant_columns=drop_constant_column_names,
         )
 

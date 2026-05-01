@@ -62,7 +62,7 @@
         <tr><td>Total beta files</td><td>{{ n_beta_files }}</td></tr>
         <tr><td>Unique subjects</td><td>{{ n_subjects }}</td></tr>
         {% if excluded_subjects %}
-        <tr><td>Excluded subjects</td><td>{{ excluded_subjects | join(", ") }}</td></tr>
+        <tr><td>Excluded subjects due to missing data in any of the following columns: {{ important_columns | join(", ") }}</td><td>{{ excluded_subjects | join(", ") }}</td></tr>
         {% endif %}
     </table>
 </div>
@@ -77,6 +77,10 @@
         <tr><td>Dropped (constant)</td><td>{{ dropped_constant_columns | join(", ") }}</td></tr>
         {% endif %}
     </table>
+
+    <p>
+        <strong>Note:</strong> Any subjects with missing covariates meant to be included during regression were dropped.
+    </p>
 </div>
 
 <div class="section">
