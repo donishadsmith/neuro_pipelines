@@ -183,8 +183,9 @@ def map_date_to_session(subject_id, subjects_visits_df, curr_log_date):
 
 def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
     tsv_filename = (
-        dst_dir / f"sub-{subject_id}_ses-0{session_id}_task-{task}_run-01_events.tsv"
+        dst_dir / f"sub-{subject_id}_ses-{session_id}_task-{task}_run-01_events.tsv"
     )
+
     event_df.to_csv(tsv_filename, sep="\t", index=False)
 
 
