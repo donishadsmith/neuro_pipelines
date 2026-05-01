@@ -181,7 +181,7 @@
         <tr><th>Parameter</th><th></th></tr>
         <tr><td>Number of files</td><td>{{ contrast.n_files }}</td></tr>
         <tr><td>Unique subjects</td><td>{{ contrast.n_subjects }}</td></tr>
-        <tr><td>Number of permutations used (capped at 10,000)</td><td>{{ contrast.max_permutations }}</td></tr>
+        <tr><td>Number of permutations used (capped at 10,000 for computational reasons)</td><td>{{ contrast.max_permutations }}</td></tr>
         <tr><td>Max possible permutations</td><td>{{ contrast.true_max_permutations }}</td></tr>
         <tr><td>Design type</td><td>{{ "Paired (within-subject)" if contrast.is_comparison else "One-sample (mean)" }}</td></tr>
         <tr><td>Design matrix columns</td><td>{{ contrast.design_columns | join(", ") }}</td></tr>
