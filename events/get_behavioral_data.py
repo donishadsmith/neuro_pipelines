@@ -49,7 +49,7 @@ def run_pipeline(
         caller=caller,
     )
 
-    dst_dir = run_events_pipeline(**kwargs)
+    dst_dir, log_files = run_events_pipeline(**kwargs)
 
     is_event_task = task not in BLOCK_TASKS[cohort]
     behavioral_data_dict = {"participant_id": [], "session_id": []}
@@ -172,4 +172,4 @@ def run_pipeline(
             index=None,
         )
 
-    return dst_dir
+    return dst_dir, log_files

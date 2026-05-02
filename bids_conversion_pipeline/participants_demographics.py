@@ -90,4 +90,9 @@ def run_pipeline(participants_tsv_path, demographics_file, covariates_to_add) ->
         participant_df.loc[mask, covariate] = covariate_values
 
     participant_df.columns = [col.lower() for col in participant_df.columns]
+    participant_df.columns = [
+        col.split(" ")[0] if col.startswith("age") else col
+        for col in participant_df.columns
+    ]
+
     participant_df.to_csv(participants_tsv_path, sep="\t", index=None)

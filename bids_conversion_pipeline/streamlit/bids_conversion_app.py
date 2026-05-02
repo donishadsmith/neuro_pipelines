@@ -1,4 +1,4 @@
-import logging, sys
+import logging, re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -9,9 +9,12 @@ sys.path.insert(
 import streamlit as st
 
 from bids_conversion import run_pipeline
+from _general_utils import _check_subjects_visits_file
 from _streamlit_utils import StreamlitLogHandler, _select_content
 
-st.title("NIfTI to BIDS Conversion Pipeline")
+st.set_page_config(layout="centered")
+
+st.title("NIfTI to BIDS Pipeline")
 st.divider()
 
 st.markdown("""**Notes for MPH Study:**\n
@@ -34,9 +37,21 @@ if st.button(
     folder = _select_content("directory")
     if folder:
         st.session_state.src_dir = folder
+        st.session_state.raw_subfolders = sorted(
+            [
+                x
+                for x in Path(st.session_state.src_dir).glob("*")
+                if x.is_dir() and re.match(r"^\d{5}", x.name)
+            ]
+        )
 
 if st.session_state.get("src_dir"):
-    st.success(f"Source: {st.session_state.src_dir}")
+    if st.session_state.raw_subfolders:
+        st.success(f"Raw NIfTI Directory: {st.session_state.src_dir}")
+    else:
+        st.error(
+            f"Not a valid raw NIfTI directory (no subjects detected): {st.session_state.src_dir}"
+        )
 
 cohort = st.selectbox(
     "Cohort",
@@ -56,9 +71,15 @@ if st.button(
     file = _select_content("file")
     if file:
         st.session_state.subjects_visits_file = file
+        st.session_state.is_valid_visits_file = _check_subjects_visits_file(
+            file, dose_column_required=False, for_app=True, return_boolean=True
+        )
 
 if st.session_state.get("subjects_visits_file"):
-    st.success(f"Visits File: {st.session_state.subjects_visits_file}")
+    if st.session_state.is_valid_visits_file:
+        st.success(f"Visits File: {st.session_state.subjects_visits_file}")
+    else:
+        st.error(f"Invalid visits file: {st.session_state.subjects_visits_file} ")
 
 st.divider()
 st.markdown("**Optional Arguments**")
@@ -79,30 +100,37 @@ if st.button("Browse for temporary directory"):
 if st.session_state.get("temp_dir"):
     st.success(f"Temp: {st.session_state.temp_dir}")
 
-subjects = st.text_input(
-    "Subject IDs",
-    help="Restrict conversion to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
-)
-if subjects:
-    subjects = [s.strip() for s in subjects.replace(",", " ").split() if s.strip()]
-
-if "exclude_src_folder_names" not in locals():
-    exclude_src_folder_names = None
-
-if st.session_state.get("src_dir"):
-    subfolders = sorted(
-        [x for x in Path(st.session_state.src_dir).glob("*") if x.is_dir()]
+if st.session_state.get("src_dir") and st.session_state.get("raw_subfolders"):
+    subjects = [
+        re.findall(r"\d{5}", x.name)[0]
+        for x in st.session_state.get("raw_subfolders")
+        if re.findall(r"\d{5}", x.name)
+    ]
+    subjects = sorted(list(set(subjects)))
+    subjects = st.multiselect(
+        "Subject IDs",
+        subjects,
+        help="Restrict conversion to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
     )
+else:
+    subjects = None
+
+if st.session_state.get("src_dir") and st.session_state.get("raw_subfolders"):
+    subfolders = st.session_state.get("raw_subfolders")
+    if subjects:
+        subfolders = [
+            x for x in subfolders if any(sub_id in x.name for sub_id in subjects)
+        ]
+
     exclude_src_folder_names = st.multiselect(
         "Source folders to exclude",
         subfolders,
         help="Select any source folders to skip during conversion.",
     )
+else:
+    exclude_src_folder_names = None
 
-if "exclude_nifti_filenames" not in locals():
-    exclude_nifti_filenames = None
-
-if st.session_state.get("src_dir"):
+if st.session_state.get("src_dir") and st.session_state.get("raw_subfolders"):
     nifti_files = sorted(
         [
             x
@@ -110,11 +138,18 @@ if st.session_state.get("src_dir"):
             if x.is_file() and str(x).endswith((".nii", ".nii.gz"))
         ]
     )
+    if subjects:
+        nifti_files = [
+            x for x in nifti_files if any(sub_id in x.name for sub_id in subjects)
+        ]
+
     exclude_nifti_filenames = st.multiselect(
         "NIfTI filenames to exclude",
         nifti_files,
         help="Select any NIfTI files to skip during conversion.",
     )
+else:
+    exclude_nifti_filenames = None
 
 delete_temp_dir = st.checkbox(
     "Delete temporary directory after processing",
@@ -158,10 +193,13 @@ kwargs = {
 
 st.divider()
 if st.button("Run Pipeline", type="primary"):
-    if not st.session_state.get("src_dir"):
-        st.error("Please select a source directory before running.")
-    elif not st.session_state.subjects_visits_file:
-        st.error("Please upload a subjects visits file before running.")
+    if not (st.session_state.get("src_dir") and st.session_state.get("raw_subfolders")):
+        st.error("Please select a valid raw NIfTI directory before running.")
+    elif not (
+        st.session_state.get("subjects_visits_file")
+        and st.session_state.get("is_valid_visits_file")
+    ):
+        st.error("Please upload a valid subjects visits file before running.")
     else:
         status_container = st.empty()
         with status_container.status("Running pipeline...", expanded=True) as status:

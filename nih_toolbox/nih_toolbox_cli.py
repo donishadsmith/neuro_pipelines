@@ -9,7 +9,12 @@ from organize_toolbox_data import run_pipeline
 
 def _get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Organize the NIH toolbox data (pivot from long to wide form)."
+        description=(
+            "Organize the NIH toolbox data (pivot from long to wide form). "
+            "Use the CSV file containing the following columns: 'RawScore', "
+            "'Theta', 'SE', 'TScore', 'Computed Score', 'Uncorrected Standard Score', "
+            "'Age-Corrected Standard Score', 'National Percentile (age adjusted)', 'Fully-Corrected T-score' as columns."
+        )
     )
     parser.add_argument(
         "--unorganized_nih_toolbox_file",
@@ -35,11 +40,11 @@ def _get_parser() -> argparse.ArgumentParser:
         help="A prefix to add to the filename for the organized NIH toolbox data.",
     )
     parser.add_argument(
-        "--drop_dates",
-        dest="drop_dates",
+        "--include_assessment_dates",
+        dest="include_assessment_dates",
         default=False,
         required=False,
-        help="Removes the assessment dates from the data.",
+        help="Include the assessment dates from the data.",
     )
     parser.add_argument(
         "--preexisting_nih_toolbox_file",

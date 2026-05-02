@@ -1,9 +1,14 @@
-import argparse, logging
+import argparse, logging, re, sys
 from pathlib import Path
+
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import streamlit as st
 
 from _streamlit_utils import StreamlitLogHandler, _select_content
+from _general_utils import _check_subjects_visits_file
 
 
 def _get_cmd_args(caller):
@@ -107,17 +112,18 @@ def _get_cmd_args(caller):
 
 
 def _app(caller, pipeline):
+    st.set_page_config(layout="centered")
+
     if caller == "BIDS Events":
         st.title("BIDS Events File Pipeline")
         note = (
             "**Note:**\n"
             "- For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data"
         )
+        st.divider()
     else:
         st.title("Behavioral Data Pipeline")
         note = ""
-
-    st.divider()
 
     st.markdown(note)
 
@@ -136,9 +142,19 @@ def _app(caller, pipeline):
         folder = _select_content("directory")
         if folder:
             st.session_state.log_dir = folder
+            st.session_state.log_files = sorted(
+                [
+                    x
+                    for x in Path(st.session_state.log_dir).glob("*")
+                    if x.is_file() and re.findall(r"\d{5}", x.name)
+                ]
+            )
 
     if st.session_state.get("log_dir"):
-        st.success(f"Source: {st.session_state.log_dir}")
+        if st.session_state.log_files:
+            st.success(f"Source: {st.session_state.log_dir}")
+        else:
+            st.error(f"Not a valid log directory: {st.session_state.get('log_dir')}")
 
     cohort = st.selectbox(
         "Cohort", ("kids", "adults"), help="Determines which tasks are available."
@@ -167,9 +183,15 @@ def _app(caller, pipeline):
         file = _select_content("file")
         if file:
             st.session_state.subjects_visits_file = file
+            st.session_state.is_valid_visits_file = _check_subjects_visits_file(
+                file, dose_column_required=False, for_app=True, return_boolean=True
+            )
 
     if st.session_state.get("subjects_visits_file"):
-        st.success(f"Visits File: {st.session_state.subjects_visits_file}")
+        if st.session_state.is_valid_visits_file:
+            st.success(f"Visits File: {st.session_state.subjects_visits_file}")
+        else:
+            st.error(f"Invalid visits file: {st.session_state.subjects_visits_file} ")
 
     st.divider()
     st.markdown("**Optional Arguments**")
@@ -201,12 +223,20 @@ def _app(caller, pipeline):
     if st.session_state.get("temp_dir"):
         st.success(f"Temp: {st.session_state.temp_dir}")
 
-    subjects = st.text_input(
-        "Subject IDs",
-        help="Restrict processing to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
-    )
-    if subjects:
-        subjects = [s.strip() for s in subjects.replace(",", " ").split() if s.strip()]
+    if st.session_state.get("log_dir") and st.session_state.get("log_files"):
+        subjects = [
+            re.findall(r"\d{5}", x.name)[0]
+            for x in st.session_state.get("log_files")
+            if re.findall(r"\d{5}", x.name)
+        ]
+        subjects = sorted(list(set(subjects)))
+        subjects = st.multiselect(
+            "Subject IDs",
+            subjects,
+            help="Restrict conversion to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
+        )
+    else:
+        subjects = None
 
     minimum_file_size = st.number_input(
         "Minimum file size (bytes)",
@@ -221,16 +251,18 @@ def _app(caller, pipeline):
         help="If checked, the temporary directory is removed once processing is complete.",
     )
 
-    exclude_filenames = None
-    if st.session_state.get("log_dir"):
-        subfolders = sorted(
-            [x for x in Path(st.session_state.log_dir).glob("*") if x.is_file()]
-        )
+    if st.session_state.get("log_dir") and st.session_state.get("log_files"):
+        files = st.session_state.get("log_files")
+        if subjects:
+            files = [x for x in files if any(sub_id in x.name for sub_id in subjects)]
+
         exclude_filenames = st.multiselect(
             "Files to exclude",
-            subfolders,
+            files,
             help="Upload any log files that should be excluded from processing.",
         )
+    else:
+        exclude_filenames = None
 
     kwargs = {
         "log_dir": st.session_state.get("log_dir"),
@@ -250,9 +282,12 @@ def _app(caller, pipeline):
 
     st.divider()
     if st.button("Run Pipeline", type="primary"):
-        if not st.session_state.get("log_dir"):
-            st.error("Please select a log directory before running.")
-        elif not st.session_state.subjects_visits_file:
+        if not (st.session_state.get("log_dir") and st.session_state.get("log_files")):
+            st.error("Please select a valid log directory before running.")
+        elif not (
+            st.session_state.get("subjects_visits_file")
+            and st.session_state.get("is_valid_visits_file")
+        ):
             st.error("Please upload a subjects visits file before running.")
         else:
             status_container = st.empty()
@@ -263,15 +298,23 @@ def _app(caller, pipeline):
                 handler = StreamlitLogHandler(status)
                 logging.getLogger().addHandler(handler)
 
-                dst_dir = pipeline(**kwargs, caller=caller)
+                dst_dir, log_files = pipeline(**kwargs, caller=caller)
 
                 logging.getLogger().removeHandler(handler)
 
                 file_type_str = (
                     "Event files" if caller == "BIDS Events" else "Behavioral CSV"
                 )
-                status.update(
-                    label=f"{file_type_str} for the {task} task ({cohort} cohort) created in: {dst_dir}",
-                    state="complete",
-                    expanded=False,
-                )
+
+                if log_files:
+                    status.update(
+                        label=f"{file_type_str} for the {task} task ({cohort} cohort) created in: {dst_dir}",
+                        state="complete",
+                        expanded=False,
+                    )
+                else:
+                    status.update(
+                        label=f"No log files found for the {task} task in: {st.session_state.get('log_dir')}",
+                        state="error",
+                        expanded=False,
+                    )

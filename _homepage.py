@@ -1,5 +1,7 @@
 import streamlit as st
 
+st.set_page_config(layout="wide")
+
 # Attempt to make the homepage look better with html
 # Note: right click and select Inspect to see html structure
 st.markdown(
@@ -10,14 +12,14 @@ st.markdown(
         padding-left: 10px;
     }
     a[data-testid="stPageLink-NavLink"] p {
-        font-size: 15px;
+        font-size: 21px;
     }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-st.title("\U0001f9e0 Neuro Pipelines")
+st.title("\U0001f9e0 Neuro Pipelines", text_alignment="center")
 
 st.divider()
 
@@ -25,8 +27,14 @@ col1, col2, col3 = st.columns(3, border=True, gap="medium")
 
 with col1:
     st.page_link(
+        "bids_conversion_pipeline/streamlit/subjects_visits_app.py",
+        label="**Subjects Visits File**",
+    )
+    st.caption("Create or update a subjects visits file.")
+
+    st.page_link(
         "bids_conversion_pipeline/streamlit/bids_conversion_app.py",
-        label="**NIfTI to BIDS Conversion**",
+        label="**NIfTI to BIDS**",
     )
     st.caption("Convert a raw NIfTI dataset to BIDS format.")
 
@@ -42,7 +50,6 @@ with col1:
     )
     st.caption(" Add or update demographic data in the participants TSV file.")
 
-
 with col2:
     st.page_link(
         "bids_conversion_pipeline/streamlit/add_dosages_app.py", label="**Add Dosages**"
@@ -54,6 +61,10 @@ with col2:
 
     st.page_link("events/behavioral_data_app.py", label="**Task Behavioral Data**")
     st.caption("Create CSV files containing task accuracy and reaction times.")
+
+    st.page_link("events/behavioral_data_app.py", label="**Task Behavioral Data**")
+    st.caption("Create CSV files containing task accuracy and reaction times.")
+
 
 with col3:
     st.page_link("move_files/move_files_app.py", label="**Move BIDS Files**")

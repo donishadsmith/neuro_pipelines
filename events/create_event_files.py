@@ -161,9 +161,9 @@ def _get_presentation_session(
 
 def map_date_to_session(subject_id, subjects_visits_df, curr_log_date):
     visit_session_map = _get_subject_visits(subject_id, subjects_visits_df)
-    visit_session_map = {v: k for k, v in visit_session_map.items()}
 
     if visit_session_map:
+        visit_session_map = {v: k for k, v in visit_session_map.items()}
         date_in_map = curr_log_date in visit_session_map
     else:
         date_in_map = False
@@ -256,6 +256,8 @@ def _create_flanker_events_files(
         )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="flanker")
+
+    return excel_files
 
 
 # Nogo trials with false alarm (indicating a button press) with an even number of
@@ -388,6 +390,8 @@ def _create_gng_events_files(
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
+    return log_files
+
 
 def _create_nback_eprime_events_files(
     temp_dir,
@@ -492,6 +496,8 @@ def _create_nback_eprime_events_files(
         finally:
             csv_path.unlink()
 
+    return edat_files
+
 
 def _create_nback_presentation_events_files(
     temp_dir,
@@ -549,6 +555,8 @@ def _create_nback_presentation_events_files(
         )
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
+
+    return text_files
 
 
 def _create_mtl_events_files(
@@ -632,6 +640,8 @@ def _create_mtl_events_files(
             ] * 4
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
+
+    return excel_files
 
 
 def _create_princess_events_files(
@@ -757,6 +767,8 @@ def _create_princess_events_files(
         finally:
             csv_path.unlink()
 
+    return edat_files
+
 
 def _get_dataframe(subjects_visits_file):
     if not subjects_visits_file:
@@ -834,13 +846,14 @@ def run_pipeline(
     if task in ["mtle", "mtlr"]:
         kwargs.update({"cohort": cohort})
 
+    log_files = []
     try:
         LGR.info("Copying data to temporary directory...")
         _copy_event_files(log_dir, temp_dir, cohort, task, minimum_file_size)
         LGR.info("Creating BIDS events files...")
-        EVENTS_FUNC[cohort][task](**kwargs)
+        log_files = EVENTS_FUNC[cohort][task](**kwargs)
     finally:
         if delete_temp_dir:
             shutil.rmtree(temp_dir)
 
-    return dst_dir
+    return dst_dir, log_files

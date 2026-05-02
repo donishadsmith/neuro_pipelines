@@ -4,15 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bids_conversion import run_pipeline
-
-
-def _convert_to_bool(arg: bool | str) -> bool:
-    if str(arg).lower() == "true":
-        return True
-    elif str(arg).lower() == "false":
-        return False
-    else:
-        raise ValueError("For booleans, only 'True' and 'False' are valid.")
+from _general_utils import _convert_to_bool
 
 
 def _get_cmd_args() -> argparse.ArgumentParser:

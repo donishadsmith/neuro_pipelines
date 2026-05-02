@@ -10,7 +10,15 @@ from _streamlit_utils import StreamlitLogHandler, _select_content
 
 from organize_toolbox_data import run_pipeline
 
+st.set_page_config(layout="centered")
+
 st.title("NIH Toolbox Pipeline")
+st.divider()
+st.markdown(
+    """*Note**:\n
+Use the CSV file containing the following columns: 'RawScore', 'Theta', 'SE', 'TScore', 'Computed Score',
+'Uncorrected Standard Score', 'Age-Corrected Standard Score', 'National Percentile (age adjusted)', 'Fully-Corrected T-score' as columns."""
+)
 
 st.divider()
 
@@ -64,10 +72,10 @@ if st.session_state.get("preexisting_nih_toolbox_file"):
         f"Pre-existing NIH Toolbox file: {st.session_state.preexisting_nih_toolbox_file}"
     )
 
-drop_dates = st.checkbox(
-    "Remove assessment dates",
-    value=False,
-    help="Removes the assessment dates from the data.",
+include_assessment_dates = st.checkbox(
+    "Include assessment dates",
+    value=True,
+    help="Includes the assessment dates from the data.",
 )
 
 kwargs = {
@@ -79,7 +87,7 @@ kwargs = {
     "preexisting_nih_toolbox_file": st.session_state.get(
         "preexisting_nih_toolbox_file"
     ),
-    "drop_dates": drop_dates,
+    "include_assessment_dates": include_assessment_dates,
 }
 
 st.divider()

@@ -11,11 +11,14 @@ from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
 from _bids_conversion_utils import (
-    _check_subjects_visits_file,
     _strip_entity,
 )
 
-from _general_utils import _extract_subjects_visits_data, _standardize_dates
+from _general_utils import (
+    _check_subjects_visits_file,
+    _extract_subjects_visits_data,
+    _standardize_dates,
+)
 
 LGR = setup_logger(__name__)
 

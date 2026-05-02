@@ -337,8 +337,8 @@ class DataContainer:
                 "Added the following variables to be excluded, if available: "
                 f"{excluded_covariates}"
             )
-            self.included_covariates = self.available_covariates.difference(
-                self.excluded_regressors
+            self.included_covariates = list(
+                self.available_covariates.difference(self.excluded_regressors)
             )
 
     @property
@@ -471,7 +471,7 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     ] + datacontainer.included_covariates
     # Only drop na rows when na is in important columns
     important_columns = [x for x in important_columns if x in df.columns]
-    df = dropna(subset=important_columns, axis=0)
+    data_table = data_table.dropna(subset=important_columns, axis=0)
     if pd.to_numeric(data_table["dose"], errors="coerce").notna().all():
         data_table["dose"] = data_table["dose"].astype(int).astype(str)
     else:
@@ -485,7 +485,9 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
 
     data_table = replace_whitespace_with_underscores(data_table)
 
-    return drop_constant_columns(data_table), important_columns
+    data_table, constant_columns = drop_constant_columns(data_table)
+
+    return data_table, constant_columns, important_columns
 
 
 @lru_cache()
@@ -1298,24 +1300,27 @@ def main(
             LGR.warning(f"No beta files found for {first_level_glt_label}")
             continue
 
-        subject_list = get_subjects(beta_files)
-        LGR.info(
-            f"Found {len(beta_files)} files from {len(set(subject_list))} subjects"
-        )
-
+        subject_list = set(get_subjects(beta_files))
         data_table, drop_constant_column_names, important_columns = create_data_table(
             bids_dir, datacontainer, subject_list, beta_files
         )
-        retained_subjects = set(data_table["Subj"].unique())
+        retained_subjects = set(
+            [sub.removeprefix("sub-") for sub in data_table["Subj"].unique()]
+        )
+        retained_beta_files = data_table["InputFile"].tolist()
+        LGR.info(
+            f"Found {len(retained_beta_files)} files from {len(retained_subjects)} subjects"
+        )
+
         excluded_subjects = sorted(all_subjects - retained_subjects)
 
         report.add_context(
             first_level_glt_label=first_level_glt_label,
-            n_beta_files=len(beta_files),
-            n_subjects=len(set(subject_list)),
+            n_beta_files=len(retained_beta_files),
+            n_subjects=len(retained_subjects),
             excluded_subjects=excluded_subjects,
-            important_columns=important_columns,
             dropped_constant_columns=drop_constant_column_names,
+            important_columns=important_columns,
         )
 
         data_table_filename = (

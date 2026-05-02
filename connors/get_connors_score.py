@@ -1,7 +1,10 @@
 """Extract data from Conners 4."""
 
-import re, shutil, unicodedata
+import re, shutil, sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
 from typing import Literal, Optional
 from datetime import datetime
 
@@ -10,12 +13,15 @@ from pypdf import PdfReader
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 
+from _general_utils import guess_delimiter
+
 LGR = setup_logger(__name__)
 
 CSV_COLUMN_NAMES = [
     "SN",
     "Visit",
     "Snvisit",
+    "Assessment Date",
     "Rater",
     "INA/EDF T score",
     "INA/EDF %",
@@ -68,7 +74,7 @@ UNIQUE_DATA_FIELD_NAMES = [
 
 def get_files(target_dir: Path, pattern: str) -> list[str]:
     """Gets files with a specific extension."""
-    return target_dir.glob(pattern)
+    return list(target_dir.glob(pattern))
 
 
 def get_non_session_column_index() -> int:
@@ -195,9 +201,7 @@ def standardize_pdf_filenames(pdf_dir: Path) -> None:
         output_file.rename(new_filename)
 
 
-def get_subject_ids(
-    reformatted_pdf_files: list[str], subjects: Optional[list[str]]
-) -> list[str]:
+def get_subject_ids(reformatted_pdf_files: list[str]) -> list[str]:
     """
     Gets subject IDs from the reformatted pdf files.
 
@@ -212,14 +216,6 @@ def get_subject_ids(
         list[str]
             List of subject IDs.
     """
-    subjects = subjects or []
-    if subjects:
-        reformatted_pdf_files = [
-            file
-            for file in reformatted_pdf_files
-            if any(subject in file for subject in subjects)
-        ]
-
     all_subjects_list = [
         (get_entity_value(file.name, "sub"), get_entity_value(file.name, "rater"))
         for file in reformatted_pdf_files
@@ -255,6 +251,23 @@ def get_sn_visit(subject_id_list: list[str], visit_list: list[str]) -> list[str]
     return sn_visit_list
 
 
+def get_assessment_dates(reformatted_pdf_files: list[str]) -> list[str]:
+    return [
+        pd.to_datetime(str(file).split("date-")[-1].split("_rater")[0])
+        for file in reformatted_pdf_files
+    ]
+
+
+def sort_files_and_dates(reformatted_pdf_files: list[str], assessment_dates: list[str]):
+    sorted_tuples = sorted(
+        list(zip(assessment_dates, reformatted_pdf_files)),
+        key=lambda x: pd.to_datetime(x[0]),
+    )
+    assessment_dates, sorted_reformatted_pdf_files = zip(*sorted_tuples)
+
+    return list(assessment_dates), list(sorted_reformatted_pdf_files)
+
+
 def create_unique_column_dict() -> dict[str, None]:
     """
     Converts a list of column names to dictionary containing the unique
@@ -285,10 +298,14 @@ def create_column_names_dict() -> dict[str, list]:
     return column_names_dict
 
 
-def replace_newline_with_space(table: list[list[str]]) -> list[list[str]]:
+def clean_lines(table: list[list[str]]) -> list[list[str]]:
+    "Replace newlines with space and remove asterisks from words."
     new_table = []
     for line in table:
-        line = [word.replace("\n", " ") if word else word for word in line]
+        line = [
+            word.replace("\n", " ").strip("*").strip("^") if word else word
+            for word in line
+        ]
         new_table.append(line)
 
     return new_table
@@ -325,7 +342,7 @@ def get_target_list(table: list[list[str]], target_name: str) -> list[str, None]
 
 
 def get_score(
-    table_column_map: dict[str, int], line: list[str, None], score_type: str
+    table_column_map: dict[str, int], line: list[str] | None, score_type: str
 ) -> str:
     connors_column_field_map = {"T score": "T-score", "%": "90% CI"}
     connors_field_name = connors_column_field_map[score_type]
@@ -341,7 +358,7 @@ def extract_conners_datafields(
     column_names_dict = create_column_names_dict()
 
     for pdf_file in reformatted_pdf_files:
-        table = replace_newline_with_space(
+        table = clean_lines(
             extract_pdf_text(pdf_file=pdf_file, page_number=3, use_pdfplumber=True)
         )
         table_column_map = create_table_column_map(table)
@@ -350,10 +367,11 @@ def extract_conners_datafields(
             data_field_name = conners_data_fields_dict[key]
             if key != "Prob":
                 for score_type in ["T score", "%"]:
+                    line = get_target_list(table, data_field_name)
                     column_names_dict[f"{key} {score_type}"].append(
                         get_score(
                             table_column_map,
-                            get_target_list(table, data_field_name),
+                            line,
                             score_type,
                         )
                     )
@@ -366,8 +384,17 @@ def extract_conners_datafields(
     return column_names_dict
 
 
+def clean_df(df: pd.DataFrame, include_assessment_dates: bool) -> pd.DataFrame:
+    date_in_df = "Assessment Date" in df.columns
+    if date_in_df:
+        if df["Assessment Date"].isna().any() or not include_assessment_dates:
+            df = df.drop(columns=["Assessment Date"], axis=1)
+
+    return df
+
+
 def run_pipeline(
-    pdf_dir: Path, csv_file_path: str, subjects: Optional[list[str]] = None
+    pdf_dir: Path, csv_file_path: str, include_assessment_dates: bool
 ) -> None:
     """Main function to reformat filenames and extract Conners data."""
     pdf_dir = Path(pdf_dir)
@@ -375,19 +402,24 @@ def run_pipeline(
     LGR.info("Standardizing PDF filenames...")
     standardize_pdf_filenames(pdf_dir)
 
-    reformatted_pdf_files = sorted(
-        get_files(pdf_dir / "reformatted_filenames" / "child", "*sub-*.pdf")
+    reformatted_pdf_files = get_files(
+        pdf_dir / "reformatted_filenames" / "child", "*sub-*.pdf"
     )
-    reformatted_pdf_files += sorted(
-        get_files(pdf_dir / "reformatted_filenames" / "parent", "*sub-*.pdf")
+    reformatted_pdf_files += get_files(
+        pdf_dir / "reformatted_filenames" / "parent", "*sub-*.pdf"
     )
 
     if not reformatted_pdf_files:
         return None
 
     data_fields_dict = initialization_sessions_dict()
+    assessment_dates = get_assessment_dates(reformatted_pdf_files)
+    data_fields_dict["Assessment Date"], reformatted_pdf_files = sort_files_and_dates(
+        reformatted_pdf_files, assessment_dates
+    )
+
     data_fields_dict["SN"], data_fields_dict["Rater"] = get_subject_ids(
-        reformatted_pdf_files, subjects
+        reformatted_pdf_files
     )
     data_fields_dict["Visit"] = get_sessions(data_fields_dict["SN"])
     data_fields_dict["Snvisit"] = get_sn_visit(
@@ -415,8 +447,9 @@ def run_pipeline(
         if csv_file_path.endswith(".xlsx"):
             original_df = pd.read_excel(filename)
         else:
+            sep = guess_delimiter(filename)
             original_df = pd.read_csv(
-                filename, sep=None, engine="python", encoding="utf-8-sig"
+                filename, sep=None, engine="python", encoding="utf-8-sig", iterator=True
             )
 
         original_df.columns = [col.replace("\ufeff", "") for col in original_df.columns]
@@ -425,12 +458,14 @@ def run_pipeline(
         df = pd.concat([original_df, df], axis=0, ignore_index=True)
         df = df.drop_duplicates()
 
+        df = clean_df(df, include_assessment_dates)
         if csv_file_path.endswith(".xlsx"):
             df.to_excel(filename)
         else:
             # Fix for dash encoding issue
-            df.to_csv(filename, sep=",", encoding="utf-8-sig", index=False)
+            df.to_csv(filename, sep=sep, encoding="utf-8-sig", index=False)
     else:
+        df = clean_df(df, include_assessment_dates)
         LGR.info(f"Creating {Path(filename).name}...")
         # Fix for dash encoding issue
         df.to_csv(filename, sep=",", encoding="utf-8-sig", index=False)

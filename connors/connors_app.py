@@ -10,6 +10,8 @@ from _streamlit_utils import StreamlitLogHandler, _select_content
 
 from get_connors_score import run_pipeline
 
+st.set_page_config(layout="centered")
+
 st.title("Connors 4 Score Extraction Pipeline")
 
 st.divider()
@@ -23,9 +25,13 @@ if st.button(
     folder = _select_content("directory")
     if folder:
         st.session_state.pdf_dir = folder
+        st.session_state.has_pdf_files = bool(list(Path(folder).glob("*.pdf")))
 
 if st.session_state.get("pdf_dir"):
-    st.success(f"Connors 4 Source Directory: {st.session_state.pdf_dir}")
+    if st.session_state.has_pdf_files:
+        st.success(f"Connors 4 Source Directory: {st.session_state.pdf_dir}")
+    else:
+        st.error(f"No PDF files detected: {st.session_state.pdf_dir}")
 
 st.divider()
 st.markdown("**Optional Arguments**")
@@ -40,17 +46,16 @@ if st.button(
 if st.session_state.get("csv_file_path"):
     st.success(f"Connors 4 CSV file: {st.session_state.csv_file_path}")
 
-subjects = st.text_input(
-    "Subject IDs",
-    help="Restrict processing to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
+include_assessment_dates = st.checkbox(
+    "Include assessment dates",
+    value=True,
+    help="Include the date of Connors 4 was issued to participant",
 )
-if subjects:
-    subjects = [s.strip() for s in subjects.replace(",", " ").split() if s.strip()]
 
 kwargs = {
     "pdf_dir": st.session_state.get("pdf_dir"),
     "csv_file_path": st.session_state.get("csv_file_path"),
-    "subjects": subjects,
+    "include_assessment_dates": include_assessment_dates,
 }
 
 st.divider()

@@ -1,4 +1,4 @@
-import sys
+import re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -10,6 +10,8 @@ import streamlit as st
 
 from participants_tsv import run_pipeline
 from _streamlit_utils import _select_content
+
+st.set_page_config(layout="centered")
 
 st.title("Participants TSV Pipeline")
 st.divider()
@@ -30,14 +32,28 @@ if st.button(
     folder = _select_content("directory")
     if folder:
         st.session_state.bids_dir = folder
+        st.session_state.bids_subfolders = sorted(
+            [
+                x
+                for x in Path(st.session_state.bids_dir).glob("*")
+                if x.is_dir() and re.match(r"^sub-\d{5}", x.name)
+            ]
+        )
 
 if st.session_state.get("bids_dir"):
-    st.success(f"BIDS directory: {st.session_state.bids_dir}")
+    if st.session_state.bids_subfolders:
+        st.success(f"BIDS directory: {st.session_state.src_dir}")
+    else:
+        st.error(
+            f"Not a valid BIDS directory (no subjects detected): {st.session_state.src_dir}"
+        )
 
 st.divider()
 if st.button("Run Pipeline", type="primary"):
-    if not st.session_state.get("bids_dir"):
-        st.error("Please select a BIDS directory before running.")
+    if not (
+        st.session_state.get("bids_dir") and st.session_state.get("bids_subfolders")
+    ):
+        st.error("Please select a valid BIDS directory before running.")
     else:
         with st.spinner("Processing..."):
             run_pipeline(st.session_state.get("bids_dir"))

@@ -34,13 +34,16 @@ _TASK_NAMES = {
 }
 
 
-def cross_validate_folders(bids_dir: Path, temp_dir: Path):
+def cross_validate_folders(bids_dir: Path, temp_dir: Path, subjects: list[str]):
     modalities = ["anat", "func"]
     for subject_folder in bids_dir.glob("*"):
         if not subject_folder.is_dir():
             continue
 
         sub_id = get_entity_value(subject_folder, "sub")
+        if subjects and sub_id not in subjects:
+            continue
+
         session_folders = [
             content for content in subject_folder.glob("*") if content.is_dir()
         ]
@@ -60,7 +63,7 @@ def cross_validate_folders(bids_dir: Path, temp_dir: Path):
         if n_subject_sessions != n_subject_temp_folders:
             LGR.warning(
                 f"The number of BIDS sessions ({n_subject_sessions}) for subject {sub_id} does not equal the number of folders "
-                f"in the temporary directory containing the subject ID {n_subject_temp_folders}"
+                f"in the temporary directory containing the subject ID ({n_subject_temp_folders})"
             )
 
 
@@ -244,6 +247,7 @@ def _generate_bids_dir_pipeline(
     temp_dir: Path,
     bids_dir: Path,
     cohort: Literal["kids", "adults"],
+    subjects: list[str],
     create_dataset_metadata: bool,
     add_sessions_tsv: bool,
     delete_temp_dir: bool,
@@ -319,7 +323,7 @@ def _generate_bids_dir_pipeline(
     if create_dataset_metadata:
         _generate_dataset_metadata(bids_dir)
 
-    cross_validate_folders(bids_dir, temp_dir)
+    cross_validate_folders(bids_dir, temp_dir, subjects)
 
     if delete_temp_dir:
         shutil.rmtree(temp_dir)

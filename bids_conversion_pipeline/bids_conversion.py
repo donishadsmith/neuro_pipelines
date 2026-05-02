@@ -2,6 +2,8 @@ import tempfile, re, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import nibabel as nib
 from nibabel.filebasedimages import ImageFileError
 
@@ -10,10 +12,11 @@ from bidsaid.io import _copy_file, load_nifti, compress_image, regex_glob
 from bidsaid.logging import setup_logger
 from bidsaid.path_utils import is_valid_date
 
+from _bids_conversion_utils import _strip_entity
+from _general_utils import _check_subjects_visits_file
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
-from _bids_conversion_utils import _check_subjects_visits_file, _strip_entity
 
 LGR = setup_logger(__name__)
 
@@ -63,7 +66,7 @@ def _filter_source_folders(
     return [folder for folder in folders if folder.name not in exclude_src_folder_names]
 
 
-def _copy_nifti_files(nifti_file: Path, temp_dir: Path, cohort: str) -> None:
+def _copy_nifti_files(nifti_file: Path, temp_dir: Path) -> None:
     dst_file = temp_dir / nifti_file.parent.name / nifti_file.name
     _copy_file(
         src_file=nifti_file,
@@ -93,15 +96,9 @@ def _copy_nifti_files(nifti_file: Path, temp_dir: Path, cohort: str) -> None:
         dst_file.unlink()
         return
 
-    filename_participant_id = nifti_file.name.split("_")[0]
-    folder_participant_id = nifti_file.parent.name.split("_")[0]
-
-    if cohort == "adults":
-        # Deal with case where files have {sub_id}{V\d+}_ instead of {sub_id}_
-        filename_participant_id = re.split(r"^[vV]\d+", filename_participant_id)[
-            0
-        ].strip()
-
+    # Deal with case where files have {sub_id}{V\d+}_ instead of {sub_id}_
+    filename_participant_id = re.findall(r"\d{5}", nifti_file.name)[0]
+    folder_participant_id = re.findall(r"\d{5}", nifti_file.parent.name)[0]
     if filename_participant_id != folder_participant_id:
         LGR.warning(
             "Deleting the following nifti file from the temporary directory "
@@ -153,12 +150,11 @@ def _is_raw_nifti(nifti_file):
 def _copy_data_to_temp_dir(
     src_dir: Path,
     temp_dir: Path,
-    cohort: str,
     subjects: Optional[list[str | int]],
     exclude_src_folder_names: Optional[list[str]],
     exclude_nifti_filenames: Optional[list[str]],
 ) -> None:
-    subject_folders = regex_glob(src_dir, pattern=r"^\d+.*_\d+$")
+    subject_folders = regex_glob(src_dir, pattern=r"^\d{5}.*_\d{6}$")
     subject_folders = _filter_subjects(subject_folders, subjects)
     subject_folders = _filter_source_folders(subject_folders, exclude_src_folder_names)
     if not subject_folders:
@@ -179,20 +175,15 @@ def _copy_data_to_temp_dir(
 
         # Handle edge case where analyses related files placed in same folder as
         # original nifti which has the naming {subjectID}_{scan_date}_{acqusition_number}
-        if cohort == "kids":
-            nifti_files = regex_glob(
-                subject_folder, pattern=r"^\d+_(\d+)?.*\.(nii|nii.gz)$"
-            )
-        else:
-            nifti_files = regex_glob(
-                subject_folder, pattern=r"^\d+([vV]\d+)?_(\d+)?.*\.(nii|nii.gz)$"
-            )
+        nifti_files = regex_glob(
+            subject_folder, pattern=r"^\d{5}([vV]\d+)?_(\d{6})?.*\.(nii|nii.gz)$"
+        )
 
         for nifti_file in nifti_files:
             if nifti_file.name in exclude_nifti_filenames:
                 continue
 
-            _copy_nifti_files(nifti_file, temp_dir, cohort)
+            _copy_nifti_files(nifti_file, temp_dir)
 
 
 def run_pipeline(
@@ -220,12 +211,12 @@ def run_pipeline(
 
         if subjects:
             subjects = _strip_entity(subjects)
+            subjects = [re.findall(r"\d{6,}", x)[0] for x in subjects]
 
         LGR.info("Copying data to temporary directory...")
         _copy_data_to_temp_dir(
             Path(src_dir),
             temp_dir,
-            cohort,
             subjects,
             exclude_src_folder_names,
             exclude_nifti_filenames,
@@ -241,6 +232,7 @@ def run_pipeline(
             temp_dir,
             bids_dir,
             cohort,
+            subjects,
             create_dataset_metadata,
             add_sessions_tsv,
             delete_temp_dir,

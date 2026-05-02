@@ -48,7 +48,7 @@ def run_pipeline(
     unorganized_nih_toolbox_file,
     dst_dir,
     prefix_filename,
-    drop_dates,
+    include_assessment_dates,
     preexisting_nih_toolbox_file,
 ):
     unorganized_nih_toolbox_file = Path(unorganized_nih_toolbox_file)
@@ -117,7 +117,7 @@ def run_pipeline(
         )
         organized_df = organized_df.drop_duplicates()
 
-    if drop_dates and "Assessment Date" in organized_df.columns:
+    if not include_assessment_dates and "Assessment Date" in organized_df.columns:
         organized_df = organized_df.drop(columns=["Assessment Date"])
 
     prefix_filename = f"{prefix_filename}_" if prefix_filename else ""
