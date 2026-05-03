@@ -1512,9 +1512,9 @@ def main(
                     nonparametric_cluster_correction_p,
                 )
 
-                header_names_filename = matrices_output_dict[
-                    "design_matrix_file"
-                ].replace("-design_matrix.csv", "-header_names.txt")
+                header_names_filename = str(
+                    matrices_output_dict["design_matrix_file"]
+                ).replace("-design_matrix.csv", "-header_names.txt")
                 with open(header_names_filename, "r") as f:
                     design_columns = f.read().split(",")
 
