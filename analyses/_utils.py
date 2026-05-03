@@ -345,7 +345,7 @@ def threshold_palm_output(output_prefix, second_level_glt_code, cluster_correcti
 
 def get_nontarget_dose(second_level_glt_code, cohort):
     if second_level_glt_code == "mean":
-        return None
+        return []
 
     doses = {"kids": {"0", "5", "10"}, "adults": {"mph", "placebo"}}
 
@@ -353,30 +353,34 @@ def get_nontarget_dose(second_level_glt_code, cohort):
 
 
 def drop_dose_rows(
-    data_table, dose_list, only_paired_data=False, return_removed_subjects=False
+    data_table,
+    nontarget_dose_list,
+    only_complete_cases=False,
+    return_removed_subjects=False,
 ):
-    if not dose_list:
+    if not nontarget_dose_list and only_complete_cases is False:
         return data_table
 
     removed_subjects = []
-    data_table = data_table[~data_table["dose"].astype(str).isin(dose_list)]
-    if only_paired_data:
-        # Keep only subjects who have both remaining doses (i.e., appear more than once)
-        duplicated_mask = data_table["Subj"].duplicated(keep=False)
-        if not duplicated_mask.to_numpy().all():
-            contrast_name = get_contrast_name_from_file(
-                data_table["InputFile"].tolist()[0]
-            )
-            removed_subjects = data_table.loc[~duplicated_mask, "Subj"].tolist()
-            total_subjects = len(
-                set(data_table["Subj"].tolist()).difference(removed_subjects)
-            )
-            LGR.warning(
-                f"For contrast ({contrast_name}), the following subjects have been removed: {removed_subjects}. "
-                f"A total of {total_subjects} unique subjects with two timepoints remain."
-            )
+    target_doses = (
+        data_table.loc[
+            ~data_table["dose"].astype(str).isin(nontarget_dose_list), "dose"
+        ]
+        .unique()
+        .tolist()
+    )
+    data_table = data_table[data_table["dose"].astype(str).isin(target_doses)]
+    if only_complete_cases:
+        counts = data_table["Subj"].value_counts()
+        removed_subjects = counts[counts < len(target_doses)].index.tolist()
+        data_table = data_table[~data_table["Subj"].isin(removed_subjects)]
+        total_subjects = len(data_table["Subj"].unique())
+        contrast_name = get_contrast_name_from_file(data_table["InputFile"].tolist()[0])
 
-        data_table = data_table[duplicated_mask]
+        LGR.warning(
+            f"For contrast ({contrast_name}), the following subjects have been removed: {removed_subjects}. "
+            f"A total of {total_subjects} unique subjects with the following doses remain: {target_doses}"
+        )
 
     if return_removed_subjects:
         return data_table, removed_subjects

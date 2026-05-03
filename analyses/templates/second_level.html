@@ -71,10 +71,10 @@
     <h2>Covariates</h2>
     <table>
         <tr><th>Parameter</th><th></th></tr>
-        <tr><td>Included covariates</td><td>{{ included_covariates | join(", ") if included_covariates else "None" }}</td></tr>
-        <tr><td>Excluded covariates</td><td>{{ excluded_covariates | join(", ") if excluded_covariates else "None" }}</td></tr>
-        {% if dropped_constant_columns %}
-        <tr><td>Dropped (constant)</td><td>{{ dropped_constant_columns | join(", ") }}</td></tr>
+        <tr><td>Included covariates (user specified)</td><td>{{ included_covariates | join(", ") if included_covariates else "None" }}</td></tr>
+        <tr><td>Excluded covariates (user specified)</td><td>{{ excluded_covariates | join(", ") if excluded_covariates else "None" }}</td></tr>
+        {% if dropped_columns %}
+        <tr><td>Dropped covariates after data checks (constant or all missing)</td><td>{{ dropped_columns | join(", ") }}</td></tr>
         {% endif %}
     </table>
 
@@ -119,7 +119,6 @@
         <tr><td>Centering</td><td><code>{{ centering_str }}</code></td></tr>
         {% endif %}
         <tr><td>GLT codes</td><td><code>{{ glt_str }}</code></td></tr>
-        <tr><td>Number of cores</td><td>{{ n_cores }}</td></tr>
     </table>
 
     <p>
@@ -190,7 +189,7 @@
         <tr><td>Design type</td><td>{{ "Paired (within-subject)" if contrast.is_comparison else "One-sample (mean)" }}</td></tr>
         <tr><td>Design matrix columns</td><td>{{ contrast.design_columns | join(", ") }}</td></tr>
         {% if contrast.removed_subjects %}
-        <tr><td>Removed subjects (unpaired)</td><td>{{ contrast.removed_subjects | join(", ") }}</td></tr>
+        <tr><td>Removed subjects (incomplete cases)</td><td>{{ contrast.removed_subjects | join(", ") }}</td></tr>
         {% endif %}
         {% if contrast.dropped_within_subject_columns %}
         <tr><td>Dropped (constant within subject)</td><td>{{ contrast.dropped_within_subject_columns | join(", ") }}</td></tr>
@@ -205,16 +204,23 @@
 
     {% if contrast.is_comparison %}
     <p>
+        Only subjects with the both doses (i.e., {{ dose_list | join(", ") }}) were included in
+        the paired two-sample test.
+
         Contrast direction: positive values represent
         <strong>{{ contrast.positive_label }}</strong>, negative values represent
         <strong>{{ contrast.negative_label }}</strong>.
+
         Exchangeability blocks were defined per subject with permutations restricted
         to within blocks (<code>-eb</code>, <code>-ee</code>, <code>-within</code>).
     </p>
     {% else %}
     <p>
-        One-sample test of the mean across doses. Sign flipping was used
-        (<code>-ise</code>) since there are no exchangeability blocks.
+        For each subject, a mean beta coefficient image was created by computing the average
+        across all doses. Only subjects with data from all doses (i.e., {{ dose_list | join(", ") }})
+        were included in the one-sample test of the mean across doses
+
+        Sign flipping was used (<code>-ise</code>) since there are no exchangeability blocks.
         Positive values represent activation above the mean of zero; negative
         values represent activation below.
     </p>

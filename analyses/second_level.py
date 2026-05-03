@@ -268,16 +268,21 @@ def _get_cmd_args():
 
 @dataclass
 class DataContainer:
-    columns_to_ignore: list[str] = field(
-        default_factory=lambda: ["Subj", "session_id", "InputFile", "dose", "dose_mg"],
+    grouping_columns: set[str] = field(
+        default_factory=lambda: set(
+            ["Subj", "session_id", "InputFile", "dose", "dose_mg"]
+        ),
     )
-    excluded_regressors: list = field(default_factory=list)
-    included_covariates: list = field(default_factory=list)
-    categorical_regressors: set = field(
+    excluded_covariates: list[str] = field(default_factory=list)
+    included_covariates: list[str] = field(default_factory=list)
+    categorical_covariates: set[str] = field(
         default_factory=lambda: set(["sex", "race", "ethnicity"])
     )
+    continuous_covariates: set[str] = field(
+        default_factory=lambda: set(["n_censored_volumes", "age"])
+    )
     # From most to least
-    deprioritized_regressors_order: list[str] = field(
+    deprioritized_covariates_order: list[str] = field(
         default_factory=lambda: [
             "ethnicity",
             "race",
@@ -315,7 +320,7 @@ class DataContainer:
 
         return glt_codes[cohort]
 
-    def update_excluded_regressors(self, excluded_covariates: list[str]) -> None:
+    def update_excluded_covariates(self, excluded_covariates: list[str]) -> None:
         excluded_covariates = [
             item for cov in excluded_covariates for item in cov.split() if cov
         ]
@@ -323,33 +328,31 @@ class DataContainer:
             return
 
         if "all" in excluded_covariates:
-            self.excluded_regressors.extend(self.available_covariates)
+            self.excluded_covariates.extend(self.available_covariates)
             LGR.info(
-                "Added the following variables to be excluded, if available: "
-                f"{self.deprioritized_regressors_order}"
+                "Added the following variables to be excluded: "
+                f"{self.excluded_covariates}"
             )
         else:
             excluded_covariates = self.available_covariates.intersection(
                 excluded_covariates
             )
-            self.excluded_regressors.extend(excluded_covariates)
+            self.excluded_covariates.extend(excluded_covariates)
             LGR.info(
-                "Added the following variables to be excluded, if available: "
+                "Added the following variables to be excluded: "
                 f"{excluded_covariates}"
             )
             self.included_covariates = list(
-                self.available_covariates.difference(self.excluded_regressors)
+                self.available_covariates.difference(self.excluded_covariates)
             )
 
     @property
-    def non_continuous_cols(self) -> list[str]:
-        return self.columns_to_ignore + list(self.categorical_regressors)
+    def afni_regressor_columns(self) -> list[str]:
+        return ["dose"] + self.included_covariates
 
     @property
-    def exclude_afni_regressor_columns(self) -> list[str]:
-        columns_to_skip = [col for col in self.columns_to_ignore if col != "dose"]
-
-        return columns_to_skip + self.excluded_regressors
+    def columns_to_keep(self) -> list[str]:
+        return list(self.grouping_columns) + list(self.available_covariates)
 
 
 def get_beta_files(analysis_dir, task, first_level_glt_label):
@@ -409,6 +412,14 @@ def replace_whitespace_with_underscores(data_table):
     return data_table
 
 
+def order_columns_names(columns):
+    return (
+        ["Subj", "dose"]
+        + [name for name in columns if name not in ["Subj", "dose", "InputFile"]]
+        + ["InputFile"]
+    )
+
+
 def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     bids_dir = Path(bids_dir)
     participants_df = pd.read_csv(bids_dir / "participants.tsv", sep="\t")
@@ -450,44 +461,37 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     # AFNI 26 requires first column to be named "Subj"
     data_table = data_table.rename(columns={"participant_id": "Subj"})
 
-    if "acq_time" in data_table.columns:
-        data_table = data_table.drop("acq_time", axis=1)
+    remove_columns = [
+        col for col in data_table.columns if col not in datacontainer.columns_to_keep
+    ]
+    data_table = data_table.drop(remove_columns, axis=1)
 
-    column_names = (
-        ["Subj", "dose"]
-        + [
-            name
-            for name in data_table.columns
-            if name not in ["Subj", "dose", "InputFile"]
-        ]
-        + ["InputFile"]
-    )
+    column_names = order_columns_names(data_table.columns)
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1)
-    important_columns = [
-        "Subj",
-        "dose",
-        "InputFile",
-    ] + datacontainer.included_covariates
-    # Only drop na rows when na is in important columns
-    important_columns = [x for x in important_columns if x in df.columns]
-    data_table = data_table.dropna(subset=important_columns, axis=0)
     if pd.to_numeric(data_table["dose"], errors="coerce").notna().all():
         data_table["dose"] = data_table["dose"].astype(int).astype(str)
     else:
         data_table["dose"] = data_table["dose"].astype(str)
 
-    continuous_vars = set(data_table.columns).difference(
-        datacontainer.non_continuous_cols + datacontainer.excluded_regressors
-    )
-    for continuous_var in continuous_vars:
+    for continuous_var in datacontainer.continuous_covariates:
         data_table[continuous_var] = data_table[continuous_var].astype(float)
 
     data_table = replace_whitespace_with_underscores(data_table)
 
     data_table, constant_columns = drop_constant_columns(data_table)
 
-    return data_table, constant_columns, important_columns
+    important_columns = (
+        ["Subj", "dose"] + datacontainer.included_covariates + ["InputFile"]
+    )
+    # Only drop na rows when na is in important columns
+    filtered_important_columns = list(
+        set(important_columns).intersection(data_table.columns)
+    )
+    filtered_important_columns = order_columns_names(filtered_important_columns)
+    data_table = data_table.dropna(subset=important_columns, axis=0)
+
+    return data_table, constant_columns, filtered_important_columns
 
 
 @lru_cache()
@@ -604,14 +608,8 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
     return glt_str
 
 
-def get_model_str(data_table, datacontainer):
-    columns = [
-        col
-        for col in data_table.columns
-        if col not in datacontainer.exclude_afni_regressor_columns
-    ]
-
-    model_str = "+".join(set(columns))
+def get_model_str(datacontainer):
+    model_str = "+".join(datacontainer.afni_regressor_columns)
     model_str += "+(1|Subj)"
 
     LGR.info(f"The following model will be used: {model_str}")
@@ -619,9 +617,9 @@ def get_model_str(data_table, datacontainer):
     return model_str
 
 
-def get_centering_str(data_table, datacontainer):
-    continuous_vars = set(data_table.columns).difference(
-        datacontainer.non_continuous_cols + datacontainer.excluded_regressors
+def get_centering_str(datacontainer):
+    continuous_vars = set(datacontainer.included_covariates).intersection(
+        datacontainer.continuous_covariates
     )
     if not continuous_vars:
         return ""
@@ -672,7 +670,7 @@ def prioritize_regressors(design_matrix, datacontainer):
     if has_dof(design_matrix):
         return design_matrix, dropped_dof_regressors
 
-    for regressor in datacontainer.deprioritized_regressors_order:
+    for regressor in datacontainer.deprioritized_covariates_order:
         if drop_columns := [
             col for col in design_matrix.columns if col.startswith(regressor)
         ]:
@@ -689,26 +687,6 @@ def prioritize_regressors(design_matrix, datacontainer):
     return design_matrix, dropped_dof_regressors
 
 
-def get_col_from_data_table(data_table, datacontainer, col_type):
-    if col_type == "categorical":
-        cols = [
-            col
-            for col in data_table.columns
-            if col in datacontainer.categorical_regressors
-            and col
-            not in datacontainer.excluded_regressors + datacontainer.columns_to_ignore
-        ]
-    else:
-        cols = [
-            col
-            for col in data_table.columns
-            if col
-            not in datacontainer.non_continuous_cols + datacontainer.excluded_regressors
-        ]
-
-    return cols
-
-
 def create_design_matrix(
     glt_data_table,
     datacontainer,
@@ -716,11 +694,15 @@ def create_design_matrix(
     average_within_subjects=False,
     second_level_glt_code=None,
 ):
-    categorical_cols = get_col_from_data_table(
-        glt_data_table, datacontainer, col_type="categorical"
+    categorical_cols = list(
+        set(datacontainer.categorical_covariates).difference(
+            datacontainer.excluded_covariates
+        )
     )
-    continuous_cols = get_col_from_data_table(
-        glt_data_table, datacontainer, col_type="continuous"
+    continuous_cols = list(
+        set(datacontainer.continuous_covariates).difference(
+            datacontainer.excluded_covariates
+        )
     )
 
     for col in categorical_cols:
@@ -1053,7 +1035,7 @@ def drop_within_subject_constant_regressors(datacontainer, glt_data_table):
     remaining_columns = [
         col
         for col in glt_data_table.columns
-        if col not in datacontainer.columns_to_ignore
+        if col not in datacontainer.grouping_columns
     ]
     is_constant = lambda col: glt_data_table.groupby("Subj")[col].nunique().max() <= 1
 
@@ -1280,10 +1262,10 @@ def main(
         )
 
     datacontainer = DataContainer()
-    datacontainer.update_excluded_regressors(excluded_covariates)
+    datacontainer.update_excluded_covariates(excluded_covariates)
     report.add_context(
         included_covariates=datacontainer.included_covariates,
-        excluded_covariates=datacontainer.excluded_regressors,
+        excluded_covariates=datacontainer.excluded_covariates,
     )
 
     for first_level_glt_label in first_level_glt_labels:
@@ -1314,20 +1296,40 @@ def main(
 
         excluded_subjects = sorted(all_subjects - retained_subjects)
 
-        report.add_context(
-            first_level_glt_label=first_level_glt_label,
-            n_beta_files=len(retained_beta_files),
-            n_subjects=len(retained_subjects),
-            excluded_subjects=excluded_subjects,
-            dropped_constant_columns=drop_constant_column_names,
-            important_columns=important_columns,
-        )
-
         data_table_filename = (
             dst_dir
             / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-data_table.txt"
         )
         data_table.to_csv(data_table_filename, sep="\t", index=False, encoding="utf-8")
+
+        # Create a filtered version of data table
+        data_table = data_table[important_columns]
+        data_table_filename = (
+            dst_dir
+            / f"task-{task}_{entity_key}-{first_level_glt_label}_desc-data_table_filtered_columns.txt"
+        )
+        data_table.to_csv(data_table_filename, sep="\t", index=False, encoding="utf-8")
+
+        missing_covariates = [
+            cov
+            for cov in datacontainer.included_covariates
+            if cov not in important_columns
+        ]
+        if missing_covariates:
+            datacontainer.excluded_covariates += missing_covariates
+            datacontainer.included_covariates = missing_covariates
+            LGR.info(
+                f"The covariates to exclude have updated due a covariate being dropped due to being constant or NaN: {datacontainer.excluded_covariates}"
+            )
+
+        report.add_context(
+            first_level_glt_label=first_level_glt_label,
+            n_beta_files=len(retained_beta_files),
+            n_subjects=len(retained_subjects),
+            excluded_subjects=excluded_subjects,
+            dropped_columns=set(drop_constant_column_names + missing_covariates),
+            important_columns=important_columns,
+        )
 
         if method == "parametric":
             if not afni_img_path:
@@ -1355,8 +1357,8 @@ def main(
             )
 
             glt_str = get_glt_codes_str(data_table, datacontainer, cohort)
-            model_str = get_model_str(data_table, datacontainer)
-            center_str = get_centering_str(data_table, datacontainer)
+            model_str = get_model_str(datacontainer)
+            center_str = get_centering_str(datacontainer)
 
             residual_filename, lmer_cmd = perform_3dlmer(
                 task,
@@ -1415,30 +1417,24 @@ def main(
             for second_level_glt_code in get_second_level_glt_codes(cohort):
                 LGR.info(f"Processing the following glt code: {second_level_glt_code}")
 
-                vs_in_code = "_vs_" in second_level_glt_code
-                if cohort == "kids" and vs_in_code:
-                    glt_data_table, removed_subjects = drop_dose_rows(
-                        data_table,
-                        get_nontarget_dose(second_level_glt_code, cohort),
-                        only_paired_data=True,
-                        return_removed_subjects=True,
-                    )
-                else:
-                    glt_data_table = data_table
-                    removed_subjects = []
+                glt_data_table, removed_subjects = drop_dose_rows(
+                    data_table,
+                    get_nontarget_dose(second_level_glt_code, cohort),
+                    only_complete_cases=True,
+                    return_removed_subjects=True,
+                )
 
                 glt_data_table, constant_columns = drop_constant_columns(glt_data_table)
-                if glt_data_table.empty:
-                    LGR.info(
-                        f"Skipping the following second level glt code: {second_level_glt_code}"
-                    )
-                    continue
+                n_files = len(glt_data_table["InputFile"].tolist())
+                if second_level_glt_code == "mean":
+                    n_files /= 2
 
                 LGR.warning(
-                    f"Using {len(glt_data_table['InputFile'].tolist())} files "
+                    f"Using {n_files} files "
                     f"from {len(glt_data_table['Subj'].unique())} subjects for analysis "
                     f"using {second_level_glt_code}"
                 )
+
                 LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
                 group_mask_filename = create_group_mask(
                     dst_dir,
@@ -1456,6 +1452,7 @@ def main(
                     second_level_glt_code,
                 )
 
+                vs_in_code = "_vs_" in second_level_glt_code
                 matrix_creation_func = (
                     create_comparison_matrices if vs_in_code else create_mean_matrices
                 )
@@ -1484,6 +1481,7 @@ def main(
                     first_level_glt_label,
                     second_level_glt_code,
                 )
+
                 output_prefix, palm_cmd = perform_palm(
                     concatenated_filename,
                     group_mask_filename,
@@ -1523,8 +1521,9 @@ def main(
                 )
                 contrast_info = {
                     "glt_code": second_level_glt_code,
-                    "n_files": len(glt_data_table["InputFile"].tolist()),
+                    "n_files": n_files,
                     "n_subjects": len(glt_data_table["Subj"].unique()),
+                    "dose_list": glt_data_table["dose"].unique().tolist(),
                     "max_permutations": max_permutations,
                     "true_max_permutations": true_max_permutations,
                     "is_comparison": vs_in_code,
@@ -1533,17 +1532,17 @@ def main(
                     "dropped_within_subject_columns": list(
                         set(
                             matrix_report_info.get("constant_column_names", [])
-                        ).difference(datacontainer.excluded_regressors)
+                        ).difference(datacontainer.excluded_covariates)
                     ),
                     "dropped_collinear_columns": list(
                         set(
                             matrix_report_info.get("collinear_column_names", [])
-                        ).difference(datacontainer.excluded_regressors)
+                        ).difference(datacontainer.excluded_covariates)
                     ),
                     "dropped_dof_columns": list(
                         set(
                             matrix_report_info.get("dropped_dof_regressor_names", [])
-                        ).difference(datacontainer.excluded_regressors)
+                        ).difference(datacontainer.excluded_covariates)
                     ),
                     "palm_cmd": palm_cmd,
                 }

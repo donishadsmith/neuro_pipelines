@@ -382,7 +382,9 @@ def main(
                 continue
 
             truncated_df = drop_dose_rows(
-                data_table, get_nontarget_dose(second_level_glt_code, cohort)
+                data_table,
+                get_nontarget_dose(second_level_glt_code, cohort),
+                only_complete_cases=(method == "nonparametric"),
             )
             # The individual conditions for gPPI are main effects and should not be interpreted
             # since there is an interaction term in the model
