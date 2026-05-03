@@ -20,7 +20,7 @@ from bidsaid.events import (
 from bidsaid.io import _copy_file
 from bidsaid.logging import setup_logger
 
-from _general_utils import _get_subject_visits, _standardize_dates
+from _general_utils import _get_dataframe, _get_subject_visits, _standardize_dates
 
 LGR = setup_logger(__name__)
 
@@ -146,7 +146,7 @@ def _get_presentation_session(
     log_file,
     subjects_visits_df,
 ):
-    curr_log_date = curr_log_date = str(
+    curr_log_date = str(
         pd.to_datetime(
             [get_presentation_log_date(log_file)],
         )[0]
@@ -190,7 +190,7 @@ def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
 
 
 # See: https://www.neurobs.com/pres_docs/html/03_presentation/03_stimulus_presentation/01_trials/03_fmri_mode/index.html
-# # Stimulus duration is 800 ms
+# Stimulus duration is 800 ms
 def _create_flanker_events_files(
     temp_dir,
     dst_dir,
@@ -770,18 +770,6 @@ def _create_princess_events_files(
     return edat_files
 
 
-def _get_dataframe(subjects_visits_file):
-    if not subjects_visits_file:
-        return None
-
-    if str(subjects_visits_file).endswith(".xlsx") or str(
-        subjects_visits_file
-    ).endswith(".xls"):
-        return pd.read_excel(subjects_visits_file)
-    else:
-        return pd.read_csv(subjects_visits_file, sep=None, engine="python")
-
-
 def _strip_entity(subjects):
     return [str(subject).removeprefix("sub-") for subject in subjects]
 
@@ -832,12 +820,15 @@ def run_pipeline(
 
     if subjects:
         subjects = _strip_entity(subjects)
+        subjects = [re.findall(r"\d{5}", x)[0] for x in subjects]
 
     kwargs = {
         "temp_dir": temp_dir,
         "dst_dir": dst_dir,
         "subjects": subjects,
-        "subjects_visits_df": _standardize_dates(_get_dataframe(subjects_visits_file)),
+        "subjects_visits_df": _standardize_dates(
+            _get_dataframe(subjects_visits_file), sort_data=True
+        ),
         "exclude_filenames": exclude_filenames,
     }
     if task in ["mtle", "mtlr", "simplegng", "complexgng"]:

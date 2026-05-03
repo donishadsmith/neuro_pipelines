@@ -15,8 +15,25 @@ st.set_page_config(layout="centered")
 st.title("NIH Toolbox Pipeline")
 st.divider()
 st.markdown(
-    """*Note**:\n
-Use the CSV file containing the following columns: 'RawScore', 'Theta', 'SE', 'TScore', 'Computed Score',
+    """
+Pipeline for converting NIH toolbox data from long-form (where the assessments are in row form) to wide form (where the assessments are in columns)\n
+
+Original format:
+
+| participant_id | Name       | RawScore |
+|----------------|------------|----------|
+| 101            | Test1      | 0        |
+| 101            | Test2      | 5        |
+| 101            | Test3      | 10       |
+
+Converted (output format):
+
+| participant_id | Test 1 Raw Score | Test 2 Raw Score | Test 3 Raw Score |
+|----------------|------------------|------------------|------------------|
+| 101            | 0                | 5                | 10               |
+
+**Note**:\n
+- Use the CSV file containing the following columns: 'RawScore', 'Theta', 'SE', 'TScore', 'Computed Score',
 'Uncorrected Standard Score', 'Age-Corrected Standard Score', 'National Percentile (age adjusted)', 'Fully-Corrected T-score' as columns."""
 )
 

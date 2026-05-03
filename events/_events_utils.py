@@ -1,4 +1,4 @@
-import argparse, logging, re, sys
+import argparse, logging, re, sys, textwrap
 from pathlib import Path
 
 from pathlib import Path
@@ -116,14 +116,50 @@ def _app(caller, pipeline):
 
     if caller == "BIDS Events":
         st.title("BIDS Events File Pipeline")
-        note = (
-            "**Note:**\n"
-            "- For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data"
-        )
-        st.divider()
+        note = textwrap.dedent("""
+                Pipeline for creating BIDS-compliant timing files.\n
+
+                Example output:
+
+                Filename: "sub-101_ses-01_task-nback_run-01.tsv"
+                Contents (timing is in seconds):
+                | onset | duration  | trial_type | accuracy  |
+                |-------|-----------|------------|-----------|
+                | 0     | 1         | A          | correct   |
+                | 4     | 1         | B          | correct   |
+                | 6     | 1         | A          | incorrect |
+                | 8     | 1         | B          | correct   |
+
+                *onset is relative to the NIfTI image where time 0 is the first
+                volume of the NIfTI image (absolute task timing is subtracted by the time of the trigger,
+                assumed to be the start of the first non-dummy volume); hence an onset of 4 seconds (assuming the TR is 2)
+                means that the block/event occured on the second time index (3th volume) for 0-based languages (counting
+                starts at 0; e.g., Python, C). For 1-based languages (counting starts at 1; e.g., R, Matlab),
+                the second time index would be the second volume, so one must be added
+                for correct mapping.*\n
+
+                **Note:**\n
+                - For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the subjects visits file.
+            """)
     else:
         st.title("Behavioral Data Pipeline")
-        note = ""
+        note = textwrap.dedent("""
+                Pipeline for creating computing task accuracy and reaction time from block and event-related tasks.\n
+
+                Example output:
+
+                | participant_id | session_id  | A_accuracy | A_average_reaction_time  |
+                |----------------|-------------|------------|--------------------------|
+                | 101            | ses-01      | 1          | 0.5                      |
+                | 101            | ses-02      | 0.96       | 0.3                      |
+                | 102            | ses-01      | 0.70       | 0.2                      |
+                | 102            | ses-02      | 0.80       | 0.7                      |
+
+                **Note:**\n
+                - For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the subjects visits file.
+            """)
+
+    st.divider()
 
     st.markdown(note)
 
@@ -231,7 +267,7 @@ def _app(caller, pipeline):
         ]
         subjects = sorted(list(set(subjects)))
         subjects = st.multiselect(
-            "Subject IDs",
+            "Detected subject IDs",
             subjects,
             help="Restrict conversion to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
         )

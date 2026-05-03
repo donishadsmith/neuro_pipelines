@@ -211,7 +211,7 @@ def run_pipeline(
 
         if subjects:
             subjects = _strip_entity(subjects)
-            subjects = [re.findall(r"\d{6,}", x)[0] for x in subjects]
+            subjects = [re.findall(r"\d{5}", x)[0] for x in subjects]
 
         LGR.info("Copying data to temporary directory...")
         _copy_data_to_temp_dir(

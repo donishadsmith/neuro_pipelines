@@ -16,7 +16,19 @@ st.set_page_config(layout="centered")
 st.title("Participants TSV Pipeline")
 st.divider()
 
-st.markdown("""**Note:**\n
+st.markdown("""
+Pipeline for creating the "participants.tsv" file or appending new participants to the "participants.tsv" file.\n
+
+Output:
+
+| participant_id |
+|----------------|
+| 101            |
+| 102            |
+| 103            |
+| 104            |
+
+**Notes:**\n
 - If the BIDS directory has a participants TSV file, it will not be overwritten, the new subjects will be appended.\n
 - If a participants TSV file exists in another directory (i.e., HPC) copy to the BIDS directory so that new subjects and demographic data can be appended.\n
 
@@ -42,10 +54,10 @@ if st.button(
 
 if st.session_state.get("bids_dir"):
     if st.session_state.bids_subfolders:
-        st.success(f"BIDS directory: {st.session_state.src_dir}")
+        st.success(f"BIDS directory: {st.session_state.bids_dir}")
     else:
         st.error(
-            f"Not a valid BIDS directory (no subjects detected): {st.session_state.src_dir}"
+            f"Not a valid BIDS directory (no subjects detected): {st.session_state.bids_dir}"
         )
 
 st.divider()

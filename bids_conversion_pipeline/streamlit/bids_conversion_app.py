@@ -17,14 +17,48 @@ st.set_page_config(layout="centered")
 st.title("NIfTI to BIDS Pipeline")
 st.divider()
 
-st.markdown("""**Notes for MPH Study:**\n
+st.markdown("""
+Pipeline for converting a raw NIfTI dataset into a BIDS-compliant dataset.\n
 
-For MPH Study:
-
+### For MPH Study:
 - Run 'Participants TSV Pipeline' and 'Add Dosages Pipeline' after conversion.\n
-- The subjects visits file must have the following columns: "participant_id" and "date".
-- If the BIDS directory has a participants TSV file, it will not be overwritten, the new subjects will be appended.\n
-- For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data.\n
+
+##### Subjects Visits File
+
+Session mapping is based exclusively on the subject ID and dates and available in the subjects visits file.
+The dates are standardized, then sorted, and the session IDs are based on the sorting order. Consequently,
+if a date is present in the subjects visits file but not found in the subject-specific source directories,
+then the date will be ignored but the session labeling will not change.
+```python
+date_map = {"01": "2000-01-01", "02": "2000-02-02", "03": "2000-03-03"}
+# 2000-02-02 is missing in source files
+new_date_map = {"01": "2000-01-01", "03": "2000-03-03"}
+```
+
+Conversely, if a date is found in the subject-specific source directories but is not in the subjects visits file,
+then the date will be used as its session label.
+```python
+date_map = {"01": "2000-01-01", "02": "2000-03-03"}
+# 2000-02-02 found in subject-specific source directories (assuming the directory is not excluded)
+new_date_map = {"01": "2000-01-01", "02": "2000-03-03", "2000-02-02": "2000-02-02"}
+```
+The file subject visits file must contain `participant_id` and `date` columns. Use `NaN` for missing sessions or
+exclude rows with no dates or unwanted dates.
+
+| participant_id | date       |
+|----------------|------------|
+| 101            | 01/02/2022 |
+| 101            | NaN        |
+| 101            | 03/02/2022 |
+| 102            | 01/02/2024 |
+
+To include dosages, add a `dose` column:
+
+| participant_id | date       | dose |
+|----------------|------------|------|
+| 101            | 01/02/2000 | 0    |
+| 101            | 03/02/2000 | 10   |
+| 102            | 01/02/2002 | NaN  |
 """)
 
 st.divider()
@@ -108,7 +142,7 @@ if st.session_state.get("src_dir") and st.session_state.get("raw_subfolders"):
     ]
     subjects = sorted(list(set(subjects)))
     subjects = st.multiselect(
-        "Subject IDs",
+        "Detected subject IDs",
         subjects,
         help="Restrict conversion to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
     )

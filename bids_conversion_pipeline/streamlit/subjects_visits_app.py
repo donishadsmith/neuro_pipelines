@@ -16,9 +16,21 @@ st.set_page_config(layout="centered")
 
 st.title("Subject Visits File Pipeline")
 st.divider()
+st.markdown("""
+    Pipeline for creating the subjects visits file based on the subjects and dates in the raw NIfTI source directory.
+    Can also append new subjects and dates to a pre-existing subjects visits file.
 
+    Example output:
+
+    | participant_id | date       |
+    |----------------|------------|
+    | 101            | 01/02/2000 |
+    | 101            | 03/02/2000 |
+    | 102            | 01/02/2001 |
+    """)
 
 st.divider()
+
 st.markdown("**Required Arguments**")
 if st.button(
     "Browse for raw NIfTI directory",

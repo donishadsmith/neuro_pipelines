@@ -444,7 +444,7 @@ def run_pipeline(
     )
     if csv_file_path and Path(csv_file_path).exists():
         LGR.info(f"Appending new data to {Path(filename).name}...")
-        if csv_file_path.endswith(".xlsx"):
+        if csv_file_path.endswith(".xlsx") or csv_file_path.endswith(".xls"):
             original_df = pd.read_excel(filename)
         else:
             sep = guess_delimiter(filename)

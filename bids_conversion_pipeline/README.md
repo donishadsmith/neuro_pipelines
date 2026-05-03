@@ -57,8 +57,23 @@ sbatch participants_tsv.sb
 ```
 
 ## Subjects Visits File
-
-When sessions are missing, a subjects visits file ensures that dates are mapped to the correct session IDs. The file must contain `participant_id` and `date` columns. Use `NaN` for missing sessions or exclude rows with no dates or unwanted dates:
+Session mapping is based exclusively on the subject ID and dates and available in the subjects visits file. The dates are standardized, then sorted, and the session IDs
+are based on the sorting order. Consequently, if a date is present in the subjects visits file but not found in the subject-specific source directories,
+then the date will be ignored but the session labeling will not change.
+```python
+date_map = {"01": "2000-01-01", "02": "2000-02-02", "03": "2000-03-03"}
+# 2000-02-02 is missing in source files
+new_date_map = {"01": "2000-01-01", "03": "2000-03-03"}
+```
+Conversely, if a date is found in the subject-specific source directories but is not in the subjects visits file,
+then the date will be used as its session label.
+```python
+date_map = {"01": "2000-01-01", "02": "2000-03-03"}
+# 2000-02-02 found in subject-specific source directories (assuming the directory is not excluded)
+new_date_map = {"01": "2000-01-01", "02": "2000-03-03", "2000-02-02": "2000-02-02"}
+```
+The file subject visits file must contain `participant_id` and `date` columns. Use `NaN` for missing sessions or
+exclude rows with no dates or unwanted dates.
 
 | participant_id | date       |
 |----------------|------------|
@@ -71,11 +86,9 @@ To include dosages, add a `dose` column:
 
 | participant_id | date       | dose |
 |----------------|------------|------|
-| 101            | 01/02/2022 | 0    |
-| 101            | NaN        | 5    |
-| 101            | 03/02/2022 | 10   |
-| 102            | 01/02/2024 | NaN  |
-
+| 101            | 01/02/2000 | 0    |
+| 101            | 03/02/2000 | 10   |
+| 102            | 01/02/2002 | NaN  |
 
 ## Streamlit Graphical User Interface (GUI)
 

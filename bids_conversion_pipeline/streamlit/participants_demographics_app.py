@@ -26,7 +26,20 @@ st.set_page_config(layout="centered")
 st.title("Participants Demographics Pipeline")
 st.divider()
 
-st.markdown("""**Note:**\n
+st.markdown("""
+Pipeline for adding demographics information to the "participants.tsv" file, which can be used
+as voxel-level covariates at the second level.\n
+
+Output:
+
+| participant_id | age       | age       |
+|----------------|-----------|-----------|
+| 101            | 1         | F         |
+| 101            | 2         | M         |
+| 101            | 3         | F         |
+| 102            | 4         | M         |
+
+**Note:**\n
 - The demographics data file must have a column named "participant_id".
 """)
 

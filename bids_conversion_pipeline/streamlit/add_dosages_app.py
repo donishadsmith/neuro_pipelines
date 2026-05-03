@@ -14,9 +14,21 @@ st.set_page_config(layout="centered")
 st.title("Add Dosages Pipeline")
 st.divider()
 
-st.markdown(
-    """**Note:** For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data"""
-)
+st.markdown("""
+Pipeline for updating the sessions.tsv files with MPH doses. Useful if this information was not available/still blinded before the subject's data
+was converted to BIDS.\n
+
+Example output:
+
+Filename: "sub-101_sessions.tsv"
+Contents:
+| session_id     | date       | dose |
+|----------------|------------|------|
+| ses-01         | 01/02/2000 | 0    |
+| ses-02         | 03/02/2000 | 10   |
+
+**Note:** For data from unwanted dates, set to a NULL value (leave that cell empty) or exclude that row from the data.\n
+""")
 
 st.divider()
 st.markdown("**Required Arguments**")
@@ -68,10 +80,10 @@ if st.session_state.get("subjects_visits_file"):
     else:
         st.error(f"Invalid visits file: {st.session_state.subjects_visits_file} ")
 
-st.divider()
-st.markdown("**Optional Arguments**")
-
 if st.session_state.get("bids_dir") and st.session_state.get("bids_subfolders"):
+    st.divider()
+    st.markdown("**Optional Arguments**")
+
     subjects = [
         re.findall(r"\d{5}", x.name)[0]
         for x in st.session_state.get("bids_subfolders")
@@ -79,7 +91,7 @@ if st.session_state.get("bids_dir") and st.session_state.get("bids_subfolders"):
     ]
     subjects = sorted(list(set(subjects)))
     subjects = st.multiselect(
-        "Subject IDs",
+        "Detected subject IDs",
         subjects,
         help="Restrict conversion to specific subjects. Enter IDs without the 'sub-' prefix, separated by commas or spaces.",
     )

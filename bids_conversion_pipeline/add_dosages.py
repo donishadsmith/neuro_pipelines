@@ -1,6 +1,6 @@
 """Standalone function when BIDS directory is created and sessions TSV file exists"""
 
-import sys
+import re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -36,6 +36,7 @@ def run_pipeline(
     sessions_tsv_list = Path(bids_dir).rglob("*sessions.tsv")
     if subjects:
         subjects = _strip_entity(subjects)
+        subjects = [re.findall(r"\d{5}", x)[0] for x in subjects]
         sessions_tsv_list = [
             file
             for file in sessions_tsv_list
@@ -65,14 +66,12 @@ def run_pipeline(
                 column_name="dose",
                 scan_date=date,
             )
-            if dose:
-                dose = dose[0]
-            else:
+            if not dose:
                 continue
 
             mask = cleaned_sessions_tsv_df["acq_time"] == date
             row_id = mask.tolist().index(True)
-            cleaned_sessions_tsv_df.at[row_id, "dose"] = dose
+            cleaned_sessions_tsv_df.at[row_id, "dose"] = dose[0]
 
         cleaned_sessions_tsv_df = add_dose_mg(
             sessions_tsv_file, cleaned_sessions_tsv_df, subjects_visits_df

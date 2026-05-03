@@ -22,6 +22,7 @@ from _bids_conversion_utils import (
 
 from _general_utils import (
     _extract_subjects_visits_data,
+    _get_dataframe,
     _get_subject_visits,
     _standardize_dates,
 )
@@ -110,76 +111,72 @@ def _generate_dataset_metadata(bids_dir: Path) -> None:
     _create_or_append_participants_tsv(bids_dir)
 
 
-def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
-    if not subjects_visits_file:
-        return None
-
-    if str(subjects_visits_file).endswith(".xlsx") or str(
-        subjects_visits_file
-    ).endswith(".xls"):
-        return pd.read_excel(subjects_visits_file)
-    else:
-        return pd.read_csv(subjects_visits_file, sep=None, engine="python")
-
-
 def _get_folder_scan_dates(subject_nifti_files: list[Path]) -> list[str]:
-    original_scan_dates = sorted(
-        list(
-            set(
-                [
-                    subject_nifti_files.parent.name.split("_")[-1]
-                    for subject_nifti_files in subject_nifti_files
-                ]
-            )
-        )
+    subject_folders = list(
+        set([subject_nifti_file.parent for subject_nifti_file in subject_nifti_files])
     )
-    # In the event a folder is missing a date:
-    converted_scan_dates = []
-    for scan_date, subject_nifti_file in zip(original_scan_dates, subject_nifti_files):
-        if not scan_date:
-            converted_scan_dates.append("NaN")
-        else:
-            try:
-                # KKI likely has a pipeline that automatically labels folders with the "%y%m%d" date format
-                new_dates = [
-                    (
-                        str(pd.to_datetime([scan_date], format=r"%y%m%d")[0]).split()[0]
-                        if is_valid_date(scan_date, r"%y%m%d")
-                        else str(pd.to_datetime([scan_date])[0]).split()[0]
-                    )
-                ]
-                converted_scan_dates.append(new_dates[0])
-            except:
-                LGR.warning(
-                    f"The following folder does not have a valid date: {subject_nifti_file.parent}"
-                )
-                converted_scan_dates.append("NaN")
+    original_scan_dates = sorted(
+        [subject_folder.name.split("_")[-1] for subject_folder in subject_folders]
+    )
 
+    standardized_scan_dates = []
+    for scan_date, subject_folder in zip(original_scan_dates, subject_folders):
+        if not scan_date:
+            LGR.warning(
+                "The following folder does not have a valid date and will "
+                f"be removed from the temporary directory: {subject_folder}"
+            )
+            shutil.rmtree(subject_folder)
+            continue
+
+        try:
+            # KKI likely has a pipeline that automatically labels folders with the "%y%m%d" date format
+            new_dates = [
+                (
+                    str(pd.to_datetime([scan_date], format=r"%y%m%d")[0]).split()[0]
+                    if is_valid_date(scan_date, r"%y%m%d")
+                    else str(pd.to_datetime([scan_date])[0]).split()[0]
+                )
+            ]
+            standardized_scan_dates.append(new_dates[0])
+        except:
+            LGR.warning(
+                "The following folder does not have a valid date and will "
+                f"be removed from the temporary directory: {subject_folder}"
+            )
+            shutil.rmtree(subject_folder)
+
+    dates_tuples = list(zip(standardized_scan_dates, original_scan_dates))
+    dates_tuples = sorted(dates_tuples, key=lambda x: pd.to_datetime(x[0]))
+    standardized_scan_dates, original_scan_dates = zip(*dates_tuples)
     original_scan_date_map = {
-        k: v for k, v in zip(converted_scan_dates, original_scan_dates)
+        k: v for k, v in zip(standardized_scan_dates, original_scan_dates)
     }
 
-    return converted_scan_dates, original_scan_date_map
+    return standardized_scan_dates, original_scan_date_map
 
 
 def _get_subject_dosages(
-    participant_id: str,
-    subjects_visits_df: pd.DataFrame,
+    participant_id: str, subjects_visits_df: pd.DataFrame, scan_dates: list[str]
 ) -> dict[str, str] | None:
-    dosages = (
-        _extract_subjects_visits_data(
-            participant_id, subjects_visits_df, column_name="dose"
-        )
-        if "dose" in subjects_visits_df.columns
-        else None
-    )
-    if dosages is None:
-        return None
+    if "dose" not in subjects_visits_df.columns:
+        dosages = None
     else:
-        return {
-            f"0{session_id}": dosage
-            for session_id, dosage in enumerate(dosages, start=1)
+        dosages = {
+            scan_date: _extract_subjects_visits_data(
+                participant_id,
+                subjects_visits_df,
+                scan_date=scan_date,
+                column_name="dose",
+            )
+            for scan_date in scan_dates
         }
+        dosages = {
+            scan_date: (dose[0] if dose else float("NaN"))
+            for scan_date, dose in dosages.items()
+        }
+
+    return dosages
 
 
 def _combine_session_data(
@@ -188,6 +185,7 @@ def _combine_session_data(
     scan_dates: list[str],
     visit_dosage_map: dict[str, str] | None,
 ) -> list[tuple[str, str, float]]:
+    # Note, _standardize_dates already sorts on the id and the dates in pandas
     session_scan_date_map = {}
     if visit_session_map:
         session_scan_date_map = {
@@ -195,32 +193,46 @@ def _combine_session_data(
             for session_id, date in visit_session_map.items()
             if date in scan_dates
         }
-        missing_dates = {
-            date: date
-            for _, date in visit_session_map.items()
-            if date not in scan_dates
-        }
-        if missing_dates:
+        dates_not_in_source = sorted(
+            set(visit_session_map.values()).difference(scan_dates)
+        )
+        if dates_not_in_source:
             LGR.warning(
-                "The following dates are missing from the subject_visits_file "
-                f"for subject {participant_id} and will be used as the session id if a source "
-                f"folder has these dates: {missing_dates.keys()}"
+                "The following dates are in the subjects visits file but have no corresponding source folder "
+                f"for subject {participant_id}: {dates_not_in_source}\n"
+                f"Session order based on the subjects visits file will be maintained: {session_scan_date_map}"
             )
 
-            session_scan_date_map.update(missing_dates)
+        dates_not_in_visits_file = sorted(
+            set(scan_dates).difference(visit_session_map.values())
+        )
+        if dates_not_in_visits_file:
+            session_scan_date_map.update(
+                {date: date for date in dates_not_in_visits_file}
+            )
+            LGR.warning(
+                "The following dates are in the source folders but not in the subjects visits file "
+                f"for subject {participant_id}: {dates_not_in_source}\n"
+                f"The date will be used as the session label and the following label mapping will be used: {session_scan_date_map}"
+            )
 
     if not session_scan_date_map:
-        session_scan_date_map = {
-            f"0{session_id}": date
-            for session_id, date in enumerate(scan_dates, start=1)
-        }
+        # The subject visits file is considered the ultimate authority on session/date ordering
+        LGR.warning(
+            "Visit session mapping could not be done for subject (participant_id), using all "
+            f"dates as session labels {scan_dates}."
+        )
+        session_scan_date_map = {date: date for date in scan_dates}
 
     filtered_dosages = []
     if visit_dosage_map:
+        reversed_session_scan_date_map = {
+            date: ses_id for ses_id, date in session_scan_date_map.items()
+        }
+        # Going by date order in the session map to guarantee that dosages are always
+        # mapped to the correct dates
         filtered_dosages = [
-            dosage
-            for session_id, dosage in visit_dosage_map.items()
-            if session_id in session_scan_date_map
+            visit_dosage_map[date] for date in reversed_session_scan_date_map
         ]
 
     if not filtered_dosages:
@@ -257,7 +269,9 @@ def _generate_bids_dir_pipeline(
 
     bids_dir.mkdir(parents=True, exist_ok=True)
 
-    subjects_visits_df = _standardize_dates(_get_dataframe(subjects_visits_file))
+    subjects_visits_df = _standardize_dates(
+        _get_dataframe(subjects_visits_file), sort_data=True
+    )
 
     participant_ids = sorted(
         list(set([nifti_file.parent.name.split("_")[0] for nifti_file in nifti_files]))
@@ -265,16 +279,20 @@ def _generate_bids_dir_pipeline(
 
     for participant_id in participant_ids:
         subject_nifti_files = _filter_nifti_files(nifti_files, participant_id)
-        scan_dates, original_scan_date_map = _get_folder_scan_dates(subject_nifti_files)
+        standardized_scan_dates, original_scan_date_map = _get_folder_scan_dates(
+            subject_nifti_files
+        )
 
         visit_session_map = _get_subject_visits(
             participant_id,
             subjects_visits_df,
         )
-        visit_dosage_map = _get_subject_dosages(participant_id, subjects_visits_df)
+        visit_dosage_map = _get_subject_dosages(
+            participant_id, subjects_visits_df, standardized_scan_dates
+        )
 
         session_data_tuple = _combine_session_data(
-            participant_id, visit_session_map, scan_dates, visit_dosage_map
+            participant_id, visit_session_map, standardized_scan_dates, visit_dosage_map
         )
 
         sessions_dict = {"session_id": [], "acq_time": [], "dose": []}

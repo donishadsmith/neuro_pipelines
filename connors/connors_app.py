@@ -14,6 +14,12 @@ st.set_page_config(layout="centered")
 
 st.title("Connors 4 Score Extraction Pipeline")
 
+st.markdown(
+    "Pipeline for renaming the Connors 4 PDF files from an assortment of random letters and numbers into "
+    "the following standardized format: `sub-{sub_id}_date-{date}_rater-{rater}` (rater is either parent or child). "
+    "Also extracts all the Connors 4 PDF files for the available subjects outputs into a single CSV file for analyses."
+)
+
 st.divider()
 
 st.markdown("**Required Arguments**")

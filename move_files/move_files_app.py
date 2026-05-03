@@ -15,7 +15,9 @@ st.set_page_config(layout="centered")
 st.title("Move BIDS Files Pipeline")
 st.divider()
 
-st.markdown("""**Notes:**\n
+st.markdown("""
+Pipeline for moving BIDS events files or sessions TSV files into their respective subject directories in a BIDS dataset.\n
+**Notes:**\n
 - Source files must follow BIDS naming conventions (i.e., filenames must start with ``sub-``).
 - Destination subdirectories must already exist - files are skipped if the target directory is not found.
 - If a file with the same name already exists in the destination, it is overwritten.""")

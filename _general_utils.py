@@ -45,7 +45,6 @@ def _get_subject_visits(
     )
     if not visit_dates:
         LGR.warning(f"Subject {participant_id} has no visit dates.")
-
         return None
 
     return {
@@ -177,3 +176,15 @@ def _check_subjects_visits_file(
     )
 
     return subjects_visits_df if return_df else None
+
+
+def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
+    if not subjects_visits_file:
+        return None
+
+    if str(subjects_visits_file).endswith(".xlsx") or str(
+        subjects_visits_file
+    ).endswith(".xls"):
+        return pd.read_excel(subjects_visits_file)
+    else:
+        return pd.read_csv(subjects_visits_file, sep=None, engine="python")
