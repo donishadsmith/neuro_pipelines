@@ -109,7 +109,6 @@ from _utils import (
     VALID_TASK_NAMES,
     create_beta_files,
     embed_image,
-    delete_dir,
     get_beta_names,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
@@ -947,7 +946,6 @@ def main(
         subject_dir = (
             Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
         )
-        delete_dir(subject_dir.parent)
 
         if skip_denoising(nifti_file, exclude_nifti_files):
             LGR.info(

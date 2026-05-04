@@ -300,6 +300,10 @@ def _determine_complexgng_nogo_accuracy(event_df):
 # Stimulus duration is 300 ms
 # Based on Presentation experimental design, the nogo has the form
 # 1;{stimuli_presentation_number};Nogo;;{number_of_preceeding_gos}
+# Important: based on the Philips exam cards these tasks use ascending slice timing with 0 slice gap, so
+# there will be cross slice excitation. In addition, these tasks use a TR of 2.5 and have 98
+# volumes so collect 245 seconds of data. The Presentation tasks last for ~260 seconds, so the BIDS events
+# for this file is truncated to drop trials at the end if the onset and duration exceeds the 245 second limit
 def _create_gng_events_files(
     temp_dir,
     dst_dir,
@@ -379,6 +383,9 @@ def _create_gng_events_files(
         event_df["trial_type_accuracy"] = (
             event_df["trial_type"].astype(str) + "_" + event_df["accuracy"].astype(str)
         )
+
+        # Drop if onset + duration exceeds 245 seconds
+        event_df = event_df[(event_df["onset"] + event_df["duration"]) <= 245]
 
         # Getting subject ID and organising files to get subject ID
         subject_id = re.search("(\d+).*-", log_file.name).group(1)

@@ -43,7 +43,6 @@ from _utils import (
     VALID_TASK_NAMES,
     embed_image,
     create_beta_files,
-    delete_dir,
     plot_signal,
     skip_denoising,
 )
@@ -512,7 +511,6 @@ def main(
             LGR.info(f"Using the following mask file: {nifti_file}")
 
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
-        delete_dir(subject_dir.parent)
 
         if skip_denoising(nifti_file, exclude_nifti_files):
             LGR.info(
