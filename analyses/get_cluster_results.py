@@ -244,7 +244,7 @@ def get_cluster_size(
 
     if verbose:
         LGR.info(
-            "Cluster side for bisided using cluster-forming threshold "
+            "Cluster size for bisided using cluster-forming threshold "
             f"{parametric_voxel_correction_p} and cluster correction {parametric_cluster_correction_p}: {cluster_size}"
         )
 
