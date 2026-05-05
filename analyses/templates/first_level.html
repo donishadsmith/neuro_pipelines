@@ -134,8 +134,8 @@
         Prior to deconvolution, the upsampled seed timeseries was padded at both edges
         using reflect padding with a pad length of {{ pad_length }} samples
         (<code>pad_seconds / upsample_dt</code>) to minimize sharp boundary artifacts; the padding was
-        removed immediately after deconvolution. 
-        <strong>{{ hrf_model_desc }}</strong> 
+        removed immediately after deconvolution.
+        <strong>{{ hrf_model_desc }}</strong>
         The seed timeseries was deconvolved using AFNI's <code>3dTfitter -FALTUNG</code> with this impulse response function
         and the following penalty syntax:
         <code>{{ faltung_penalty_syntax }}</code>. Finally, the PPI

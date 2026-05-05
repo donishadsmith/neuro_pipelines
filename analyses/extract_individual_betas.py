@@ -283,8 +283,11 @@ def get_subject_beta_filenames(
 
     if parent_path:
         subject_beta_filenames = [
-            str(next(parent_path.rglob(f"*{Path(file).name}*")))
+            next(parent_path.rglob(f"*{Path(file).name}*"), None)
             for file in subject_beta_filenames
+        ]
+        subject_beta_filenames = [
+            str(file) if file else float("NaN") for file in subject_beta_filenames
         ]
 
     return subject_beta_filenames
@@ -304,6 +307,11 @@ def compute_average_betas(
         mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filenames[0]))
 
     for dose, subject_beta_filename in zip(doses, subject_beta_filenames):
+        subject_mask = (data_table["Subj"] == subject) & (data_table["dose"] == dose)
+        if pd.isna(subject_beta_filename):
+            average_betas[subject_mask] = float("NaN")
+            continue
+
         subject_beta_filename = Path(subject_beta_filename)
         subject = get_entity_value(
             subject_beta_filename.name, entity="sub", return_entity_prefix=True
@@ -311,7 +319,6 @@ def compute_average_betas(
         beta_img = nib.load(subject_beta_filename)
         beta_img_fdata = beta_img.get_fdata()
         average_beta = beta_img_fdata[mask_img.get_fdata() == 1].mean()
-        subject_mask = (data_table["Subj"] == subject) & (data_table["dose"] == dose)
         average_betas[subject_mask] = average_beta
 
     return average_betas
@@ -431,6 +438,8 @@ def main(
                             glm_beta_name,
                             parent_path=glm_dir,
                         )
+                        if pd.Series(glm_subject_beta_filenames).isna().all():
+                            continue
 
                         beta_coefficient_df["GLM Individual Cluster Beta"] = (
                             compute_average_betas(

@@ -119,6 +119,7 @@ LGR = setup_logger(__name__)
 
 EVENT_RELATED_TASKS = ["flanker", "simplegng", "complexgng"]
 
+
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description="Perform first level gPPI (task-based functional connectivty) for a task."
@@ -690,7 +691,7 @@ def deconvolve_seed_timeseries(
         f"1dcat {gamma_file_name}_tmp > {gamma_file_name}"
     )
 
-    # Perform deconvolution to estimate the neural response given the upsampled seed timeseries 
+    # Perform deconvolution to estimate the neural response given the upsampled seed timeseries
     # and an hrf response function, while also adding a penalty for better/smoother estimation
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "{hrf_cmd} && '
@@ -1151,12 +1152,14 @@ def main(
 
         # gPPI preparation
         seed_mask_path = Path(seed_mask_path)
-        
-        hrf_model_type = "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({upsample_dt}, 1)"
+
+        hrf_model_type = (
+            "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({upsample_dt}, 1)"
+        )
         hrf_model_desc = (
-            "A standard Gamma (GAM) function was used to model the impulse response for this event-related task." 
-            if task in EVENT_RELATED_TASKS else 
-            f"A custom {upsample_dt}s duration BLOCK function was simulated via 3dDeconvolve to model the impulse response for this block-design task."
+            "A standard Gamma (GAM) function was used to model the impulse response for this event-related task."
+            if task in EVENT_RELATED_TASKS
+            else f"A custom {upsample_dt}s duration BLOCK function was simulated via 3dDeconvolve to model the impulse response for this block-design task."
         )
 
         report.add_context(
