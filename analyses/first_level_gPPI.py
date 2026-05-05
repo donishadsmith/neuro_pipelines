@@ -495,16 +495,16 @@ def create_dynamic_deconvolve_gPPI_cmd(
     if task == "flanker":
         labels_dict = {
             "stims": (
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} congruent ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} incongruent ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} nogo ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} neutral ",
-                "-stim_times {time_label} {timing_file} 'GAM' -stim_label {label} errors ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_congruent ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_incongruent ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_nogo ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_neutral ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} congruent ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} incongruent ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} neutral ",
+                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_congruent ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_incongruent ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_nogo ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_neutral ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_errors ",
             ),
             "gltsyms": (
                 "-gltsym 'SYM: +1*PPI_incongruent -1*PPI_congruent' -glt_label {label} PPI_incongruent_vs_PPI_congruent ",
@@ -525,9 +525,9 @@ def create_dynamic_deconvolve_gPPI_cmd(
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
                 "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_go ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_nogo ",
-                "-stim_file {ppi_file} -stim_label {label} PPI_errors ",
+                "-stim_file {label}  {ppi_file} -stim_label {label} PPI_go ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_nogo ",
+                "-stim_file {label} {ppi_file} -stim_label {label} PPI_errors ",
             ),
             "gltsyms": (
                 "-gltsym 'SYM: +1*PPI_nogo -1*PPI_go' -glt_label {label} PPI_nogo_vs_PPI_go ",
@@ -562,7 +562,6 @@ def create_dynamic_deconvolve_gPPI_cmd(
             )
         else:
             stims += stim_string.format(
-                time_label=label,
                 label=label,
                 timing_file=timing_dir / f"{regressor}.1D",
             )
@@ -571,7 +570,7 @@ def create_dynamic_deconvolve_gPPI_cmd(
 
     # Length of the stims
     deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
-        num_labels=label - 1
+        num_labels=label
     )
 
     # Only keep gltsym with two
