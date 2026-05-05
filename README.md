@@ -58,8 +58,9 @@ In terminal:
 ```bash
 streamlit run app.py
 ```
-##### Homepage
+
 ![image](assets/hub.png)
+![image](assets/app.png)
 
 ### HPC (Conda)
 
