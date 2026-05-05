@@ -180,8 +180,8 @@ def get_individual_interpretations(
             ("activation", "deactivation")
             if "PPI_" not in beta_name
             else (
-                "increased_connectivity_with_seed_roi",
-                "decreased_connectivity_with_seed_roi",
+                "increased connectivity with seed roi",
+                "decreased connectivity with seed roi",
             )
         )
         interpretations = np.where(
