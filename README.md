@@ -61,9 +61,6 @@ streamlit run app.py
 ##### Homepage
 ![image](assets/hub.png)
 
-##### NIfTI to BIDS Pipeline Conversion Page
-![image](assets/pipeline1.png)
-
 ### HPC (Conda)
 
 ```bash
