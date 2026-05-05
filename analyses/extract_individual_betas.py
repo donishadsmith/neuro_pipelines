@@ -299,6 +299,7 @@ def compute_average_betas(
     mask_filename,
     mask_origin="cluster",
 ):
+    subjects = data_table["Subj"].tolist()
     doses = data_table["dose"].tolist()
     average_betas = np.full(data_table.shape[0], np.nan)
     mask_img = nib.load(mask_filename)
@@ -306,16 +307,13 @@ def compute_average_betas(
     if mask_origin == "seed":
         mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filenames[0]))
 
-    for dose, subject_beta_filename in zip(doses, subject_beta_filenames):
+    for subject, dose, subject_beta_filename in zip(subjects, doses, subject_beta_filenames):
         subject_mask = (data_table["Subj"] == subject) & (data_table["dose"] == dose)
         if pd.isna(subject_beta_filename):
             average_betas[subject_mask] = float("NaN")
             continue
 
         subject_beta_filename = Path(subject_beta_filename)
-        subject = get_entity_value(
-            subject_beta_filename.name, entity="sub", return_entity_prefix=True
-        )
         beta_img = nib.load(subject_beta_filename)
         beta_img_fdata = beta_img.get_fdata()
         average_beta = beta_img_fdata[mask_img.get_fdata() == 1].mean()
