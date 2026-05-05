@@ -18,10 +18,10 @@ def _select_content(content):
     window.withdraw()
     window.wm_attributes("-topmost", 1)
     if content == "directory":
-        folder = filedialog.askdirectory(master=window)
+        path = filedialog.askdirectory(master=window)
     else:
-        folder = filedialog.askopenfilename(master=window)
+        path = filedialog.askopenfilename(master=window)
 
     window.destroy()
 
-    return folder
+    return path
