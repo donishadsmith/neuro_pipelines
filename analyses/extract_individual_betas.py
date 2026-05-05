@@ -436,57 +436,55 @@ def main(
                             glm_beta_name,
                             parent_path=glm_dir,
                         )
-                        if pd.Series(glm_subject_beta_filenames).isna().all():
-                            continue
-
-                        beta_coefficient_df["GLM Individual Cluster Beta"] = (
-                            compute_average_betas(
-                                beta_coefficient_df,
-                                glm_subject_beta_filenames,
-                                cluster_mask_filename,
-                            )
-                        )
-
-                        beta_coefficient_df[
-                            "GLM Individual Cluster Beta Interpretation"
-                        ] = get_individual_interpretations(
-                            beta_coefficient_df,
-                            beta_name,
-                            mask_origin="cluster",
-                            analysis_type="glm",
-                            remove_PPI_prefix=True,
-                        )
-
-                        if seed_mask_path:
-                            possible_coordinate = get_coordinate_from_filename(
-                                seed_mask_path
-                            )
-                            if possible_coordinate:
-                                beta_coefficient_df["Seed MNI Coordinate"] = (
-                                    possible_coordinate
-                                )
-
-                            LGR.info(
-                                f"Using the following seed mask path: {seed_mask_path}"
-                            )
-
-                            beta_coefficient_df["GLM Individual Seed Beta"] = (
+                        if not pd.Series(glm_subject_beta_filenames).isna().all():
+                            beta_coefficient_df["GLM Individual Cluster Beta"] = (
                                 compute_average_betas(
                                     beta_coefficient_df,
                                     glm_subject_beta_filenames,
-                                    seed_mask_path,
-                                    mask_origin="seed",
+                                    cluster_mask_filename,
                                 )
                             )
+
                             beta_coefficient_df[
-                                "GLM Individual Seed Beta Interpretation"
+                                "GLM Individual Cluster Beta Interpretation"
                             ] = get_individual_interpretations(
                                 beta_coefficient_df,
                                 beta_name,
-                                mask_origin="seed",
+                                mask_origin="cluster",
                                 analysis_type="glm",
                                 remove_PPI_prefix=True,
                             )
+
+                            if seed_mask_path:
+                                possible_coordinate = get_coordinate_from_filename(
+                                    seed_mask_path
+                                )
+                                if possible_coordinate:
+                                    beta_coefficient_df["Seed MNI Coordinate"] = (
+                                        possible_coordinate
+                                    )
+
+                                LGR.info(
+                                    f"Using the following seed mask path: {seed_mask_path}"
+                                )
+
+                                beta_coefficient_df["GLM Individual Seed Beta"] = (
+                                    compute_average_betas(
+                                        beta_coefficient_df,
+                                        glm_subject_beta_filenames,
+                                        seed_mask_path,
+                                        mask_origin="seed",
+                                    )
+                                )
+                                beta_coefficient_df[
+                                    "GLM Individual Seed Beta Interpretation"
+                                ] = get_individual_interpretations(
+                                    beta_coefficient_df,
+                                    beta_name,
+                                    mask_origin="seed",
+                                    analysis_type="glm",
+                                    remove_PPI_prefix=True,
+                                )
 
                     if analysis_type == "gPPI":
                         beta_coefficient_df["GPPI Units of Beta Coefficient"] = (
