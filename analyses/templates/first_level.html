@@ -119,7 +119,7 @@
         {% endif %}
         <tr><td>Upsample dt (Seed Timeseries Denoising)</td><td>{{ upsample_dt }} s</td></tr>
         <tr><td>Pad Seconds</td><td>{{ pad_seconds }} s</td></tr>
-
+        <tr><td>HRF Model Type</td><td><code>{{ hrf_model_type }}</code></td></tr>
     </table>
 
     <p>
@@ -134,12 +134,13 @@
         Prior to deconvolution, the upsampled seed timeseries was padded at both edges
         using reflect padding with a pad length of {{ pad_length }} samples
         (<code>pad_seconds / upsample_dt</code>) to minimize sharp boundary artifacts; the padding was
-        removed immediately after deconvolution. The seed timeseries was then deconvolved using
-        AFNI's <code>3dTfitter -FALTUNG</code> with the GAM impulse response function
-        (generated via <code>waver -GAM</code>) and the following penalty syntax:
-        <code>{{ faltung_penalty_syntax }}</code>. Finally, using AFNI's <code>waver -GAM</code>, the PPI
+        removed immediately after deconvolution. 
+        <strong>{{ hrf_model_desc }}</strong> 
+        The seed timeseries was deconvolved using AFNI's <code>3dTfitter -FALTUNG</code> with this impulse response function
+        and the following penalty syntax:
+        <code>{{ faltung_penalty_syntax }}</code>. Finally, the PPI
         interaction term was created by multiplying the deconvolved neural signal with the mean-centered
-        binary condition vector (via <code>1deval</code>) and convolving the product with GAM. The PPI
+        binary condition vector (via <code>1deval</code>) and convolving the product with the selected HRF model. The PPI
         interaction term was then downsampled back to the original TR grid of {{ tr }} s.
     </p>
 </div>

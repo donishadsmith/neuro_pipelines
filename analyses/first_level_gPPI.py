@@ -7,11 +7,9 @@ Papers:
 
 Forums:
 1) https://discuss.afni.nimh.nih.gov/t/gppi-analysis-and-upsampling/172
-
-AFNI:
-1) https://afni.nimh.nih.gov/CD-CorrAna
 2) https://web.archive.org/web/20241103095511/https://afni.nimh.nih.gov/CD-CorrAna
    (archived website)
+3) https://discuss.afni.nimh.nih.gov/t/how-to-do-gppi-to-event-related-fmri/457/4
 
 1) Collect confounds and create censor file
 2) PSC scaling of NIfTI image, compute mean for censored files
@@ -40,7 +38,7 @@ For each condition in task (6-10):
 8) Deconvolve seed timeseries to get the neural signal that will later
    interact with the task regressor and this interaction will be convolved.
 9) Create PPI term PPI = ([neural signal * binary_condition_vector] * hrf)(t).
-   Use GAM.
+   Use GAM for event-related tasks, and a simulated BLOCK function for block-design tasks.
 10) Downsample the PPI term back down to the true TR grid
 
 After:
@@ -119,6 +117,7 @@ from _utils import (
 
 LGR = setup_logger(__name__)
 
+EVENT_RELATED_TASKS = ["flanker", "simplegng", "complexgng"]
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
@@ -647,6 +646,7 @@ def deconvolve_seed_timeseries(
     pad_seconds,
     faltung_penalty_syntax,
     afni_img_path,
+    task,
 ):
     gamma_file_name = upsampled_seed_timeseries_file.parent / "GammaHR.1D"
     deconvolved_seed_timeseries_file = (
@@ -678,12 +678,22 @@ def deconvolve_seed_timeseries(
         padded_upsampled_seed_timeseries_file, padded_arr.reshape(-1, 1), fmt="%f"
     )
 
-    # Create impulse response function (GAM) and perform deconvolution to estimate the neural response given the
-    # upsampled seed timeseries and an impulse response function, while also adding a penalty for better/smoother
-    # estimation
+    # https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDeconvolve.html
+    # https://doi.org/10.1002/hbm.26047
+    # Creating 30 second hrf
+    hrf_model = "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({upsample_dt},1)"
+
+    hrf_cmd = (
+        f"3dDeconvolve -nodata {int(30 / upsample_dt)} {upsample_dt} -polort -1 "
+        f"-num_stimts 1 -stim_times 1 '1D: 0' '{hrf_model}' "
+        f"-x1D {gamma_file_name}_tmp -x1D_stop -quiet && "
+        f"1dcat {gamma_file_name}_tmp > {gamma_file_name}"
+    )
+
+    # Perform deconvolution to estimate the neural response given the upsampled seed timeseries 
+    # and an hrf response function, while also adding a penalty for better/smoother estimation
     cmd = (
-        f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "waver '
-        f"-dt {upsample_dt} -GAM -inline 1@1 > {gamma_file_name} && "
+        f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "{hrf_cmd} && '
         f"3dTfitter -RHS {padded_upsampled_seed_timeseries_file} "
         f'-FALTUNG {gamma_file_name} {padded_deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
     )
@@ -691,9 +701,6 @@ def deconvolve_seed_timeseries(
     LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
-    # Note: deconvolved file ends up being saved as a column vector as opposed to a row vector here
-    # AFNI saves the deconvolved file as a row; hence for create interaction term the deconvolved
-    # file does not need \\'
     deconvolved_arr = np.loadtxt(padded_deconvolved_seed_timeseries_file)[
         pad_length:-pad_length
     ]
@@ -703,6 +710,7 @@ def deconvolve_seed_timeseries(
 
     padded_upsampled_seed_timeseries_file.unlink()
     padded_deconvolved_seed_timeseries_file.unlink()
+    Path(f"{gamma_file_name}_tmp").unlink()
 
     return deconvolved_seed_timeseries_file
 
@@ -752,8 +760,6 @@ def create_convolved_ppi_term(
     afni_img_path,
     upsample_dt,
 ):
-    # waver -GAM -peak 1 -TR ?  -input Inter_neuA.1D -numout #TRs > Inter_A.1D
-    # PPI = ([neural signal * binary_condition_vector] * hrf)(t)
     neural_interaction_file = (
         deconvolved_seed_timeseries_file.parent
         / upsampled_condition_regressor_file.name.replace(
@@ -765,6 +771,10 @@ def create_convolved_ppi_term(
     )
 
     numout = np.loadtxt(deconvolved_seed_timeseries_file).size
+    gamma_file_name = deconvolved_seed_timeseries_file.parent / "GammaHR.1D"
+
+    # PPI = ([neural signal * binary_condition_vector] * hrf)(t)
+    convolution_cmd = f"waver -FILE {upsample_dt} {gamma_file_name} -peak 1 -input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"
 
     # Create the interaction, which simply zeroes the parts when the condition is not active
     # Then reconvolve the interaction term to get the estimated HRF, ensure no extended tail due to convolution
@@ -773,8 +783,7 @@ def create_convolved_ppi_term(
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "1deval '
         f"-a {deconvolved_seed_timeseries_file} -b {upsampled_condition_regressor_file} "
         f"-expr 'a*b' > {neural_interaction_file} && "
-        f"waver -GAM -peak 1 -TR {upsample_dt} "
-        f'-input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"'
+        f'{convolution_cmd}"'
     )
 
     LGR.info(f"Reconvolving upsampled PPI regressor: {cmd}")
@@ -1142,6 +1151,13 @@ def main(
 
         # gPPI preparation
         seed_mask_path = Path(seed_mask_path)
+        
+        hrf_model_type = "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({upsample_dt}, 1)"
+        hrf_model_desc = (
+            "A standard Gamma (GAM) function was used to model the impulse response for this event-related task." 
+            if task in EVENT_RELATED_TASKS else 
+            f"A custom {upsample_dt}s duration BLOCK function was simulated via 3dDeconvolve to model the impulse response for this block-design task."
+        )
 
         report.add_context(
             seed_mask_path=str(seed_mask_path),
@@ -1151,6 +1167,8 @@ def main(
             pad_length=int(pad_seconds / upsample_dt),
             faltung_penalty_syntax=faltung_penalty_syntax,
             tr=tr,
+            hrf_model_type=hrf_model_type,
+            hrf_model_desc=hrf_model_desc,
         )
 
         ppi_dir = timing_dir / "ppi"
@@ -1197,6 +1215,7 @@ def main(
             pad_seconds,
             faltung_penalty_syntax,
             afni_img_path,
+            task,
         )
         plot_title = "Deconvolved Seed Timeseries"
         deconvolved_seed_timeseries_plot_filename = plot_signal(
