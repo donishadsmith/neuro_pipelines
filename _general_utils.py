@@ -1,4 +1,4 @@
-import csv
+import csv, tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -16,6 +16,33 @@ def _convert_to_bool(arg: bool | str) -> bool:
         return False
     else:
         raise ValueError("For booleans, only 'True' and 'False' are valid.")
+
+
+def _resolve_directories(bids_dir, temp_dir, caller):
+    base_folder = {
+        "BIDS Dataset": "BIDS_Dataset",
+        "BIDS Events": "BIDS Events",
+        "Behavioral Data": "Behavioral_Data",
+    }
+    if not bids_dir:
+        bids_dir = Path().home() / base_folder[caller]
+    else:
+        bids_dir = Path(bids_dir)
+
+    bids_dir.mkdir(parents=True, exist_ok=True)
+
+    use_tempfile = bool(temp_dir)
+    temp_dir = temp_dir or tempfile.TemporaryDirectory().name
+    temp_dir = Path(temp_dir)
+    if temp_dir.exists() and not use_tempfile:
+        raise FileExistsError(
+            "The temporary directory exists; either choose another name or "
+            f"delete the following directory: {temp_dir}"
+        )
+
+    temp_dir(parents=True, exist_ok=True)
+
+    return bids_dir, temp_dir
 
 
 def _extract_subjects_visits_data(

@@ -307,7 +307,9 @@ def compute_average_betas(
     if mask_origin == "seed":
         mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filenames[0]))
 
-    for subject, dose, subject_beta_filename in zip(subjects, doses, subject_beta_filenames):
+    for subject, dose, subject_beta_filename in zip(
+        subjects, doses, subject_beta_filenames
+    ):
         subject_mask = (data_table["Subj"] == subject) & (data_table["dose"] == dose)
         if pd.isna(subject_beta_filename):
             average_betas[subject_mask] = float("NaN")

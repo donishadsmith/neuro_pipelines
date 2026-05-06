@@ -528,6 +528,11 @@ def main(
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
+        dummy_method = (
+            "user-specified"
+            if n_dummy_scans != "auto"
+            else "(number of 'non_steady_state_XX' columns in fMRIPrep confounds TSV)"
+        )
         if n_dummy_scans == "auto":
             n_dummy_scans = compute_n_dummy_scans(confounds_df)
             LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
@@ -555,6 +560,8 @@ def main(
             n_censored_volumes=int(n_censored),
             n_total_volumes=int(kept.size),
             percent_censored=float(percent_censored),
+            dummy_method=dummy_method,
+            n_dummy_scans=n_dummy_scans,
         )
 
         if percent_censored > exclusion_criteria:

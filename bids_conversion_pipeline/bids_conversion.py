@@ -1,4 +1,4 @@
-import tempfile, re, shutil, sys
+import re, shutil, sys
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -13,35 +13,12 @@ from bidsaid.logging import setup_logger
 from bidsaid.path_utils import is_valid_date
 
 from _bids_conversion_utils import _strip_entity
-from _general_utils import _check_subjects_visits_file
+from _general_utils import _check_subjects_visits_file, _resolve_directories
 from standardize_task_names import _standardize_task_pipeline
 from create_bids_dir import _generate_bids_dir_pipeline
 from create_metadata import _create_json_sidecar_pipeline
 
 LGR = setup_logger(__name__)
-
-
-def _resolve_directories(bids_dir, temp_dir):
-    if not bids_dir:
-        bids_dir = Path().home() / "BIDS_Dataset"
-    else:
-        bids_dir = Path(bids_dir)
-
-    if not bids_dir.exists():
-        bids_dir.mkdir()
-
-    use_tempfile = bool(temp_dir)
-    temp_dir = temp_dir or tempfile.TemporaryDirectory().name
-    temp_dir = Path(temp_dir)
-    if not temp_dir.exists():
-        temp_dir.mkdir()
-    elif temp_dir.exists() and not use_tempfile:
-        raise FileExistsError(
-            "The temporary directory exists; either choose another name or "
-            f"delete the following directory: {temp_dir}"
-        )
-
-    return bids_dir, temp_dir
 
 
 def _filter_subjects(
@@ -207,7 +184,9 @@ def run_pipeline(
         _check_subjects_visits_file(subjects_visits_file, dose_column_required=False)
 
         LGR.info("Resolving directories...")
-        bids_dir, temp_dir = _resolve_directories(bids_dir, temp_dir)
+        bids_dir, temp_dir = _resolve_directories(
+            bids_dir, temp_dir, caller="BIDS Dataset"
+        )
 
         if subjects:
             subjects = _strip_entity(subjects)

@@ -20,7 +20,13 @@ from bidsaid.events import (
 from bidsaid.io import _copy_file
 from bidsaid.logging import setup_logger
 
-from _general_utils import _get_dataframe, _get_subject_visits, _standardize_dates
+from _general_utils import (
+    SubjectsVisitsFileError,
+    _get_dataframe,
+    _get_subject_visits,
+    _resolve_directories,
+    _standardize_dates,
+)
 
 LGR = setup_logger(__name__)
 
@@ -35,35 +41,6 @@ FILE_SIZE_MINIMUM_KB = {
         "mtlr": 8,
     },
 }
-
-
-class SubjectsVisitsFileError(Exception):
-    """Exception for issues with the subjects sessions file."""
-
-
-def _resolve_directories(dst_dir, temp_dir, caller):
-    if not dst_dir:
-        dst_dir = Path().home() / (
-            "BIDS_Events" if caller == "BIDS Events" else "Behavioral_Data"
-        )
-    else:
-        dst_dir = Path(dst_dir)
-
-    if not dst_dir.exists():
-        dst_dir.mkdir()
-
-    use_tempfile = bool(temp_dir)
-    temp_dir = temp_dir or tempfile.TemporaryDirectory().name
-    temp_dir = Path(temp_dir)
-    if not temp_dir.exists():
-        temp_dir.mkdir()
-    elif temp_dir.exists() and not use_tempfile:
-        raise FileExistsError(
-            "The temporary directory exists; either choose another name or "
-            f"delete the following directory: {temp_dir}"
-        )
-
-    return dst_dir, temp_dir
 
 
 def _filter_log_files(log_files, subjects, exclude_filenames):

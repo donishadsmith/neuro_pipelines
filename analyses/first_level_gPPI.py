@@ -569,9 +569,7 @@ def create_dynamic_deconvolve_gPPI_cmd(
     stims = stims.rstrip()
 
     # Length of the stims
-    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
-        num_labels=label
-    )
+    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(num_labels=label)
 
     # Only keep gltsym with two
     kept_gltsyms = []
@@ -846,7 +844,8 @@ def main(
     for session in sessions:
         report = HTMLReport(subject, session, task, analysis_type="gPPI")
         report_path = (
-            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-gPPI_report.html"
+            report_dir
+            / f"sub-{subject}_ses-{session}_task-{task}_desc-gPPI_report.html"
         )
 
         confounds_tsv_files = layout.get(
@@ -972,6 +971,11 @@ def main(
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
+        dummy_method = (
+            "user-specified"
+            if n_dummy_scans != "auto"
+            else "(number of 'non_steady_state_XX' columns in fMRIPrep confounds TSV)"
+        )
         if n_dummy_scans == "auto":
             n_dummy_scans = compute_n_dummy_scans(confounds_df)
             LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
@@ -999,6 +1003,8 @@ def main(
             n_censored_volumes=int(n_censored),
             n_total_volumes=int(kept.size),
             percent_censored=float(percent_censored),
+            dummy_method=dummy_method,
+            n_dummy_scans=n_dummy_scans,
         )
 
         if percent_censored > exclusion_criteria:

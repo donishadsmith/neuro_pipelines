@@ -73,9 +73,10 @@
         <tr><td>Selected components</td><td>{{ acompcor_component_names | join(", ") }}</td></tr>
         <tr><td>High-pass filtering</td><td>cosine basis set (128 s / 0.008 Hz cutoff)</td></tr>
         <tr><td>Cosine parameter names</td><td>{{ cosine_parameter_names | join(", ") }}</td></tr>
+        <tr><td>Number of non-steady state scans removed</td><td>{{ n_dummy_scans}} ({{ dummy_method }})</td></tr>
         <tr><td>FD threshold</td><td>{{ fd_threshold }} mm</td></tr>
         <tr><td>Outlier exclusion threshold</td><td>{{ exclusion_criteria * 100 }}%</td></tr>
-        <tr><td>Volumes flagged</td><td>{{ n_censored_volumes }} / {{ n_total_volumes }} ({{ "%.1f" | format(percent_censored * 100) }}%)</td></tr>
+        <tr><td>Volumes flagged (excluding non-steady state scans)</td><td>{{ n_censored_volumes }} / {{ n_total_volumes }} ({{ "%.1f" | format(percent_censored * 100) }}%)</td></tr>
         {% if dropped_regressors %}
         <tr><td>Dropped regressors (collinear/constant)</td><td>{{ dropped_regressors | join(", ") }}</td></tr>
         {% endif %}
