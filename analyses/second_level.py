@@ -947,8 +947,8 @@ def create_comparison_matrices(
     return matrices_filenames_dict, report_info
 
 
-def set_permutations(max_permutation):
-    n_permutations = min(max_permutation, 10000)
+def set_permutations(true_max_permutation):
+    n_permutations = min(true_max_permutation, 10000)
 
     LGR.info(f"Setting number of permutations to: {n_permutations}")
 
@@ -957,10 +957,12 @@ def set_permutations(max_permutation):
 
 def compute_n_permutation(glt_data_table):
     n_subjects = len(glt_data_table["Subj"].unique())
-    max_permutation = 2**n_subjects
-    LGR.info(f"Maximum permutations possible = {max_permutation}")
+    true_max_permutation = 2**n_subjects
+    LGR.info(f"Maximum permutations possible = {true_max_permutation}")
 
-    return set_permutations(max_permutation), max_permutation
+    n_permutations = set_permutations(true_max_permutation)
+
+    return n_permutations, true_max_permutation
 
 
 def create_concatenated_image(
@@ -1468,7 +1470,7 @@ def main(
                 max_permutations, true_max_permutations = (
                     compute_n_permutation(glt_data_table)
                     if n_permutations == "auto"
-                    else n_permutations
+                    else (n_permutations, n_permutations)
                 )
 
                 concatenated_filename = create_concatenated_image(
