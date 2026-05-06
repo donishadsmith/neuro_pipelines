@@ -974,7 +974,7 @@ def main(
         dummy_method = (
             "user-specified"
             if n_dummy_scans != "auto"
-            else "(number of 'non_steady_state_XX' columns in fMRIPrep confounds TSV)"
+            else "(number of 'non_steady_state_outlier_XX' columns in fMRIPrep confounds TSV)"
         )
         if n_dummy_scans == "auto":
             n_dummy_scans = compute_n_dummy_scans(confounds_df)
