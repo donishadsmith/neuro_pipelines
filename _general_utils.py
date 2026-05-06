@@ -40,7 +40,7 @@ def _resolve_directories(bids_dir, temp_dir, caller):
             f"delete the following directory: {temp_dir}"
         )
 
-    temp_dir(parents=True, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     return bids_dir, temp_dir
 
