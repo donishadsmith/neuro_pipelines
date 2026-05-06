@@ -389,7 +389,7 @@ def main(
     )
     if not sessions:
         session = "NaN"
-        report = HTMLReport(subject, session, task, analysis_type="gPPI")
+        report = HTMLReport(subject, session, task, analysis_type="glm")
         report_path = (
             report_dir / f"sub-{subject}_ses-NaN_task-{task}_desc-glm_report.html"
         )
@@ -402,7 +402,7 @@ def main(
         sys.exit(status=1)
 
     for session in sessions:
-        report = HTMLReport(subject, session, task, analysis_type="gPPI")
+        report = HTMLReport(subject, session, task, analysis_type="glm")
         report_path = (
             report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
         )
