@@ -833,7 +833,7 @@ def main(
         session = "NaN"
         report = HTMLReport(subject, session, task, analysis_type="gPPI")
         report_path = (
-            report_dir / f"sub-{subject}_ses-NaN_task-{task}_desc-glm_report.html"
+            report_dir / f"sub-{subject}_ses-NaN_task-{task}_desc-gPPI_report.html"
         )
         msg = f"No sessions for {subject} for {task}."
         LGR.warning(msg)
@@ -846,7 +846,7 @@ def main(
     for session in sessions:
         report = HTMLReport(subject, session, task, analysis_type="gPPI")
         report_path = (
-            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
+            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-gPPI_report.html"
         )
 
         confounds_tsv_files = layout.get(
