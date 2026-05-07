@@ -83,6 +83,8 @@ echo Hostname: $(hostname)
 echo ID: $(id)
 getent passwd "$(id -u)"
 
+# For node failure issues use the --exclude flag
+
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
