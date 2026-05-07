@@ -71,9 +71,9 @@ if [[ -n $EXCLUDE_NIFTI_FILES ]]; then
 	CMD+=" --exclude_nifti_files $EXCLUDE_NIFTI_FILES"
 fi
 
-# hostname
-# id
-# getent passwd "$(id -u)" || echo "getent failed"
+echo Hostname: $(hostname)
+echo ID: $(id)
+getent passwd "$(id -u)"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
