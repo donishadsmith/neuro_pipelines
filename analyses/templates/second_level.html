@@ -71,8 +71,8 @@
     <h2>Covariates</h2>
     <table>
         <tr><th>Parameter</th><th></th></tr>
-        <tr><td>Categorical covariates (user-specified)</td><td>{{ categorical_covariates | join(", ") if categorical_covariates else "None" }}</td></tr>
-        <tr><td>Numerical covariates (user-specified)</td><td>{{ numerical_covariates | join(", ") if numerical_covariates else "None" }}</td></tr>
+        <tr><td>Categorical voxel-level covariates (user-specified)</td><td>{{ categorical_covariates | join(", ") if categorical_covariates else "None" }}</td></tr>
+        <tr><td>Numerical voxel-level covariates (user-specified)</td><td>{{ numerical_covariates | join(", ") if numerical_covariates else "None" }}</td></tr>
         {% if dropped_columns %}
         <tr><td>Dropped covariates after data checks (constant or all missing)</td><td>{{ dropped_columns | join(", ") }}</td></tr>
         {% endif %}
