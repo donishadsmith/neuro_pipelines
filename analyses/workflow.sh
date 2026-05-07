@@ -61,7 +61,7 @@ export FILTER_CORRECT_TRIALS=false                       # Filter event-related 
 
 # GPPI SPECIFIC PARAMETERS
 export GPPI_UPSAMPLE_DT=0.1						         # Choose float, Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.
-export GPPI_PAD_SECONDS=10.0                             # Choose float, pads timeseries for deconvolution for gPPI
+export GPPI_PAD_SECONDS=30.0                             # Choose float, pads timeseries for deconvolution for gPPI
 export GPPI_FALTUNG_PENALTY_SYNTAX="012 0"               # Deconvolution penalty syntax. See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"
 
 # ------------------------------------------------

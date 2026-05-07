@@ -26,7 +26,7 @@ For each condition in task (6-10):
 6) Upsample seed timeseries (https://www.nature.com/articles/s42003-024-07088-3) and task regressor to 0.1
    (TR_orig/ TR_sub is equal to number of points added between each TR or
    the duration / TR_sub is equal to the number of points added after each onset
-   time).
+   time). Improves the convolution procedure.
    Resources:
         1) https://discuss.afni.nimh.nih.gov/t/gppi-analysis-and-upsampling/172
         2) https://www.nature.com/articles/s42003-024-07088-3
@@ -36,9 +36,16 @@ For each condition in task (6-10):
    term. Great paper about this:
    https://direct.mit.edu/imag/article/doi/10.1162/IMAG.a.989/133601/Common-pitfalls-during-model-specification-in
 8) Deconvolve seed timeseries to get the neural signal that will later
-   interact with the task regressor and this interaction will be convolved.
+   interact with the task regressor and this interaction will be convolved. The seed timeseries
+   is not directly multiplied by the convolved task timing because the seed timeseries itself (assuming it
+   is affected by the task) is already the observed product of the neural signal and task, so
+   direct interaction results in (neural signal of seed * hrf) x (task * hrf) != (neural signal of seed x Task) * hrf.
+   Though finding the best estimate of the neural signal based on observed BOLD = Ideal Hrf * neural signal of seed
+   is a noisy, imperfect operation which is compounded by the fact that the observed BOLD timeseries is itself
+   the true BOLD + noise, which denoising can help but never fully fix.
 9) Create PPI term PPI = ([neural signal * binary_condition_vector] * hrf)(t).
    Use GAM for event-related tasks, and a simulated BLOCK function for block-design tasks.
+   Basically use same hrf funcion used for task in GLM.
 10) Downsample the PPI term back down to the true TR grid
 
 After:
@@ -204,7 +211,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--exclusion_criteria",
         dest="exclusion_criteria",
-        default=0.30,
+        default=0.20,
         type=float,
         required=False,
         help=(
@@ -259,7 +266,7 @@ def _get_cmd_args():
     parser.add_argument(
         "--pad_seconds",
         dest="pad_seconds",
-        default=10.0,
+        default=30.0,
         type=float,
         required=False,
         help=(
@@ -352,11 +359,11 @@ def denoise_seed_timeseries(
 
     # Note: Some Afni functions only accept rows and require \', using \\' to
     # make the backslash literal
-    # Check the diagnostic plots to ensure there are not several long continuous gaps of 
+    # Check the diagnostic plots to ensure there are not several long continuous gaps of
     # censored volumes since that run may need to be discarded. Appears to be
     # no best approach for dealing with high-motion prior to deconvolution
-    # everything has a tradeoff. The framewise displacement threshold of 0.5 
-    # combined with outlier threshold of 0.30 should capture a good amount of
+    # everything has a tradeoff. The framewise displacement threshold of 0.5
+    # combined with outlier threshold of 0.20 should capture a good amount of
     # unusable runs with severe motion
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "

@@ -39,7 +39,7 @@ FD_THRESHOLD=${FD_THRESHOLD:-0.5}                                     # Choose a
 EXCLUSION_CRITERIA=${EXCLUSION_CRITERIA:-0.3}                         # Choose a float between 0.20-0.40
 FWHM=${FWHM:-6}                                                       # Choose integer
 GPPI_UPSAMPLE_DT=${GPPI_UPSAMPLE_DT:-0.1} 						      # Choose float, Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.
-GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-10.0}                            # Choose float, pads timeseries for deconvolution for gPPI
+GPPI_PAD_SECONDS=${GPPI_PAD_SECONDS:-30.0}                            # Choose float, pads timeseries for deconvolution for gPPI
 GPPI_FALTUNG_PENALTY_SYNTAX=${GPPI_FALTUNG_PENALTY_SYNTAX:-"012 0"}   # Deconvolution penalty syntax. See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"
 
 # Extract one subject from the like corresponding to the current
