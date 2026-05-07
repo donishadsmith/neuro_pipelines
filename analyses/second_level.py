@@ -1276,11 +1276,9 @@ def main(
         )
         data_table.to_csv(data_table_filename, sep="\t", index=False, encoding="utf-8")
 
-        missing_covariates = [
-            cov
-            for cov in datacontainer.included_covariates
-            if cov not in important_columns
-        ]
+        missing_covariates = list(
+            set(datacontainer.included_covariates).difference(important_columns)
+        )
         if missing_covariates:
             datacontainer.categorical_covariates = list(
                 set(datacontainer.categorical_covariates).difference(missing_covariates)
