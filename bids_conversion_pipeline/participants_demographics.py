@@ -36,6 +36,7 @@ def _change_dtype(merged_df):
 def run_pipeline(participants_tsv_path, demographics_file, covariates_to_add) -> None:
     participant_df = pd.read_csv(participants_tsv_path, sep="\t")
     demographic_df = _get_demographic_df(demographics_file)
+    demographic_df.columns = [col.strip() for col in demographic_df.columns]
     if "participant_id" not in demographic_df.columns:
         raise ValueError("`participant_id` must be a column in `demographics_file`.")
 
@@ -72,6 +73,11 @@ def run_pipeline(participants_tsv_path, demographics_file, covariates_to_add) ->
             participant_df, demographic_df[covariates], on="participant_id", how="left"
         )
         merged_df = merged_df.T.drop_duplicates().T
+        merged_df.columns = [
+            col.removesuffix("_x").removesuffix("_y")
+            for col in merged_df.columns
+            if col.removesuffix("_x").removesuffix("_y") in covariates
+        ]
         merged_df["participant_id"] = merged_df["participant_id"].apply(
             lambda x: f"sub-{x}"
         )
@@ -79,8 +85,8 @@ def run_pipeline(participants_tsv_path, demographics_file, covariates_to_add) ->
         merged_df.columns = [col.lower() for col in merged_df.columns]
         merged_df = merged_df.dropna(axis=1, how="all")
 
-        LGR.info(f"Columns in 'participants.tsv': {merged_df}")
+        LGR.info(f"Columns in 'participants.tsv': {merged_df.columns.to_list()}")
 
         merged_df.to_csv(participants_tsv_path, sep="\t", index=None)
 
-        return merged_df.colums
+        return merged_df.columns.tolist()

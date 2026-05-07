@@ -199,8 +199,8 @@ def create_timing_files(
         trial_df = event_df[event_df["trial_type"] == trial_type]
         row_mask = (
             trial_df["accuracy"] == "correct"
-            if separate_trials_by_accuracy else
-            np.full(len(trial_df), True, dtype=bool)
+            if separate_trials_by_accuracy
+            else np.full(len(trial_df), True, dtype=bool)
         )
 
         timing_data = (

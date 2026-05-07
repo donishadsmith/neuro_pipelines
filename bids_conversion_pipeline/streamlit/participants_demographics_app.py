@@ -131,7 +131,7 @@ if st.button("Run Pipeline", type="primary"):
             columns = run_pipeline(**kwargs)
 
         st.success(
-            f"Demographic data added/updated to: {st.session_state.get('participants_tsv_path')}."
+            f"Demographic data added/updated to: {st.session_state.get('participants_tsv_path')}"
         )
 
-        st.info(f"Columns available in 'participants.tsv': {columns}")
+        st.info(f"Columns available in 'participants.tsv': {', '.join(columns)}")
