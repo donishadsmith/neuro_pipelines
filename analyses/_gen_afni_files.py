@@ -6,7 +6,7 @@ import numpy as np, pandas as pd
 from bidsaid.logging import setup_logger
 
 from _denoising import get_col_name, get_new_matrix_and_names, remove_collinear_columns
-from _utils import CONDITION_DURATIONS
+from _first_level_utils import CONDITION_DURATIONS, EVENT_RELATED_TASKS
 
 LGR = setup_logger(__name__)
 
@@ -94,13 +94,6 @@ def create_nuisance_regressor_file(
     return regressor_file, report_info
 
 
-def is_timing_file_empty(timing_file):
-    if not Path(timing_file).exists():
-        return True
-
-    return np.loadtxt(timing_file, delimiter=" ").size == 0
-
-
 def save_event_file(timing_dir, trial_type, timing_data):
     filename = timing_dir / f"{trial_type}.1D"
     timing_str = " ".join(timing_data)
@@ -172,9 +165,8 @@ def create_binary_condition(
 def create_timing_files(
     subject_dir, event_file, task, filter_correct_trials=False, append_task_name=True
 ):
-    event_related_tasks = ["flanker", "simplegng", "complexgng"]
     separate_trials_by_accuracy = False
-    if task in event_related_tasks:
+    if task in EVENT_RELATED_TASKS:
         if filter_correct_trials:
             LGR.info(
                 f"**FILTERING** the following task for correct trials only: {task}. "

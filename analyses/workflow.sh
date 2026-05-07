@@ -71,7 +71,7 @@ export CATEGORICAL_COVARIATES=""                        # Categorical covariates
 export NUMERICAL_COVARIATES="n_censored_volumes"        # Numerical covariates to include in model; separated by space (e.g., "n_censored_volumes age"). Note, only number of censored volumes varies within person
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
-export EXCLUDE_NIFTI_FILES=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
+export EXCLUDE_NIFTIS_FILE=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
                                                         # should contain a single column named 'nifti_prefix_filename'
 export PARAMETRIC_VOXEL_CORRECTION_P=0.001              # Cluster forming threshold for parametric method
 export PARAMETRIC_CLUSTER_CORRECTION_P=0.05             # Cluster correction threshold for parametric method

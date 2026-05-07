@@ -82,7 +82,7 @@ def _get_cmd_args():
         "--save_excel_version",
         dest="save_excel_version",
         required=False,
-        default=True,
+        default=False,
         help=(
             "Save Excel version of the cluster tables "
             "to allow for certain Excel features such as highlighting"

@@ -15,6 +15,11 @@ from bidsaid.qc import get_n_censored_volumes
 
 from _denoising import remove_collinear_columns
 from _report import HTMLReport
+from _second_level_utils import (
+    estimate_noise_smoothness,
+    perform_cluster_simulation,
+    threshold_palm_output,
+)
 from _utils import (
     _get_dataframe,
     drop_dose_rows,
@@ -23,9 +28,6 @@ from _utils import (
     get_second_level_glt_codes,
     get_nontarget_dose,
     get_group_labels,
-    estimate_noise_smoothness,
-    perform_cluster_simulation,
-    threshold_palm_output,
     save_binary_mask,
 )
 
@@ -267,12 +269,12 @@ def _get_cmd_args():
         help="Number of cores to use for 3dlmer when method is parametric.",
     )
     parser.add_argument(
-        "--exclude_nifti_files",
-        dest="exclude_nifti_files",
+        "--exclude_niftis_file",
+        dest="exclude_niftis_file",
         default=None,
         required=False,
         help=(
-            "Prefixes of the filename of the NIfTI images to exclude. "
+            "Path to a file containing prefixes of the filename of the NIfTI images to exclude. "
             "Can list the fill name of the file (no parent directories) to exlude that specific file "
             "or can include the prefix (i.e., 'sub-101_task-nback_ses-01_space-MNI' or 'sub-101') to exclude all files starting "
             "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
@@ -303,7 +305,7 @@ class DataContainer:
             all_conflicting = conflicting_categorical | conflicting_numerical
             LGR.warning(
                 f"The following variables are grouping columns and cannot be "
-                f"included as covariates: {sorted(all_conflicting)}. "
+                f"included as covariates: {all_conflicting}. "
                 "They will be removed as covariates."
             )
             self.categorical_covariates = list(
@@ -353,11 +355,11 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
     )
 
 
-def exclude_beta_files(beta_files, exclude_nifti_files):
-    if not exclude_nifti_files:
+def exclude_beta_files(beta_files, exclude_niftis_file):
+    if not exclude_niftis_file:
         return beta_files
 
-    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_files)[
+    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
         "nifti_prefix_filename"
     ].tolist()
 
@@ -1178,7 +1180,7 @@ def main(
     tfce_C,
     nonparametric_cluster_correction_p,
     n_cores,
-    exclude_nifti_files,
+    exclude_niftis_file,
     categorical_covariates,
     numerical_covariates,
 ):
@@ -1242,7 +1244,7 @@ def main(
         all_subjects = set(get_subjects(beta_files))
         beta_files = exclude_beta_files(
             beta_files,
-            exclude_nifti_files,
+            exclude_niftis_file,
         )
         if not beta_files:
             LGR.warning(f"No beta files found for {first_level_glt_label}")
@@ -1276,11 +1278,9 @@ def main(
         )
         data_table.to_csv(data_table_filename, sep="\t", index=False, encoding="utf-8")
 
-        missing_covariates = [
-            cov
-            for cov in datacontainer.included_covariates
-            if cov not in important_columns
-        ]
+        missing_covariates = list(
+            set(datacontainer.included_covariates).difference(important_columns)
+        )
         if missing_covariates:
             datacontainer.categorical_covariates = list(
                 set(datacontainer.categorical_covariates).difference(missing_covariates)
@@ -1369,7 +1369,6 @@ def main(
             acf_lines = acf_parameters_filename.read_text().strip().splitlines()
             acf_parameters = acf_lines[1].split()[:4]
             report.add_context(acf_parameters=acf_parameters)
-
         else:
             # Nonparametric (PALM)
             use_native_palm = shutil.which("palm") is not None

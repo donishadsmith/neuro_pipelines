@@ -12,18 +12,14 @@ remove a significant amount of frames resulting in either suboptimal estimated b
 or too little retainerd participants. There is no optimal denoising strategy for all datasets.
 """
 
-import argparse, json, sys
+import argparse
 from pathlib import Path
 
-import bids, numpy as np, pandas as pd
-
-from bidsaid._helpers import iterable_to_str
+import pandas as pd
 from bidsaid.logging import setup_logger
-from bidsaid.qc import compute_n_dummy_scans, create_censor_mask
 from bidsaid.metadata import get_tr, get_n_volumes
 
 from _denoising import (
-    get_acompcor_component_names,
     get_cosine_regressors,
     get_motion_regressors,
     percent_signal_change,
@@ -34,17 +30,26 @@ from _gen_afni_files import (
     create_binary_condition,
     create_timing_files,
     create_nuisance_regressor_file,
-    is_timing_file_empty,
 )
 from _argparse_typing import n_dummy_type, boolean_flags
-from _models import create_design_matrix, perform_first_level
-from _report import HTMLReport
+from _first_level_utils import (
+    InvalidRunError,
+    check_censoring,
+    collect_acompcor_names,
+    collect_session_files,
+    create_diagnostic_condition_plots,
+    filter_regressor_names,
+    summarize_timing_conditions,
+    validate_first_level_inputs,
+)
+from _models import (
+    create_design_matrix,
+    get_task_deconvolve_adults_cmd,
+    get_task_deconvolve_kids_cmd,
+    perform_first_level,
+)
 from _utils import (
-    VALID_TASK_NAMES,
-    embed_image,
     create_beta_files,
-    plot_signal,
-    skip_denoising,
 )
 
 LGR = setup_logger(__name__)
@@ -170,12 +175,12 @@ def _get_cmd_args():
         help="Spatial blurring.",
     )
     parser.add_argument(
-        "--exclude_nifti_files",
-        dest="exclude_nifti_files",
+        "--exclude_niftis_file",
+        dest="exclude_niftis_file",
         default=None,
         required=False,
         help=(
-            "Prefixes of the filename of the NIfTI images to exclude. "
+            "File containing prefixes of the filename of the NIfTI images to exclude. "
             "Can list the fill name of the file (no parent directories) to exlude that specific file "
             "or can include the prefix (i.e., 'sub-101_task-nback_ses-01_space-MNI' or 'sub-101') to exclude all files starting "
             "with that prefix. Should contain a single column named 'nifti_prefix_filename' "
@@ -183,175 +188,6 @@ def _get_cmd_args():
     )
 
     return parser
-
-
-def get_task_deconvolve_kids_cmd(task, timing_dir, nuisance_regressors_file):
-    if task == "nback":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 4 ",
-            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'center.1D'} 'BLOCK(32, 1)' -stim_label 2 center "
-            f"-stim_times 3 {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label 3 1-back "
-            f"-stim_times 4 {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label 4 2-back "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*1-back -1*center' -glt_label 1 1-back_vs_center "
-            "-gltsym 'SYM: +1*2-back -1*center' -glt_label 2 2-back_vs_center "
-            "-gltsym 'SYM: +1*2-back -1*1-back' -glt_label 3 2-back_vs_1-back ",
-        }
-    elif task == "mtle":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_encoding "
-            f"-ortvec {nuisance_regressors_file} Nuisance ",
-        }
-    elif task == "mtlr":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_retrieval "
-            f"-ortvec {nuisance_regressors_file} Nuisance ",
-        }
-    elif task == "princess":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "args": f"-stim_times 1 {timing_dir / 'switch.1D'} 'BLOCK(52, 1)' -stim_label 1 switch "
-            f"-stim_times 2 {timing_dir / 'nonswitch.1D'} 'BLOCK(52, 1)' -stim_label 2 nonswitch "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*switch -1*nonswitch' -glt_label 1 switch_vs_nonswitch ",
-        }
-    else:
-        deconvolve_cmd = create_dynamic_deconvolve_glm_cmd(
-            timing_dir, nuisance_regressors_file, task
-        )
-
-    return deconvolve_cmd
-
-
-def get_task_deconvolve_adults_cmd(task, timing_dir, nuisance_regressors_file):
-    if task == "nback":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 2 ",
-            "args": f"-stim_times 1 {timing_dir / '0-back.1D'} 'BLOCK(30, 1)' -stim_label 1 0-back "
-            f"-stim_times 2 {timing_dir / '2-back.1D'} 'BLOCK(30, 1)' -stim_label 2 2-back "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*2-back -1*0-back' -glt_label 1 2-back_vs_0-back ",
-        }
-    elif task == "mtle":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 3 ",
-            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'neutral_encoding.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_encoding "
-            f"-stim_times 3 {timing_dir / 'aversive_encoding.1D'} 'BLOCK(18, 1)' -stim_label 3 aversive_encoding "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*aversive_encoding -1*neutral_encoding' -glt_label 1 aversive_encoding_vs_neutral_encoding ",
-        }
-    elif task == "mtlr":
-        deconvolve_cmd = {
-            "num_stimts": "-num_stimts 3 ",
-            "args": f"-stim_times 1 {timing_dir / 'instruction.1D'} 'BLOCK(2, 1)' -stim_label 1 instruction "
-            f"-stim_times 2 {timing_dir / 'neutral_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 2 neutral_retrieval "
-            f"-stim_times 3 {timing_dir / 'aversive_retrieval.1D'} 'BLOCK(18, 1)' -stim_label 3 aversive_retrieval "
-            f"-ortvec {nuisance_regressors_file} Nuisance "
-            "-gltsym 'SYM: +1*aversive_retrieval -1*neutral_retrieval' -glt_label 1 aversive_retrieval_vs_neutral_retrieval ",
-        }
-    else:
-        deconvolve_cmd = create_dynamic_deconvolve_glm_cmd(
-            timing_dir, nuisance_regressors_file, task
-        )
-
-    return deconvolve_cmd
-
-
-def create_dynamic_deconvolve_glm_cmd(timing_dir, nuisance_regressors_file, task):
-    # Dynamically create the flanker or go nogo contrasts to avoid including contrasts that
-    # have no data
-    deconvolve_cmd = {
-        "num_stimts": "-num_stimts {num_labels} ",
-        "args": "{stims} -ortvec {nuisance_regressors_file} Nuisance {gltsyms}",
-    }
-
-    if task == "flanker":
-        labels_dict = {
-            "stims": (
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} congruent ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} incongruent ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} neutral ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-            ),
-            "gltsyms": (
-                "-gltsym 'SYM: +1*incongruent -1*congruent' -glt_label {label} incongruent_vs_congruent ",
-                "-gltsym 'SYM: +1*nogo -1*neutral' -glt_label {label} nogo_vs_neutral ",
-            ),
-        }
-
-        files = [
-            "congruent.1D",
-            "incongruent.1D",
-            "nogo.1D",
-            "neutral.1D",
-            "errors.1D",
-        ]
-    else:
-        labels_dict = {
-            "stims": (
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
-                "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-            ),
-            "gltsyms": ("-gltsym 'SYM: +1*nogo -1*go' -glt_label {label} nogo_vs_go",),
-        }
-
-        files = ["go.1D", "nogo.1D", "errors.1D"]
-
-    empty_mask = np.array([is_timing_file_empty(timing_dir / file) for file in files])
-
-    nonempty_files = np.array(files)[~empty_mask]
-    keep_trial_types = [file.removesuffix(".1D") for file in nonempty_files]
-
-    # Length of the stims
-    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
-        num_labels=len(nonempty_files)
-    )
-
-    # Only keep stims without empty files
-    stims = ""
-    for label, trial_type in enumerate(keep_trial_types, start=1):
-        bool_list = [
-            trial_type == stim_string.rstrip().split(" ")[-1]
-            for stim_string in labels_dict["stims"]
-        ]
-
-        stim_string = labels_dict["stims"][bool_list.index(True)]
-
-        stims += stim_string.format(
-            label=label, timing_file=timing_dir / f"{trial_type}.1D"
-        )
-
-    stims = stims.rstrip()
-
-    # Only keep gltsym with two
-    kept_gltsyms = []
-    for gltsym in labels_dict["gltsyms"]:
-        glt_label = gltsym.rstrip().split(" ")[-1]
-        glt_label_parts = glt_label.split("_vs_")
-        if all(
-            glt_label_part in keep_trial_types for glt_label_part in glt_label_parts
-        ):
-            kept_gltsyms.append(gltsym)
-
-    gltsyms = ""
-    for label, gltsym in enumerate(kept_gltsyms, start=1):
-        gltsyms += gltsym.format(label=label)
-
-    gltsyms = gltsyms.rstrip()
-
-    deconvolve_cmd["args"] = deconvolve_cmd["args"].format(
-        stims=stims, nuisance_regressors_file=nuisance_regressors_file, gltsyms=gltsyms
-    )
-
-    return deconvolve_cmd
 
 
 def main(
@@ -371,235 +207,88 @@ def main(
     n_acompcor,
     acompcor_strategy,
     fwhm,
-    exclude_nifti_files,
+    exclude_niftis_file,
 ):
-    report_dir = Path(dst_dir) / "reports" / "first_level"
-    report_dir.mkdir(parents=True, exist_ok=True)
-
-    if task not in VALID_TASK_NAMES[cohort]:
-        LGR.warning(
-            f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
-        )
-        sys.exit(status=1)
-
-    layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or True)
-
-    sessions = layout.get(
-        subject=subject, task=task, target="session", return_type="id"
+    report_dir, layout, sessions = validate_first_level_inputs(
+        dst_dir,
+        bids_dir,
+        deriv_dir,
+        cohort,
+        task,
+        subject,
+        analysis_type="glm",
     )
-    if not sessions:
-        session = "NaN"
-        report = HTMLReport(subject, session, task, analysis_type="glm")
-        report_path = (
-            report_dir / f"sub-{subject}_ses-NaN_task-{task}_desc-glm_report.html"
-        )
-        msg = f"No sessions for {subject} for {task}."
-        LGR.warning(msg)
-
-        report.mark_excluded(msg)
-        report.create_report(report_path, "first_level.html")
-
-        sys.exit(status=1)
 
     for session in sessions:
-        report = HTMLReport(subject, session, task, analysis_type="glm")
-        report_path = (
-            report_dir / f"sub-{subject}_ses-{session}_task-{task}_desc-glm_report.html"
+        report, report_path, subject_files, skip_iteration = collect_session_files(
+            report_dir,
+            layout,
+            subject,
+            session,
+            task,
+            space,
+            acompcor_strategy,
+            exclude_niftis_file,
+            analysis_type="glm",
         )
-
-        confounds_tsv_files = layout.get(
-            scope="derivatives",
-            subject=subject,
-            session=session,
-            task=task,
-            desc="confounds",
-            extension="tsv",
-            return_type="file",
-        )
-        if not confounds_tsv_files:
-            msg = f"No confound files TSV found for session: {session}"
-            LGR.info(msg)
-
-            report.mark_excluded(msg)
-            report.create_report(report_path, "first_level.html")
+        if skip_iteration:
             continue
-        else:
-            confounds_tsv_file = confounds_tsv_files[0]
 
-        if acompcor_strategy != "none":
-            confounds_json_file = layout.get(
-                scope="derivatives",
-                subject=subject,
-                session=session,
-                task=task,
-                desc="confounds",
-                extension="json",
-                return_type="file",
-            )
-            if not confounds_json_file:
-                msg = f"No confound files JSON found for session: {session}"
-                LGR.info(msg)
-
-                report.mark_excluded(msg)
-                report.create_report(report_path, "first_level.html")
-                continue
-            else:
-                confounds_json_file = confounds_json_file[0]
-
-        event_file = layout.get(
-            scope="raw",
-            subject=subject,
-            session=session,
-            task=task,
-            suffix="events",
-            extension="tsv",
-            return_type="file",
-        )
-        if not event_file:
-            msg = f"No event files found for session: {session}"
-            LGR.info(msg)
-
-            report.mark_excluded(msg)
-            report.create_report(report_path, "first_level.html")
-            continue
-        else:
-            event_file = event_file[0]
-
-        # Space parameter not getting template
-        mask_files = layout.get(
-            scope="derivatives",
-            subject=subject,
-            session=session,
-            task=task,
-            suffix="mask",
-            extension="nii.gz",
-            return_type="file",
-        )
-        if not mask_files:
-            msg = f"No mask files found for session: {session}"
-            LGR.info(msg)
-
-            report.mark_excluded(msg)
-            report.create_report(report_path, "first_level.html")
-            continue
-        else:
-            mask_file = [file for file in mask_files if space in str(Path(file).name)][
-                0
-            ]
-            LGR.info(f"Using the following mask file: {mask_file}")
-
-        nifti_files = layout.get(
-            scope="derivatives",
-            subject=subject,
-            session=session,
-            task=task,
-            suffix="bold",
-            extension="nii.gz",
-            return_type="file",
-        )
-        if not nifti_files:
-            msg = f"No nifti files found for session: {session}"
-            LGR.info(msg)
-
-            report.mark_excluded(msg)
-            report.create_report(report_path, "first_level.html")
-            continue
-        else:
-            nifti_file = [
-                file for file in nifti_files if space in str(Path(file).name)
-            ][0]
-            LGR.info(f"Using the following mask file: {nifti_file}")
+        confounds_tsv_file = subject_files["confounds_tsv_file"]
+        confounds_json_file = subject_files["confounds_json_file"]
+        event_file = subject_files["event_file"]
+        mask_file = subject_files["mask_file"]
+        nifti_file = subject_files["nifti_file"]
 
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
-
-        if skip_denoising(nifti_file, exclude_nifti_files):
-            LGR.info(
-                "Denoising of the following file will be skipped due to the prefix being found in "
-                f"`exclude_nifti_files` ({exclude_nifti_files}): {nifti_file}"
-            )
-
-            report.mark_excluded(
-                f"Skipped due to prefix being found in {exclude_nifti_files} "
-            )
-            report.create_report(report_path, "first_level.html")
-            continue
-
         subject_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
 
-        dummy_method = (
-            "user-specified"
-            if n_dummy_scans != "auto"
-            else "(number of 'non_steady_state_outlier_XX' columns in fMRIPrep confounds TSV)"
-        )
-        if n_dummy_scans == "auto":
-            n_dummy_scans = compute_n_dummy_scans(confounds_df)
-            LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
-
-        censor_mask = create_censor_mask(
-            confounds_df,
-            column_name="framewise_displacement",
-            n_dummy_scans=n_dummy_scans,
-            threshold=fd_threshold,
-        )
-        censor_mask = censor_mask.astype(np.int8)
-
-        kept = censor_mask[n_dummy_scans:]
-        n_censored = np.sum(kept == 0)
-        percent_censored = n_censored / kept.size
-        LGR.warning(
-            f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
-            f"proportion of steady state volumes removed at an fd threshold > {fd_threshold} mm: "
-            f" {percent_censored}"
-        )
+        try:
+            censor_mask, censor_info = check_censoring(
+                subject,
+                session,
+                task,
+                confounds_df,
+                n_dummy_scans,
+                fd_threshold,
+                exclusion_criteria,
+            )
+        except InvalidRunError as exc:
+            report.mark_excluded(str(exc))
+            report.create_report(report_path, "first_level.html")
+            continue
 
         report.add_context(
             fd_threshold=fd_threshold,
             exclusion_criteria=exclusion_criteria,
-            n_censored_volumes=int(n_censored),
-            n_total_volumes=int(kept.size),
-            percent_censored=float(percent_censored),
-            dummy_method=dummy_method,
-            n_dummy_scans=n_dummy_scans,
+            n_censored_volumes=censor_info["n_censored"],
+            n_total_volumes=censor_info["n_total"],
+            percent_censored=censor_info["percent_censored"],
+            dummy_method=censor_info["dummy_method"],
+            n_dummy_scans=censor_info["n_dummy_scans"],
         )
 
-        if percent_censored > exclusion_criteria:
-            LGR.warning(
-                f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
-                "run excluded because the percent censored is greater than the "
-                f"exclusion criteria: {exclusion_criteria}"
-            )
-
-            report.mark_excluded(
-                f"Proportion of flagged volumes ({percent_censored:.1%}) "
-                f"exceeded threshold ({exclusion_criteria:.0%})."
-            )
-            report.create_report(report_path, "first_level.html")
-            continue
-
         censor_file = create_censor_file(
-            subject_dir, subject, session, task, space, censor_mask
+            subject_dir,
+            subject,
+            session,
+            task,
+            space,
+            censor_mask,
         )
 
         cosine_regressors, cosine_regressor_names = get_cosine_regressors(confounds_df)
 
         motion_regressors, motion_regressor_names = get_motion_regressors(
-            confounds_df, n_motion_parameters
+            confounds_df,
+            n_motion_parameters,
         )
 
-        if acompcor_strategy == "none":
-            acompcor_regressors, acompcor_regressor_names = None, None
-        else:
-            with open(confounds_json_file, "r") as f:
-                confounds_meta = json.load(f)
-
-            acompcor_regressor_names = get_acompcor_component_names(
-                confounds_meta, n_acompcor, acompcor_strategy
-            )
-            acompcor_regressors = confounds_df[acompcor_regressor_names].to_numpy(
-                copy=True
-            )
+        acompcor_regressors, acompcor_regressor_names = collect_acompcor_names(
+            confounds_json_file, confounds_df, acompcor_strategy, n_acompcor
+        )
 
         report.add_context(
             n_motion_parameters=n_motion_parameters,
@@ -612,19 +301,9 @@ def main(
             filter_correct_trials=filter_correct_trials,
         )
 
-        regressor_names_nested_list = filter(
-            None,
-            [
-                cosine_regressor_names,
-                motion_regressor_names,
-                acompcor_regressor_names,
-            ],
+        regressor_names = filter_regressor_names(
+            cosine_regressor_names, motion_regressor_names, acompcor_regressor_names
         )
-        regressor_names = [
-            regressor
-            for regressor_list in regressor_names_nested_list
-            for regressor in regressor_list
-        ]
         nuisance_regressors_file, report_info = create_nuisance_regressor_file(
             subject_dir,
             subject,
@@ -638,80 +317,57 @@ def main(
             acompcor_regressors,
         )
 
-        dropped_regressors = (
-            report_info["collinear_regressor_names"]
-            + report_info["constant_column_names"]
+        report.add_context(
+            dropped_regressors=(
+                report_info["collinear_regressor_names"]
+                + report_info["constant_column_names"]
+            )
         )
-        if dropped_regressors:
-            report.add_context(dropped_regressors=dropped_regressors)
 
         timing_dir = create_timing_files(
-            subject_dir, event_file, task, filter_correct_trials
+            subject_dir,
+            event_file,
+            task,
+            filter_correct_trials,
         )
 
         tr = get_tr(nifti_file)
         n_volumes = get_n_volumes(nifti_file)
 
         condition_filenames_dict = create_binary_condition(
-            afni_img_path, timing_dir, cohort, task, tr, n_volumes, censor_file
+            afni_img_path,
+            timing_dir,
+            cohort,
+            task,
+            tr,
+            n_volumes,
+            censor_file,
         )
 
-        diagnostic_condition_plots = []
-        for cond_name, cond_vector_files in condition_filenames_dict.items():
-            noncensored_condition_plot_filename = plot_signal(
-                cond_vector_files["noncensored_binary_vector"],
-                tr,
-                plot_title=f"{cond_name} No Motion Censoring",
-                base_filename=f"{cond_name}_desc-noncensored_binary_vector.png",
-            )
-
-            censored_condition_plot_filename = plot_signal(
-                cond_vector_files["censored_binary_vector"],
-                tr,
-                plot_title=f"{cond_name} Censored (FD = {fd_threshold})",
-                base_filename=f"{cond_name}_desc-censored_binary_vector.png",
-            )
-
-            diagnostic_condition_plots.append(
-                {
-                    "name": cond_name,
-                    "noncensored_condition_plot": embed_image(
-                        noncensored_condition_plot_filename
-                    ),
-                    "censored_condition_plot": embed_image(
-                        censored_condition_plot_filename
-                    ),
-                }
-            )
-
-        report.add_context(
-            diagnostic_condition_plots=diagnostic_condition_plots,
+        diagnostic_condition_plots = create_diagnostic_condition_plots(
+            condition_filenames_dict,
+            tr,
+            fd_threshold,
         )
+        report.add_context(diagnostic_condition_plots=diagnostic_condition_plots)
 
-        timing_conditions = []
-        for tf in sorted(timing_dir.glob("*.1D")):
-            data = np.loadtxt(tf, delimiter=" ")
-            timing_conditions.append(
-                {
-                    "name": tf.stem,
-                    "n_events": int(data.size) if data.size > 0 else 0,
-                }
-            )
-        report.add_context(
-            timing_conditions=timing_conditions,
-            event_type=(
-                "blocks"
-                if task not in ["flanker", "simplegng", "complexgng"]
-                else "events"
-            ),
-        )
+        timing_conditions, event_type = summarize_timing_conditions(timing_dir, task)
+        report.add_context(timing_conditions=timing_conditions, event_type=event_type)
 
         percent_change_nifti_file = percent_signal_change(
-            subject_dir, afni_img_path, nifti_file, mask_file, censor_file
+            subject_dir,
+            afni_img_path,
+            nifti_file,
+            mask_file,
+            censor_file,
         )
 
         smoothed_nifti_file = perform_spatial_smoothing(
-            subject_dir, afni_img_path, percent_change_nifti_file, mask_file, fwhm
+            subject_dir,
+            afni_img_path,
+            percent_change_nifti_file,
+            mask_file,
+            fwhm,
         )
 
         get_task_deconvolve_cmd = {
@@ -720,7 +376,10 @@ def main(
         }
 
         deconvolve_cmd = get_task_deconvolve_cmd[cohort](
-            task, timing_dir, nuisance_regressors_file
+            task,
+            timing_dir,
+            nuisance_regressors_file,
+            analysis_type="glm",
         )
 
         report.add_context(
@@ -749,7 +408,12 @@ def main(
         betas_dir.mkdir(parents=True, exist_ok=True)
 
         create_beta_files(
-            stats_file_relm, betas_dir, afni_img_path, cohort, task, analysis_type="glm"
+            stats_file_relm,
+            betas_dir,
+            afni_img_path,
+            cohort,
+            task,
+            analysis_type="glm",
         )
 
         report.create_report(report_path, "first_level.html")
