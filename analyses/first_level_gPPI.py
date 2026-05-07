@@ -352,13 +352,19 @@ def denoise_seed_timeseries(
 
     # Note: Some Afni functions only accept rows and require \', using \\' to
     # make the backslash literal
+    # Check the diagnostic plots to ensure there are not several long continuous gaps of 
+    # censored volumes since that run may need to be discarded. Appears to be
+    # no best approach for dealing with high-motion prior to deconvolution
+    # everything has a tradeoff. The framewise displacement threshold of 0.5 
+    # combined with outlier threshold of 0.30 should capture a good amount of
+    # unusable runs with severe motion
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dTproject "
         f"-input {seed_timeseries_file}\\' "
         f"-ort {nuisance_regressors_file} "
         f"-polort {polort} "
         f"-censor {censor_file} "
-        "-cenmode ZERO "
+        "-cenmode NTRP "
         f"-prefix {denoised_seed_timeseries_file}"
     )
 

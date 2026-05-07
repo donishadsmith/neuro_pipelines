@@ -101,10 +101,12 @@
         however, AFNI's <code>3dTproject</code> was used to simply orthogonalize the seed to the
         nuisance regressors rather than prewhiten it, as temporal autocorrelation in the seed
         must be preserved for proper deconvolution. High-motion volumes were handled by using
-        <code>-cenmode ZERO</code>, which replaces flagged volumes with zeros rather than removing
-        or interpolating them. This retains the original timeseries length while preventing
-        motion-contaminated signal or interpolation artifacts from propagating through the
-        deconvolution and PPI interaction term.
+        <code>-cenmode NTRP </code>, which replaces flagged volumes with interpolated values
+        from neighboring time points. This approach preserves the continuous timeseries
+        and avoids the artificial signal drops for the subsequent <code>3dTfitter</code>
+        deconvolution step. Importantly,the flagged volumes were censored during the final
+        <code>3dDeconvolve</code> General Linear Model estimation, ensuring that interpolated
+        data did not contribute to the final functional connectivity beta coefficients.
     </p>
     {% endif %}
 </div>
