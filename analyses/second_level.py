@@ -158,15 +158,31 @@ def _get_cmd_args():
         ),
     )
     parser.add_argument(
-        "--excluded_covariates",
-        dest="excluded_covariates",
-        default=["age", "sex", "race", "ethnicity"],
+        "--categorical_covariates",
+        dest="categorical_covariates",
+        default=[],
         required=False,
         nargs="*",
         type=str,
         help=(
-            "Additional covariates to exclude from second level model. "
-            "Should be a single string with variables separated as space or 'all' to exclude everything."
+            "Categorical covariates to include in the second level model (e.g., sex race ethnicity). "
+            "For nonparametric only, these covariates will be dummy-coded and mean-centered to prevent "
+            "E[Y] = B0 + B1E[Xc] = E[Y] = B0 + B1(0), which allows the intercept to be the mean of Y instead "
+            "of the mean of the reference group coded 0. "
+            "Should be a single string with variables separated by space."
+        ),
+    )
+    parser.add_argument(
+        "--numerical_covariates",
+        dest="numerical_covariates",
+        default=["n_censored_volumes"],
+        required=False,
+        nargs="*",
+        type=str,
+        help=(
+            "Numerical covariates to include in the second level model (e.g., n_censored_volumes age). "
+            "These will be mean-centered for both parametric and nonparametric methods. "
+            "Should be a single string with variables separated by space."
         ),
     )
     parser.add_argument(
@@ -273,35 +289,37 @@ class DataContainer:
             ["Subj", "session_id", "InputFile", "dose", "dose_mg"]
         ),
     )
-    excluded_covariates: list[str] = field(default_factory=list)
-    included_covariates: list[str] = field(default_factory=list)
-    categorical_covariates: set[str] = field(
-        default_factory=lambda: set(["sex", "race", "ethnicity"])
-    )
-    continuous_covariates: set[str] = field(
-        default_factory=lambda: set(["n_censored_volumes", "age"])
-    )
-    # From most to least
-    deprioritized_covariates_order: list[str] = field(
-        default_factory=lambda: [
-            "ethnicity",
-            "race",
-            "sex",
-            "age",
-            "n_censored_volumes",
-        ],
-    )
-    # May expand in future, but these are the available covariates at this time
-    # Added for more accurate reporting of the availble covariates in the BIDS participants.tsv file
-    available_covariates: set[str] = field(
-        default_factory=lambda: {
-            "sex",
-            "age",
-            "n_censored_volumes",
-            "race",
-            "ethnicity",
-        }
-    )
+    categorical_covariates: list[str] = field(default_factory=list)
+    numerical_covariates: list[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        conflicting_categorical = set(self.categorical_covariates).intersection(
+            self.grouping_columns
+        )
+        conflicting_numerical = set(self.numerical_covariates).intersection(
+            self.grouping_columns
+        )
+        if conflicting_categorical or conflicting_numerical:
+            all_conflicting = conflicting_categorical | conflicting_numerical
+            LGR.warning(
+                f"The following variables are grouping columns and cannot be "
+                f"included as covariates: {sorted(all_conflicting)}. "
+                "They will be removed as covariates."
+            )
+            self.categorical_covariates = list(
+                set(self.categorical_covariates).difference(self.grouping_columns)
+            )
+            self.numerical_covariates = list(
+                set(self.numerical_covariates).difference(self.grouping_columns)
+            )
+
+    @property
+    def included_covariates(self) -> list[str]:
+        return self.categorical_covariates + self.numerical_covariates
+
+    @property
+    def columns_to_keep(self) -> list[str]:
+        return list(self.grouping_columns) + self.included_covariates
 
     @staticmethod
     def get_glt_codes(cohort: str) -> str:
@@ -320,39 +338,9 @@ class DataContainer:
 
         return glt_codes[cohort]
 
-    def update_excluded_covariates(self, excluded_covariates: list[str]) -> None:
-        excluded_covariates = [
-            item for cov in excluded_covariates for item in cov.split() if cov
-        ]
-        if not excluded_covariates:
-            return
-
-        if "all" in excluded_covariates:
-            self.excluded_covariates.extend(self.available_covariates)
-            LGR.info(
-                "Added the following variables to be excluded: "
-                f"{self.excluded_covariates}"
-            )
-        else:
-            excluded_covariates = self.available_covariates.intersection(
-                excluded_covariates
-            )
-            self.excluded_covariates.extend(excluded_covariates)
-            LGR.info(
-                "Added the following variables to be excluded: "
-                f"{excluded_covariates}"
-            )
-            self.included_covariates = list(
-                self.available_covariates.difference(self.excluded_covariates)
-            )
-
     @property
     def afni_regressor_columns(self) -> list[str]:
         return ["dose"] + self.included_covariates
-
-    @property
-    def columns_to_keep(self) -> list[str]:
-        return list(self.grouping_columns) + list(self.available_covariates)
 
 
 def get_beta_files(analysis_dir, task, first_level_glt_label):
@@ -474,8 +462,9 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     else:
         data_table["dose"] = data_table["dose"].astype(str)
 
-    for continuous_var in datacontainer.continuous_covariates:
-        data_table[continuous_var] = data_table[continuous_var].astype(float)
+    for numerical_var in datacontainer.numerical_covariates:
+        if numerical_var in data_table.columns:
+            data_table[numerical_var] = data_table[numerical_var].astype(float)
 
     data_table = replace_whitespace_with_underscores(data_table)
 
@@ -618,14 +607,12 @@ def get_model_str(datacontainer):
 
 
 def get_centering_str(datacontainer):
-    continuous_vars = set(datacontainer.included_covariates).intersection(
-        datacontainer.continuous_covariates
-    )
-    if not continuous_vars:
+    numerical_vars = datacontainer.numerical_covariates
+    if not numerical_vars:
         return ""
 
-    qvars_str = "'" + ",".join(continuous_vars) + "'"
-    centers_str = "'" + ",".join(["0"] * len(continuous_vars)) + "'"
+    qvars_str = "'" + ",".join(numerical_vars) + "'"
+    centers_str = "'" + ",".join(["0"] * len(numerical_vars)) + "'"
     centering_str = f"-qVars {qvars_str} -qVarCenters {centers_str}"
 
     LGR.info(f"The following centering string will be used: {centering_str}")
@@ -664,29 +651,6 @@ def generate_matrices_filenames(
     return matrices_filenames_dict
 
 
-def prioritize_regressors(design_matrix, datacontainer):
-    has_dof = lambda design_matrix: design_matrix.shape[0] > design_matrix.shape[1]
-    dropped_dof_regressors = []
-    if has_dof(design_matrix):
-        return design_matrix, dropped_dof_regressors
-
-    for regressor in datacontainer.deprioritized_covariates_order:
-        if drop_columns := [
-            col for col in design_matrix.columns if col.startswith(regressor)
-        ]:
-            LGR.info(f"Dropping the following regressor(s) to save dof: {drop_columns}")
-            design_matrix = design_matrix.drop(columns=drop_columns)
-            dropped_dof_regressors.extend(drop_columns)
-
-        LGR.info(
-            f"N OBSERVATIONS: {design_matrix.shape[0]}; N COLUMNS: {design_matrix.shape[0]}"
-        )
-        if has_dof(design_matrix):
-            break
-
-    return design_matrix, dropped_dof_regressors
-
-
 def create_design_matrix(
     glt_data_table,
     datacontainer,
@@ -695,14 +659,10 @@ def create_design_matrix(
     second_level_glt_code=None,
 ):
     categorical_cols = list(
-        set(datacontainer.categorical_covariates).difference(
-            datacontainer.excluded_covariates
-        )
+        set(datacontainer.categorical_covariates).intersection(glt_data_table.columns)
     )
-    continuous_cols = list(
-        set(datacontainer.continuous_covariates).difference(
-            datacontainer.excluded_covariates
-        )
+    numerical_cols = list(
+        set(datacontainer.numerical_covariates).intersection(glt_data_table.columns)
     )
 
     for col in categorical_cols:
@@ -730,7 +690,7 @@ def create_design_matrix(
 
     design_components = {}
     mean_center = lambda arr: arr - arr.mean()
-    for col in continuous_cols:
+    for col in numerical_cols:
         design_components.update({col: mean_center(glt_data_table[col].to_numpy())})
 
     # All categorical variables are constant across sessions and have been dropped
@@ -759,11 +719,6 @@ def create_design_matrix(
         design_matrix = pd.DataFrame(
             design_arr, columns=list(regressor_positions.values())
         )
-        design_matrix, dropped_dof_regressors = prioritize_regressors(
-            design_matrix, datacontainer
-        )
-    else:
-        dropped_dof_regressors = []
 
     if include_intercept:
         # Using row shape of original table for case where design matrix is empty
@@ -787,7 +742,15 @@ def create_design_matrix(
             axis=1,
         )
 
-    return design_matrix, collinear_column_names, dropped_dof_regressors
+    residual_dof = design_matrix.shape[0] - design_matrix.shape[1]
+    if residual_dof <= 0:
+        LGR.warning(
+            f"Insufficient degrees of freedom: {design_matrix.shape[0]} observations, "
+            f"{design_matrix.shape[1]} regressors, residual DOF = {residual_dof}. "
+            "Consider removing covariates."
+        )
+
+    return design_matrix, collinear_column_names, residual_dof
 
 
 def create_contrast_matrix(design_matrix, contrast_matrix_filename):
@@ -853,13 +816,11 @@ def create_mean_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
-    design_matrix, collinear_column_names, dropped_dof_regressors = (
-        create_design_matrix(
-            glt_data_table,
-            datacontainer,
-            include_intercept=True,
-            average_within_subjects=(second_level_glt_code == "mean"),
-        )
+    design_matrix, collinear_column_names, residual_dof = create_design_matrix(
+        glt_data_table,
+        datacontainer,
+        include_intercept=True,
+        average_within_subjects=(second_level_glt_code == "mean"),
     )
     design_matrix.to_csv(
         matrices_filenames_dict["design_matrix_file"],
@@ -879,7 +840,7 @@ def create_mean_matrices(
     report_info = {
         "constant_column_names": [],
         "collinear_column_names": collinear_column_names,
-        "dropped_dof_regressor_names": dropped_dof_regressors,
+        "residual_dof": residual_dof,
     }
 
     return matrices_filenames_dict, report_info
@@ -915,13 +876,11 @@ def create_comparison_matrices(
     eb_data = glt_data_table["Subj"].factorize()[0] + 1
     np.savetxt(matrices_filenames_dict["eb_file"], eb_data, delimiter=",", fmt="%d")
 
-    design_matrix, collinear_column_names, dropped_dof_regressors = (
-        create_design_matrix(
-            glt_data_table,
-            datacontainer,
-            include_intercept=False,
-            second_level_glt_code=second_level_glt_code,
-        )
+    design_matrix, collinear_column_names, residual_dof = create_design_matrix(
+        glt_data_table,
+        datacontainer,
+        include_intercept=False,
+        second_level_glt_code=second_level_glt_code,
     )
     design_matrix.to_csv(
         matrices_filenames_dict["design_matrix_file"],
@@ -941,18 +900,18 @@ def create_comparison_matrices(
     report_info = {
         "constant_column_names": constant_columns_names,
         "collinear_column_names": collinear_column_names,
-        "dropped_dof_regressor_names": dropped_dof_regressors,
+        "residual_dof": residual_dof,
     }
 
     return matrices_filenames_dict, report_info
 
 
 def set_permutations(true_max_permutation):
-    n_permutations = min(true_max_permutation, 10000)
+    max_permutation = min(true_max_permutation, 10000)
 
-    LGR.info(f"Setting number of permutations to: {n_permutations}")
+    LGR.info(f"Setting number of permutations to: {max_permutation}")
 
-    return n_permutations
+    return max_permutation
 
 
 def compute_n_permutation(glt_data_table):
@@ -960,9 +919,7 @@ def compute_n_permutation(glt_data_table):
     true_max_permutation = 2**n_subjects
     LGR.info(f"Maximum permutations possible = {true_max_permutation}")
 
-    n_permutations = set_permutations(true_max_permutation)
-
-    return n_permutations, true_max_permutation
+    return set_permutations(true_max_permutation), true_max_permutation
 
 
 def create_concatenated_image(
@@ -1222,7 +1179,8 @@ def main(
     nonparametric_cluster_correction_p,
     n_cores,
     exclude_nifti_files,
-    excluded_covariates,
+    categorical_covariates,
+    numerical_covariates,
 ):
     bids_dir = Path(bids_dir)
     deriv_dir = Path(deriv_dir) if deriv_dir else None
@@ -1263,11 +1221,17 @@ def main(
             cohort, task, analysis_type, caller="second_level"
         )
 
-    datacontainer = DataContainer()
-    datacontainer.update_excluded_covariates(excluded_covariates)
+    datacontainer = DataContainer(
+        categorical_covariates=categorical_covariates,
+        numerical_covariates=numerical_covariates,
+    )
+    LGR.info(
+        f"Included covariates: {datacontainer.included_covariates} "
+        f"(categorical: {categorical_covariates}, numerical: {numerical_covariates})"
+    )
     report.add_context(
-        included_covariates=datacontainer.included_covariates,
-        excluded_covariates=datacontainer.excluded_covariates,
+        categorical_covariates=datacontainer.categorical_covariates,
+        numerical_covariates=datacontainer.numerical_covariates,
     )
 
     for first_level_glt_label in first_level_glt_labels:
@@ -1318,10 +1282,15 @@ def main(
             if cov not in important_columns
         ]
         if missing_covariates:
-            datacontainer.excluded_covariates += missing_covariates
-            datacontainer.included_covariates = missing_covariates
+            datacontainer.categorical_covariates = list(
+                set(datacontainer.categorical_covariates).difference(missing_covariates)
+            )
+            datacontainer.numerical_covariates = list(
+                set(datacontainer.numerical_covariates).difference(missing_covariates)
+            )
             LGR.info(
-                f"The covariates to exclude have updated due a covariate being dropped due to being constant or NaN: {datacontainer.excluded_covariates}"
+                f"The following covariates were dropped due to being constant or NaN: {missing_covariates}. "
+                f"Remaining included covariates: {datacontainer.included_covariates}"
             )
 
         report.add_context(
@@ -1532,20 +1501,12 @@ def main(
                     "design_columns": design_columns,
                     "removed_subjects": removed_subjects,
                     "dropped_within_subject_columns": list(
-                        set(
-                            matrix_report_info.get("constant_column_names", [])
-                        ).difference(datacontainer.excluded_covariates)
+                        matrix_report_info.get("constant_column_names", [])
                     ),
                     "dropped_collinear_columns": list(
-                        set(
-                            matrix_report_info.get("collinear_column_names", [])
-                        ).difference(datacontainer.excluded_covariates)
+                        matrix_report_info.get("collinear_column_names", [])
                     ),
-                    "dropped_dof_columns": list(
-                        set(
-                            matrix_report_info.get("dropped_dof_regressor_names", [])
-                        ).difference(datacontainer.excluded_covariates)
-                    ),
+                    "residual_dof": matrix_report_info.get("residual_dof"),
                     "palm_cmd": palm_cmd,
                 }
                 if vs_in_code:

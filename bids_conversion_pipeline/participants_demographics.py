@@ -75,15 +75,12 @@ def run_pipeline(participants_tsv_path, demographics_file, covariates_to_add) ->
         merged_df["participant_id"] = merged_df["participant_id"].apply(
             lambda x: f"sub-{x}"
         )
-
         merged_df = _change_dtype(merged_df)
         merged_df.columns = [col.lower() for col in merged_df.columns]
-
-        merged_df.columns = [
-            col.split(" ")[0] if col.startswith("age") else col
-            for col in merged_df.columns
-        ]
-
         merged_df = merged_df.dropna(axis=1, how="all")
 
+        LGR.info(f"Columns in 'participants.tsv': {merged_df}")
+
         merged_df.to_csv(participants_tsv_path, sep="\t", index=None)
+
+        return merged_df.colums

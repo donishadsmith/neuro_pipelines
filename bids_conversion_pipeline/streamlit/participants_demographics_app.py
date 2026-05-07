@@ -128,8 +128,10 @@ if st.button("Run Pipeline", type="primary"):
         )
     else:
         with st.spinner("Processing..."):
-            run_pipeline(**kwargs)
+            columns = run_pipeline(**kwargs)
 
         st.success(
             f"Demographic data added/updated to: {st.session_state.get('participants_tsv_path')}."
         )
+
+        st.info(f"Columns available in 'participants.tsv': {columns}")

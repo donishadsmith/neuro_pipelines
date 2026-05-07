@@ -71,8 +71,8 @@
     <h2>Covariates</h2>
     <table>
         <tr><th>Parameter</th><th></th></tr>
-        <tr><td>Included covariates (user specified)</td><td>{{ included_covariates | join(", ") if included_covariates else "None" }}</td></tr>
-        <tr><td>Excluded covariates (user specified)</td><td>{{ excluded_covariates | join(", ") if excluded_covariates else "None" }}</td></tr>
+        <tr><td>Categorical covariates (user-specified)</td><td>{{ categorical_covariates | join(", ") if categorical_covariates else "None" }}</td></tr>
+        <tr><td>Numerical covariates (user-specified)</td><td>{{ numerical_covariates | join(", ") if numerical_covariates else "None" }}</td></tr>
         {% if dropped_columns %}
         <tr><td>Dropped covariates after data checks (constant or all missing)</td><td>{{ dropped_columns | join(", ") }}</td></tr>
         {% endif %}
@@ -197,9 +197,7 @@
         {% if contrast.dropped_collinear_columns %}
         <tr><td>Dropped (collinear)</td><td>{{ contrast.dropped_collinear_columns | join(", ") }}</td></tr>
         {% endif %}
-        {% if contrast.dropped_dof_columns %}
-        <tr><td>Dropped (insufficient DOF)</td><td>{{ contrast.dropped_dof_columns | join(", ") }}</td></tr>
-        {% endif %}
+        <tr><td>Residual degrees of freedom</td><td>{{ contrast.residual_dof }}{% if contrast.residual_dof is not none and contrast.residual_dof <= 0 %} <strong style="color: red;">(WARNING: insufficient DOF)</strong>{% endif %}</td></tr>
     </table>
 
     {% if contrast.is_comparison %}

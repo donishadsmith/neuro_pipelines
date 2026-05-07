@@ -173,7 +173,7 @@ def create_timing_files(
     subject_dir, event_file, task, filter_correct_trials=False, append_task_name=True
 ):
     event_related_tasks = ["flanker", "simplegng", "complexgng"]
-    special_tasks = event_related_tasks if filter_correct_trials else []
+    separate_trials_by_accuracy = False
     if task in event_related_tasks:
         if filter_correct_trials:
             LGR.info(
@@ -181,6 +181,7 @@ def create_timing_files(
                 "Contrasts related to this task will **ONLY** include trials that subject "
                 "answered correctly on."
             )
+            separate_trials_by_accuracy = True
         else:
             LGR.info(
                 f"**NOT FILTERING** the following task for correct trials only: {task} "
@@ -197,9 +198,9 @@ def create_timing_files(
     for trial_type in trial_types:
         trial_df = event_df[event_df["trial_type"] == trial_type]
         row_mask = (
+            trial_df["accuracy"] == "correct"
+            if separate_trials_by_accuracy else
             np.full(len(trial_df), True, dtype=bool)
-            if task not in special_tasks
-            else trial_df["accuracy"] == "correct"
         )
 
         timing_data = (
@@ -217,7 +218,7 @@ def create_timing_files(
         save_event_file(timing_dir, trial_type, timing_data)
 
     # Get all errors
-    if task in special_tasks:
+    if separate_trials_by_accuracy:
         timing_data = event_df.loc[event_df["accuracy"] == "incorrect", "onset"].astype(
             str
         )

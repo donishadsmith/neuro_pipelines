@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # SLURM MANUAL https://slurm.schedmd.com/sbatch.html
@@ -68,7 +67,8 @@ export GPPI_FALTUNG_PENALTY_SYNTAX="012 0"               # Deconvolution penalty
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export EXCLUDED_COVARIATES="age sex race ethnicity"     # Covariates to save dof; separated by space; Use "" to include all covariates or "all" to exclude all covariates. Note, only number of censored volumes varies within person
+export CATEGORICAL_COVARIATES=""                        # Categorical covariates to include in model; separated by space (e.g., "sex race ethnicity")
+export NUMERICAL_COVARIATES="n_censored_volumes"        # Numerical covariates to include in model; separated by space (e.g., "n_censored_volumes age"). Note, only number of censored volumes varies within person
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
 export EXCLUDE_NIFTI_FILES=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path

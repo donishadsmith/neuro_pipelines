@@ -46,7 +46,8 @@ AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
 # e.g. sbatch second_level.sb nback
 TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 FIRST_LEVEL_GLT_LABEL=${FIRST_LEVEL_GLT_LABEL:-}
-EXCLUDED_COVARIATES=${EXCLUDED_COVARIATES:-"age sex race ethnicity"}
+CATEGORICAL_COVARIATES=${CATEGORICAL_COVARIATES:-""}
+NUMERICAL_COVARIATES=${NUMERICAL_COVARIATES:-"n_censored_volumes"}
 GM_PROBSEG_IMG_PATH=${GM_PROBSEG_IMG_PATH:-""}
 GM_MASK_THRESHOLD=${GM_MASK_THRESHOLD:-0.20}
 APRIORI_IMG_PATH=${APRIORI_IMG_PATH:-""}
@@ -82,9 +83,10 @@ CMD="$PYTHON second_level.py \
 	--task $TASK \
 	--cohort $COHORT \
 	--space $TEMPLATE_SPACE \
-	--excluded_covariates $EXCLUDED_COVARIATES \
 	--analysis_type $ANALYSIS_TYPE \
-    --n_cores $SLURM_CPUS_PER_TASK"
+    --n_cores $SLURM_CPUS_PER_TASK \
+	--categorical_covariates $CATEGORICAL_COVARIATES \
+	--numerical_covariates $NUMERICAL_COVARIATES"
 
 if [[ -n $FIRST_LEVEL_GLT_LABEL ]]; then
 	CMD+=" --first_level_glt_label $FIRST_LEVEL_GLT_LABEL"
