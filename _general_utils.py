@@ -1,4 +1,4 @@
-import csv, tempfile
+import csv, tempfile, re
 from pathlib import Path
 from typing import Optional
 
@@ -128,6 +128,16 @@ def _standardize_dates(
                 ascending=True,
                 key=lambda col: pd.to_datetime(col),
             )
+
+    return df
+
+
+def _standardize_participant_ids(df: pd.DataFrame):
+    df["participant_id"] = (
+        df["participant_id"]
+        .apply(lambda x: str(x))
+        .apply(lambda x: re.findall(r"\d{5}", x)[0])
+    )
 
     return df
 

@@ -26,6 +26,7 @@ from _general_utils import (
     _get_subject_visits,
     _resolve_directories,
     _standardize_dates,
+    _standardize_participant_ids,
 )
 
 LGR = setup_logger(__name__)
@@ -177,13 +178,20 @@ def _create_flanker_events_files(
 ):
     excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects, exclude_filenames)
     for excel_file in excel_files:
-        extractor = PresentationEventExtractor(
-            excel_file,
-            convert_to_seconds=["Time", "Duration"],
-            trial_types=".*(left|right)$",
-            scanner_event_type="Pulse",
-            scanner_trigger_code="99",
-        )
+        try:
+            extractor = PresentationEventExtractor(
+                excel_file,
+                convert_to_seconds=["Time", "Duration"],
+                trial_types=".*(left|right)$",
+                scanner_event_type="Pulse",
+                scanner_trigger_code="99",
+            )
+        except:
+            LGR.exception(
+                f"An event file could not be created for the following file: {excel_file}",
+                exc_info=True,
+            )
+            continue
 
         events = {}
         events["onset"] = extractor.extract_onsets()
@@ -296,15 +304,22 @@ def _create_gng_events_files(
     for log_file in log_files:
         trial_types = ("Go", "Nogo") if task == "simplegng" else (".*Go.*", ".*Nogo.*")
         trial_column_name = "Trial_Type(str)" if task == "simplegng" else "Code"
-        extractor = PresentationEventExtractor(
-            log_file,
-            convert_to_seconds=["Time", "Duration"],
-            trial_types=trial_types,
-            initial_column_headers=["Subject", "Trial"],
-            scanner_event_type="Picture",
-            trial_column_name=trial_column_name,
-            scanner_trigger_code="scanner trigger",
-        )
+        try:
+            extractor = PresentationEventExtractor(
+                log_file,
+                convert_to_seconds=["Time", "Duration"],
+                trial_types=trial_types,
+                initial_column_headers=["Subject", "Trial"],
+                scanner_event_type="Picture",
+                trial_column_name=trial_column_name,
+                scanner_trigger_code="scanner trigger",
+            )
+        except:
+            LGR.exception(
+                f"An event file could not be created for the following file: {log_file}",
+                exc_info=True,
+            )
+            continue
 
         events = {}
         events["onset"] = extractor.extract_onsets()
@@ -411,20 +426,28 @@ def _create_nback_eprime_events_files(
             )
             input_df.loc[input_df.index[-1], "Procedure[Block]"] = "Quit"
 
-            extractor = EPrimeBlockExtractor(
-                input_df,
-                onset_column_name="StimDisplay.OnsetTime",
-                procedure_column_name="Procedure[Block]",
-                block_cue_names=("1-back", "center", "2-back"),
-                convert_to_seconds=[
-                    "StimDisplay.OnsetTime",
-                    "StimDisplay.OffsetTime",
-                    "StimDisplay.RTTime",
-                ],
-                rest_block_codes="Rest",
-                quit_code="Quit",
-                rest_code_frequency="variable",
-            )
+            try:
+                extractor = EPrimeBlockExtractor(
+                    input_df,
+                    onset_column_name="StimDisplay.OnsetTime",
+                    procedure_column_name="Procedure[Block]",
+                    block_cue_names=("1-back", "center", "2-back"),
+                    convert_to_seconds=[
+                        "StimDisplay.OnsetTime",
+                        "StimDisplay.OffsetTime",
+                        "StimDisplay.RTTime",
+                    ],
+                    rest_block_codes="Rest",
+                    quit_code="Quit",
+                    rest_code_frequency="variable",
+                )
+            except:
+                LGR.exception(
+                    f"An event file could not be created for the following file: {edat_file}",
+                    exc_info=True,
+                )
+                continue
+
             events = {}
             # No onset column timing infomation, make assumption that as soon as scanner started
             # immediately starts at the first rest block which occures 16 seconds prior to the
@@ -492,13 +515,21 @@ def _create_nback_presentation_events_files(
 ):
     text_files = _filter_log_files(temp_dir.glob("*.txt"), subjects, exclude_filenames)
     for text_file in text_files:
-        extractor = PresentationBlockExtractor(
-            text_file,
-            convert_to_seconds=["Time", "Duration"],
-            block_cue_names=["0back", "2back"],
-            scanner_event_type="Pulse",
-            scanner_trigger_code="30",
-        )
+        try:
+            extractor = PresentationBlockExtractor(
+                text_file,
+                convert_to_seconds=["Time", "Duration"],
+                block_cue_names=["0back", "2back"],
+                scanner_event_type="Pulse",
+                scanner_trigger_code="30",
+            )
+        except:
+            LGR.exception(
+                f"An event file could not be created for the following file: {text_file}",
+                exc_info=True,
+            )
+            continue
+
         events = {}
         events["onset"] = extractor.extract_onsets()
         events["duration"] = extractor.extract_durations()
@@ -565,16 +596,23 @@ def _create_mtl_events_files(
         if not input_df[input_df["Event Type"] == "Quit"].empty:
             input_df.loc[input_df["Event Type"] == "Quit", "Code"] = "quit"
 
-        extractor = PresentationBlockExtractor(
-            input_df,
-            convert_to_seconds=["Time", "Duration"],
-            block_cue_names=(task_name),
-            scanner_event_type="Pulse",
-            scanner_trigger_code="30",
-            rest_block_codes="rest",
-            quit_code="quit",
-            split_cue_as_instruction=True,
-        )
+        try:
+            extractor = PresentationBlockExtractor(
+                input_df,
+                convert_to_seconds=["Time", "Duration"],
+                block_cue_names=(task_name),
+                scanner_event_type="Pulse",
+                scanner_trigger_code="30",
+                rest_block_codes="rest",
+                quit_code="quit",
+                split_cue_as_instruction=True,
+            )
+        except:
+            LGR.exception(
+                f"An event file could not be created for the following file: {excel_file}",
+                exc_info=True,
+            )
+            continue
 
         events = {}
         events["onset"] = extractor.extract_onsets()
@@ -674,20 +712,28 @@ def _create_princess_events_files(
 
             dutch_to_english = {"dag": "day", "nacht": "night", "dagnacht": "daynight"}
             input_df["huizen"] = input_df["huizen"].replace(dutch_to_english)
-            extractor = EPrimeBlockExtractor(
-                input_df,
-                onset_column_name="dagnacht.OnsetTime",
-                procedure_column_name="huizen",
-                trigger_column_name="eind.OnsetTime",
-                block_cue_names=dutch_to_english.values(),
-                convert_to_seconds=[
-                    "dagnacht.OnsetTime",
-                    "eind.OnsetTime",
-                    "feedback.OffsetTime",
-                    "dagnacht.RT",
-                ],
-                split_cue_as_instruction=False,
-            )
+
+            try:
+                extractor = EPrimeBlockExtractor(
+                    input_df,
+                    onset_column_name="dagnacht.OnsetTime",
+                    procedure_column_name="huizen",
+                    trigger_column_name="eind.OnsetTime",
+                    block_cue_names=dutch_to_english.values(),
+                    convert_to_seconds=[
+                        "dagnacht.OnsetTime",
+                        "eind.OnsetTime",
+                        "feedback.OffsetTime",
+                        "dagnacht.RT",
+                    ],
+                    split_cue_as_instruction=False,
+                )
+            except:
+                LGR.exception(
+                    f"An event file could not be created for the following file: {edat_file}",
+                    exc_info=True,
+                )
+                continue
 
             events = {}
             # Best guess of scanner time would be the first fixpunt which appears after
@@ -810,8 +856,8 @@ def run_pipeline(
         "temp_dir": temp_dir,
         "dst_dir": dst_dir,
         "subjects": subjects,
-        "subjects_visits_df": _standardize_dates(
-            _get_dataframe(subjects_visits_file), sort_data=True
+        "subjects_visits_df": _standardize_participant_ids(
+            _standardize_dates(_get_dataframe(subjects_visits_file), sort_data=True)
         ),
         "exclude_filenames": exclude_filenames,
     }

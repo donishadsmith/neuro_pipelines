@@ -18,6 +18,7 @@ from _general_utils import (
     _check_subjects_visits_file,
     _extract_subjects_visits_data,
     _standardize_dates,
+    _standardize_participant_ids,
 )
 
 LGR = setup_logger(__name__)
@@ -31,7 +32,9 @@ def run_pipeline(
     subjects_visits_df = _check_subjects_visits_file(
         subjects_visits_file, dose_column_required=True, return_df=True
     )
-    subjects_visits_df = _standardize_dates(subjects_visits_df)
+    subjects_visits_df = _standardize_participant_ids(
+        _standardize_dates(subjects_visits_df)
+    )
 
     sessions_tsv_list = Path(bids_dir).rglob("*sessions.tsv")
     if subjects:

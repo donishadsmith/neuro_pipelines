@@ -25,6 +25,7 @@ from _general_utils import (
     _get_dataframe,
     _get_subject_visits,
     _standardize_dates,
+    _standardize_participant_ids,
 )
 
 LGR = setup_logger(__name__)
@@ -269,8 +270,8 @@ def _generate_bids_dir_pipeline(
 
     bids_dir.mkdir(parents=True, exist_ok=True)
 
-    subjects_visits_df = _standardize_dates(
-        _get_dataframe(subjects_visits_file), sort_data=True
+    subjects_visits_df = _standardize_participant_ids(
+        _standardize_dates(_get_dataframe(subjects_visits_file), sort_data=True)
     )
 
     participant_ids = sorted(
