@@ -26,7 +26,7 @@ TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
-EXCLUDE_NIFTI_FILES=${EXCLUDE_NIFTI_FILES:-""}        # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
+EXCLUDE_NIFTIS_FILE=${EXCLUDE_NIFTIS_FILE:-""}        # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
 
 TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}
 FILTER_CORRECT_TRIALS=${FILTER_CORRECT_TRIALS:-false} # Filter event-related tasks for correctness set to true or false
@@ -67,13 +67,15 @@ CMD="$PYTHON first_level_glm.py \
 	--exclusion_criteria $EXCLUSION_CRITERIA \
 	--fwhm $FWHM"
 
-if [[ -n $EXCLUDE_NIFTI_FILES ]]; then
-	CMD+=" --exclude_nifti_files $EXCLUDE_NIFTI_FILES"
+if [[ -n $EXCLUDE_NIFTIS_FILE ]]; then
+	CMD+=" --exclude_niftis_file $EXCLUDE_NIFTIS_FILE"
 fi
 
 echo Hostname: $(hostname)
 echo ID: $(id)
 getent passwd "$(id -u)"
+
+# For node failure issues use the --exclude flag
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD

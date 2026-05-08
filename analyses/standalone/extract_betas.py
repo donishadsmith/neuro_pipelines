@@ -3,7 +3,7 @@ from pathlib import Path
 
 from bidsaid.logging import setup_logger
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from _utils import create_beta_files
 

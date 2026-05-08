@@ -3,13 +3,12 @@ from pathlib import Path
 
 from bidsaid.logging import setup_logger
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from _second_level_utils import estimate_noise_smoothness, perform_cluster_simulation
 from _utils import (
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
-    estimate_noise_smoothness,
-    perform_cluster_simulation,
 )
 
 LGR = setup_logger(__name__)
