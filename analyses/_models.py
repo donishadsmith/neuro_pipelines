@@ -9,6 +9,7 @@ from _first_level_utils import is_timing_file_empty, EVENT_RELATED_TASKS
 
 LGR = setup_logger(__name__)
 
+
 def create_design_matrix(
     subject_dir,
     afni_img_path,

@@ -69,7 +69,7 @@ def get_first_level_gltsym_codes(cohort, task, analysis_type, caller):
         contrasts = modify_contrast_names(contrasts)
 
     return (
-        (f"{contrast}#0_Coef" for contrast in contrasts)
+        tuple(f"{contrast}#0_Coef" for contrast in contrasts)
         if caller == "extract_betas"
         else contrasts
     )

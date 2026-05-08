@@ -92,6 +92,7 @@ def _get_required_files(layout, label, **kwargs):
 
     return files
 
+
 def _select_by_space(files, space):
     return [file for file in files if space in Path(file).name][0]
 
@@ -110,7 +111,7 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
     )[0]
 
     if acompcor_strategy != "none":
-        subject_files["confounds_json_file"]  = _get_required_files(
+        subject_files["confounds_json_file"] = _get_required_files(
             layout,
             "confound JSON files",
             scope="derivatives",
@@ -130,24 +131,30 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
         **base_kwargs,
     )[0]
 
-    subject_files["mask_file"] = _select_by_space(_get_required_files(
-        layout,
-        "mask files",
-        scope="derivatives",
-        suffix="mask",
-        extension="nii.gz",
-        **base_kwargs,
-    ), space)
+    subject_files["mask_file"] = _select_by_space(
+        _get_required_files(
+            layout,
+            "mask files",
+            scope="derivatives",
+            suffix="mask",
+            extension="nii.gz",
+            **base_kwargs,
+        ),
+        space,
+    )
     LGR.info(f"Using the following mask file: {subject_files['mask_file']}")
 
-    subject_files["nifti_file"] = _select_by_space(_get_required_files(
-        layout,
-        "nifti files",
-        scope="derivatives",
-        suffix="bold",
-        extension="nii.gz",
-        **base_kwargs,
-    ), space)
+    subject_files["nifti_file"] = _select_by_space(
+        _get_required_files(
+            layout,
+            "nifti files",
+            scope="derivatives",
+            suffix="bold",
+            extension="nii.gz",
+            **base_kwargs,
+        ),
+        space,
+    )
     LGR.info(f"Using the following nifti file: {subject_files['nifti_file']}")
 
     return subject_files
@@ -347,6 +354,7 @@ def filter_regressor_names(
     ]
 
     return regressor_names
+
 
 def is_timing_file_empty(timing_file):
     if not Path(timing_file).exists():

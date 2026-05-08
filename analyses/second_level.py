@@ -269,8 +269,8 @@ def _get_cmd_args():
         help="Number of cores to use for 3dlmer when method is parametric.",
     )
     parser.add_argument(
-        "--exclude_niftis_file",
-        dest="exclude_niftis_file",
+        "--exclude_nifti_file",
+        dest="exclude_nifti_file",
         default=None,
         required=False,
         help=(
@@ -355,11 +355,11 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
     )
 
 
-def exclude_beta_files(beta_files, exclude_niftis_file):
-    if not exclude_niftis_file:
+def exclude_beta_files(beta_files, exclude_nifti_file):
+    if not exclude_nifti_file:
         return beta_files
 
-    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
+    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_file)[
         "nifti_prefix_filename"
     ].tolist()
 
@@ -1180,7 +1180,7 @@ def main(
     tfce_C,
     nonparametric_cluster_correction_p,
     n_cores,
-    exclude_niftis_file,
+    exclude_nifti_file,
     categorical_covariates,
     numerical_covariates,
 ):
@@ -1236,7 +1236,13 @@ def main(
         numerical_covariates=datacontainer.numerical_covariates,
     )
 
+    original_categorical_covariates = list(datacontainer.categorical_covariates)
+    original_numerical_covariates = list(datacontainer.numerical_covariates)
+
     for first_level_glt_label in first_level_glt_labels:
+        datacontainer.categorical_covariates = list(original_categorical_covariates)
+        datacontainer.numerical_covariates = list(original_numerical_covariates)
+
         entity_key = get_contrast_entity_key(first_level_glt_label)
         LGR.info(f"FIRST LEVEL GLTLABEL: {first_level_glt_label}")
 
@@ -1244,7 +1250,7 @@ def main(
         all_subjects = set(get_subjects(beta_files))
         beta_files = exclude_beta_files(
             beta_files,
-            exclude_niftis_file,
+            exclude_nifti_file,
         )
         if not beta_files:
             LGR.warning(f"No beta files found for {first_level_glt_label}")
