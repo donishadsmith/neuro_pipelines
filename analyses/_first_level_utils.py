@@ -251,17 +251,19 @@ def check_censoring(
     exclusion_criteria,
 ):
     if n_dummy_scans == "auto":
-        n_dummy_scans = compute_n_dummy_scans(confounds_df)
-        LGR.info(f"There are {n_dummy_scans} non-steady state scans.")
+        n_non_steady_state = compute_n_dummy_scans(confounds_df)
+        LGR.info(f"There are {n_non_steady_state} non-steady state scans.")
+    else:
+        n_non_steady_state = n_dummy_scans
 
     censor_mask = create_censor_mask(
         confounds_df,
         column_name="framewise_displacement",
-        n_dummy_scans=n_dummy_scans,
+        n_dummy_scans=n_non_steady_state,
         threshold=fd_threshold,
     ).astype(np.int8)
 
-    kept = censor_mask[n_dummy_scans:]
+    kept = censor_mask[n_non_steady_state:]
     n_censored = int(np.sum(kept == 0))
     percent_censored = n_censored / kept.size
 
@@ -272,7 +274,7 @@ def check_censoring(
     )
 
     censor_info = CensorInfo(
-        n_dummy_scans=n_dummy_scans,
+        n_dummy_scans=n_non_steady_state,
         n_censored=n_censored,
         n_total=int(kept.size),
         percent_censored=float(percent_censored),
