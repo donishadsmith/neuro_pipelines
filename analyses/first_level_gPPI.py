@@ -696,6 +696,20 @@ def main(
             space,
             censor_mask,
         )
+
+        high_motion_only_mask = censor_mask.copy()
+        high_motion_only_mask[: censor_info.n_dummy_scans] = 1
+
+        _ = create_censor_file(
+            subject_dir,
+            subject,
+            session,
+            task,
+            space,
+            high_motion_only_mask,
+            desc="high_motion_outliers_only",
+        )
+
         cosine_regressors, cosine_regressor_names = get_cosine_regressors(confounds_df)
 
         motion_regressors, motion_regressor_names = get_motion_regressors(

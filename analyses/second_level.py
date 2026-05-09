@@ -429,20 +429,31 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
                 subject_beta_file, "ses", return_entity_prefix=True
             )
             df.loc[df["session_id"] == ses_id, "InputFile"] = subject_beta_file
-            censor_file = (
-                Path(subject_beta_file).name.split("desc-")[0] + "desc-censor.1D"
+            all_censored_file = (
+                Path(subject_beta_file).name.split("desc-")[0]
+                + "desc-all_censored_volumes.1D"
             )
             parent_path = Path(subject_beta_file).parent
             if parent_path.name == "betas":
                 parent_path = parent_path.parent
 
-            censor_file = parent_path / censor_file
-            if censor_file.exists():
-                df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = (
-                    get_n_censored_volumes(censor_file)
+            all_censored_file = parent_path / all_censored_file
+            high_motion_file = (
+                all_censored_file.parent
+                / all_censored_file.name.replace(
+                    "all_censored_volumes", "high_motion_outliers_only"
                 )
+            )
+            if all_censored_file.exists() and high_motion_file.exists():
+                n_high_motion = get_n_censored_volumes(high_motion_file)
+                n_dummy_scans = (
+                    get_n_censored_volumes(all_censored_file) - n_high_motion
+                )
+                df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = n_high_motion
+                df.loc[df["session_id"] == ses_id, "n_dummy_scans"] = n_dummy_scans
             else:
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = np.nan
+                df.loc[df["session_id"] == ses_id, "n_dummy_scans"] = np.nan
 
         sessions_dfs.append(df)
 

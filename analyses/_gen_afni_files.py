@@ -17,10 +17,12 @@ class RegressorReport:
     constant_column_names: list[str] = field(default_factory=list)
 
 
-def create_censor_file(subject_dir, subject, session, task, space, censor_mask):
+def create_censor_file(
+    subject_dir, subject, session, task, space, censor_mask, desc="all_censored_volumes"
+):
     censor_file = (
         subject_dir
-        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-censor.1D"
+        / f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}_desc-{desc}.1D"
     )
 
     np.savetxt(censor_file, censor_mask, fmt="%d")
@@ -83,7 +85,9 @@ def create_nuisance_regressor_file(
         constant_col_names = []
 
     censored_volumes = np.where(censor_mask == 0)[0].tolist()
-    LGR.info(f"The following volume indices will be censored: {censored_volumes}")
+    LGR.info(
+        f"The following volume indices will be censored (non-steady state + high motion outliers): {censored_volumes}"
+    )
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)

@@ -31,6 +31,7 @@ class CensorInfo:
     percent_censored: float
     dummy_method: str
 
+
 EVENT_RELATED_TASKS = ["flanker", "simplegng", "complexgng"]
 
 # Using constant durations instead of BIDS one, which have small
