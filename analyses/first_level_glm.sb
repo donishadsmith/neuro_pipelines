@@ -73,7 +73,9 @@ fi
 
 echo Hostname: $(hostname)
 echo ID: $(id)
-getent passwd "$(id -u)"
+getent passwd $(id -u)
+
+echo Subject: ${SUBJECT#sub-}
 
 # For node failure issues use the --exclude flag
 

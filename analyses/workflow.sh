@@ -181,6 +181,22 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ===============
     # RUN_FIRST_LEVEL
     # ===============
+    # TROUBLESHOOTING NODE FAILURES:
+    # First-level jobs run as parallel SLURM arrays and are most likely to encounter
+    # node-level issues, resulting in incomplete processing/failures (e.g., 
+    # account issues with Apptainer). SLURM appears to still mark these as COMPLETED
+    # even if Apptainer failed on the node.
+    #
+    # After first-level jobs finish, check for failures:
+    # Use the following command:
+    #  cd /projects/bigos_lab/mph-study/code/logs && grep -rl "Exit Code: 1\|FATAL" --include="*first_level*.err" . | sed 's/\.err$/.out/' | xargs -I{} head {} | grep "Hostname:\|Subject:"
+    #
+    # If there are errors it will output text of the host (e.g., cpu104) with issue and the subject
+    # Then in first_level_glm.sb or first_level_gPPI.sb add:
+    #  #SBATCH --exclude=cpu104,cpu108
+    #
+    # to exclude these houses and resubmit jobs for those specific subject:
+    #  sbatch --array=0,1 first_level_glm.sb 90000 90001
     if [[ $RUN_FIRST_LEVEL == true ]]; then
         JOB_ID_1=$(sbatch --parsable --array=0-$N_SUBJECTS "${MAIL_ARGS[@]}" $FIRST_LEVEL_SCRIPT)
 
