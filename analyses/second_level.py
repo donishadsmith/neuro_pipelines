@@ -319,10 +319,6 @@ class DataContainer:
     def included_covariates(self) -> list[str]:
         return self.categorical_covariates + self.numerical_covariates
 
-    @property
-    def columns_to_keep(self) -> list[str]:
-        return list(self.grouping_columns) + self.included_covariates
-
     @staticmethod
     def get_glt_codes(cohort: str) -> str:
         glt_codes = {
