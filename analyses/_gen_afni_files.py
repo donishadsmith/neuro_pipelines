@@ -91,7 +91,7 @@ def create_nuisance_regressor_file(
 
     mean = data[censor_mask.astype(bool)].mean(axis=0)
     std = data[censor_mask.astype(bool)].std(axis=0, ddof=1)
-    std[std < np.finfo(np.float64).eps] = 1.0
+    std[std < np.finfo(std.dtype).eps] = 1.0
     data[censor_mask.astype(bool)] = (data[censor_mask.astype(bool)] - mean) / std
 
     np.savetxt(regressor_file, data, fmt="%.6f")
