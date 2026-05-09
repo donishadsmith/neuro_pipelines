@@ -1,4 +1,5 @@
 import json, sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import bids, numpy as np
@@ -11,6 +12,24 @@ from _utils import VALID_TASK_NAMES, _get_dataframe, embed_image, plot_signal
 from _report import HTMLReport
 
 LGR = setup_logger(__name__)
+
+
+@dataclass(frozen=True)
+class SessionFiles:
+    confounds_tsv_file: str
+    confounds_json_file: str | None
+    event_file: str
+    mask_file: str
+    nifti_file: str
+
+
+@dataclass(frozen=True)
+class CensorInfo:
+    n_dummy_scans: int
+    n_censored: int
+    n_total: int
+    percent_censored: float
+    dummy_method: str
 
 EVENT_RELATED_TASKS = ["flanker", "simplegng", "complexgng"]
 
@@ -99,9 +118,8 @@ def _select_by_space(files, space):
 
 def _collect_files(layout, subject, session, task, space, acompcor_strategy):
     base_kwargs = dict(subject=subject, session=session, task=task)
-    subject_files = {}
 
-    subject_files["confounds_tsv_file"] = _get_required_files(
+    confounds_tsv_file = _get_required_files(
         layout,
         "confound TSV files",
         scope="derivatives",
@@ -111,7 +129,7 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
     )[0]
 
     if acompcor_strategy != "none":
-        subject_files["confounds_json_file"] = _get_required_files(
+        confounds_json_file = _get_required_files(
             layout,
             "confound JSON files",
             scope="derivatives",
@@ -120,9 +138,9 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
             **base_kwargs,
         )[0]
     else:
-        subject_files["confounds_json_file"] = None
+        confounds_json_file = None
 
-    subject_files["event_file"] = _get_required_files(
+    event_file = _get_required_files(
         layout,
         "event files",
         scope="raw",
@@ -131,7 +149,7 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
         **base_kwargs,
     )[0]
 
-    subject_files["mask_file"] = _select_by_space(
+    mask_file = _select_by_space(
         _get_required_files(
             layout,
             "mask files",
@@ -142,9 +160,9 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
         ),
         space,
     )
-    LGR.info(f"Using the following mask file: {subject_files['mask_file']}")
+    LGR.info(f"Using the following mask file: {mask_file}")
 
-    subject_files["nifti_file"] = _select_by_space(
+    nifti_file = _select_by_space(
         _get_required_files(
             layout,
             "nifti files",
@@ -155,9 +173,15 @@ def _collect_files(layout, subject, session, task, space, acompcor_strategy):
         ),
         space,
     )
-    LGR.info(f"Using the following nifti file: {subject_files['nifti_file']}")
+    LGR.info(f"Using the following nifti file: {nifti_file}")
 
-    return subject_files
+    return SessionFiles(
+        confounds_tsv_file=confounds_tsv_file,
+        confounds_json_file=confounds_json_file,
+        event_file=event_file,
+        mask_file=mask_file,
+        nifti_file=nifti_file,
+    )
 
 
 def _skip_denoising(nifti_filename, exclude_niftis_file):
@@ -203,18 +227,18 @@ def collect_session_files(
     )
 
     try:
-        subject_files = _collect_files(
+        session_files = _collect_files(
             layout, subject, session, task, space, acompcor_strategy
         )
-        _check_run_validity(subject_files["nifti_file"], exclude_niftis_file)
+        _check_run_validity(session_files.nifti_file, exclude_niftis_file)
 
-        return report, report_path, subject_files, False
+        return report, report_path, session_files, False
     except (MissingFileError, InvalidRunError) as exc:
         LGR.warning(str(exc))
         report.mark_excluded(str(exc))
         report.create_report(report_path, "first_level.html")
 
-        return report, report_path, {}, True
+        return report, report_path, None, True
 
 
 def check_censoring(
@@ -247,17 +271,17 @@ def check_censoring(
         f" {percent_censored}"
     )
 
-    censor_info = {
-        "n_dummy_scans": n_dummy_scans,
-        "n_censored": n_censored,
-        "n_total": int(kept.size),
-        "percent_censored": float(percent_censored),
-        "dummy_method": (
+    censor_info = CensorInfo(
+        n_dummy_scans=n_dummy_scans,
+        n_censored=n_censored,
+        n_total=int(kept.size),
+        percent_censored=float(percent_censored),
+        dummy_method=(
             "user-specified"
             if n_dummy_scans != "auto"
             else "(number of 'non_steady_state_outlier_XX' columns in fMRIPrep confounds TSV)"
         ),
-    }
+    )
 
     if percent_censored > exclusion_criteria:
         LGR.warning(

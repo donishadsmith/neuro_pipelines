@@ -1,5 +1,5 @@
 import subprocess
-from pathlib import Path
+from dataclasses import dataclass, field
 
 import numpy as np, pandas as pd
 
@@ -9,6 +9,12 @@ from _denoising import get_col_name, get_new_matrix_and_names, remove_collinear_
 from _first_level_utils import CONDITION_DURATIONS, EVENT_RELATED_TASKS
 
 LGR = setup_logger(__name__)
+
+
+@dataclass(frozen=True)
+class RegressorReport:
+    collinear_regressor_names: list[str] = field(default_factory=list)
+    constant_column_names: list[str] = field(default_factory=list)
 
 
 def create_censor_file(subject_dir, subject, session, task, space, censor_mask):
@@ -86,10 +92,10 @@ def create_nuisance_regressor_file(
 
     np.savetxt(regressor_file, data, fmt="%.6f")
 
-    report_info = {
-        "collinear_regressor_names": collinear_regressor_names,
-        "constant_column_names": constant_col_names,
-    }
+    report_info = RegressorReport(
+        collinear_regressor_names=collinear_regressor_names,
+        constant_column_names=constant_col_names,
+    )
 
     return regressor_file, report_info
 

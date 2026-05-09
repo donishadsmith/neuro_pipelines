@@ -220,7 +220,7 @@ def main(
     )
 
     for session in sessions:
-        report, report_path, subject_files, skip_iteration = collect_session_files(
+        report, report_path, session_files, skip_iteration = collect_session_files(
             report_dir,
             layout,
             subject,
@@ -234,11 +234,11 @@ def main(
         if skip_iteration:
             continue
 
-        confounds_tsv_file = subject_files["confounds_tsv_file"]
-        confounds_json_file = subject_files["confounds_json_file"]
-        event_file = subject_files["event_file"]
-        mask_file = subject_files["mask_file"]
-        nifti_file = subject_files["nifti_file"]
+        confounds_tsv_file = session_files.confounds_tsv_file
+        confounds_json_file = session_files.confounds_json_file
+        event_file = session_files.event_file
+        mask_file = session_files.mask_file
+        nifti_file = session_files.nifti_file
 
         subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
         subject_dir.mkdir(parents=True, exist_ok=True)
@@ -263,11 +263,11 @@ def main(
         report.add_context(
             fd_threshold=fd_threshold,
             exclusion_criteria=exclusion_criteria,
-            n_censored_volumes=censor_info["n_censored"],
-            n_total_volumes=censor_info["n_total"],
-            percent_censored=censor_info["percent_censored"],
-            dummy_method=censor_info["dummy_method"],
-            n_dummy_scans=censor_info["n_dummy_scans"],
+            n_censored_volumes=censor_info.n_censored,
+            n_total_volumes=censor_info.n_total,
+            percent_censored=censor_info.percent_censored,
+            dummy_method=censor_info.dummy_method,
+            n_dummy_scans=censor_info.n_dummy_scans,
         )
 
         censor_file = create_censor_file(
@@ -319,8 +319,8 @@ def main(
 
         report.add_context(
             dropped_regressors=(
-                report_info["collinear_regressor_names"]
-                + report_info["constant_column_names"]
+                report_info.collinear_regressor_names
+                + report_info.constant_column_names
             )
         )
 
