@@ -461,12 +461,6 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     data_table = all_sessions.merge(participants_df, on="participant_id")
     # AFNI 26 requires first column to be named "Subj"
     data_table = data_table.rename(columns={"participant_id": "Subj"})
-
-    remove_columns = [
-        col for col in data_table.columns if col not in datacontainer.columns_to_keep
-    ]
-    data_table = data_table.drop(remove_columns, axis=1)
-
     column_names = order_columns_names(data_table.columns)
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1)
@@ -1247,8 +1241,8 @@ def main(
         numerical_covariates=datacontainer.numerical_covariates,
     )
 
-    original_categorical_covariates = list(datacontainer.categorical_covariates)
-    original_numerical_covariates = list(datacontainer.numerical_covariates)
+    original_categorical_covariates = set(datacontainer.categorical_covariates)
+    original_numerical_covariates = set(datacontainer.numerical_covariates)
 
     for first_level_glt_label in first_level_glt_labels:
         datacontainer.categorical_covariates = list(original_categorical_covariates)
