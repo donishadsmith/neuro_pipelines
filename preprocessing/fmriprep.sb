@@ -10,6 +10,12 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/fmriprep_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/fmriprep_%A_%a.err
 # -------------------------------------------------------------------------
+if ! getent passwd $(id -u) > /dev/null 2>&1; then
+    echo "Can't determine user account information on $(hostname). Requeueing job"
+    scontrol requeue ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
+    exit 0
+fi
+
 # Use --array=0-NUMSUBS (e.g., sbatch --array=0-16 fmriprep.sb) to process multiple subjects at the same time
 FMRIPREP_VERSION="25.2.3"
 
