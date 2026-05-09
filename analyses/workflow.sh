@@ -196,7 +196,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     #  #SBATCH --exclude=cpu104,cpu108
     #
     # to exclude these houses and resubmit jobs for those specific subject:
-    #  sbatch --array=0,1 first_level_glm.sb 90000 90001
+    #  sbatch --array=0-1 first_level_glm.sb 90000 90001
     if [[ $RUN_FIRST_LEVEL == true ]]; then
         JOB_ID_1=$(sbatch --parsable --array=0-$N_SUBJECTS "${MAIL_ARGS[@]}" $FIRST_LEVEL_SCRIPT)
 
