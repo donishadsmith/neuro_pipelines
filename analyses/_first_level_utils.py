@@ -298,7 +298,7 @@ def check_censoring(
         dummy_method=(
             "user-specified"
             if n_dummy_scans != "auto"
-            else "(number of 'non_steady_state_outlier_XX' columns in fMRIPrep confounds TSV)"
+            else "number of 'non_steady_state_outlier_XX' columns in fMRIPrep confounds TSV"
         ),
         mean_fd_before_censoring=float(mean_fd_before_censoring),
         mean_fd_after_censoring=float(mean_fd_after_censoring),

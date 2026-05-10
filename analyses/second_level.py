@@ -1556,7 +1556,7 @@ def main(
 
         report_path = (
             report_dir
-            / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_report.html"
+            / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_{analysis_type}_report.html"
         )
         report.create_report(report_path, "second_level.html")
 
