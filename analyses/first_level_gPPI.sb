@@ -14,6 +14,7 @@ BAD_NODES_FILE="/projects/bigos_lab/mph-study/code/logs/bad_nodes_${SLURM_ARRAY_
 
 if ! getent passwd $(id -u) > /dev/null 2>&1; then
     echo $(hostname) >> $BAD_NODES_FILE
+	sort -u -o $BAD_NODES_FILE $BAD_NODES_FILE
     echo "Can't determine user account information on $(hostname). Requeueing job."
     scontrol requeue ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
     scontrol update JobId=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} ExcNodeList=$(paste -sd, $BAD_NODES_FILE)
