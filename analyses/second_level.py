@@ -509,6 +509,26 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     return data_table, constant_columns, filtered_important_columns
 
 
+def get_sample_sizes(data_table):
+    dose_sample_sizes = data_table["dose"].value_counts().items()
+    dose_sample_sizes_string = ", ".join(
+        f"{name} (N={size})" for name, size in dose_sample_sizes
+    )
+
+    subject_dose_sample_sizes = dict(
+        data_table["Subj"].value_counts().value_counts()
+    ).items()
+    subject_dose_sample_sizes_string = ", ".join(
+        f"{num_doses} doses available (N={size})"
+        for num_doses, size in subject_dose_sample_sizes
+    )
+    subject_dose_sample_sizes_string = subject_dose_sample_sizes_string.replace(
+        "1 doses", "1 dose"
+    )
+
+    return dose_sample_sizes_string, subject_dose_sample_sizes_string
+
+
 @lru_cache()
 def get_layout(bids_dir, deriv_dir):
     return bids.BIDSLayout(bids_dir, derivatives=deriv_dir or None)
@@ -1325,8 +1345,10 @@ def main(
                 f"Remaining included covariates: {datacontainer.included_covariates}"
             )
 
+        dose_sample_sizes, subject_dose_sample_sizes = get_sample_sizes(data_table)
+
         report.add_context(
-            first_level_glt_label=first_level_glt_label,
+            first_level_glt_label=f"{first_level_glt_label} ({first_level_glt_label.replace('_vs_', '>')})",
             n_beta_files=len(retained_beta_files),
             n_subjects=len(retained_subjects),
             excluded_subjects=excluded_subjects,
@@ -1334,6 +1356,8 @@ def main(
             important_columns=important_columns,
             all_data_table_columns=all_data_table_columns,
             filtered_data_table_columns=important_columns,
+            dose_sample_sizes=dose_sample_sizes,
+            subject_dose_sample_sizes=subject_dose_sample_sizes,
         )
 
         if method == "parametric":
