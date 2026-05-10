@@ -457,22 +457,22 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
                 df.loc[df["session_id"] == ses_id, "n_dummy_scans"] = np.nan
 
             # Files saved together and should both exist
-            fd_file = all_censored_file.parent / all_censored_file.name.replace(
-                "all_censored_volumes", "fd_after_censoring"
-            )
             fd_before_file = all_censored_file.parent / all_censored_file.name.replace(
                 "all_censored_volumes", "fd_before_censoring"
             )
-            if fd_file.exists() and fd_before_file.exists():
-                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.mean(
-                    np.loadtxt(fd_file)
-                )
+            fd_after_file = all_censored_file.parent / all_censored_file.name.replace(
+                "all_censored_volumes", "fd_after_censoring"
+            )
+            if fd_before_file.exists() and fd_after_file.exists():
                 df.loc[df["session_id"] == ses_id, "mean_fd_before_censoring"] = (
                     np.mean(np.loadtxt(fd_before_file))
                 )
+                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.mean(
+                    np.loadtxt(fd_after_file)
+                )
             else:
-                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.nan
                 df.loc[df["session_id"] == ses_id, "mean_fd_before_censoring"] = np.nan
+                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.nan
 
         sessions_dfs.append(df)
 
