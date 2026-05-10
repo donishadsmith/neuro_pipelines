@@ -77,6 +77,8 @@
         <tr><td>FD threshold</td><td>{{ fd_threshold }} mm</td></tr>
         <tr><td>Outlier exclusion threshold</td><td>{{ exclusion_criteria * 100 }}%</td></tr>
         <tr><td>Volumes flagged (excluding non-steady state scans)</td><td>{{ n_censored_volumes }} / {{ n_total_volumes }} ({{ "%.1f" | format(percent_censored * 100) }}%)</td></tr>
+        <tr><td>Mean FD (excluding non-steady state volumes, before censoring)</td><td>{{ "%.4f" | format(mean_fd_before_censoring) }} mm</td></tr>
+        <tr><td>Mean FD (after censoring at FD &gt; {{ fd_threshold }} mm)</td><td>{{ "%.4f" | format(mean_fd_after_censoring) }} mm</td></tr>
         {% if dropped_regressors %}
         <tr><td>Dropped regressors (collinear/constant)</td><td>{{ dropped_regressors | join(", ") }}</td></tr>
         {% endif %}

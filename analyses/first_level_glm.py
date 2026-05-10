@@ -27,6 +27,7 @@ from _denoising import (
 )
 from _gen_afni_files import (
     create_censor_file,
+    create_fd_file,
     create_binary_condition,
     create_timing_files,
     create_nuisance_regressor_file,
@@ -268,6 +269,8 @@ def main(
             percent_censored=censor_info.percent_censored,
             dummy_method=censor_info.dummy_method,
             n_dummy_scans=censor_info.n_dummy_scans,
+            mean_fd_before_censoring=censor_info.mean_fd_before_censoring,
+            mean_fd_after_censoring=censor_info.mean_fd_after_censoring,
         )
 
         censor_file = create_censor_file(
@@ -276,8 +279,7 @@ def main(
 
         high_motion_only_mask = censor_mask.copy()
         high_motion_only_mask[: censor_info.n_dummy_scans] = 1
-
-        _ = create_censor_file(
+        create_censor_file(
             subject_dir,
             subject,
             session,
@@ -285,6 +287,17 @@ def main(
             space,
             high_motion_only_mask,
             desc="high_motion_outliers_only",
+        )
+
+        create_fd_file(
+            subject_dir,
+            subject,
+            session,
+            task,
+            space,
+            confounds_df,
+            censor_mask,
+            censor_info.n_dummy_scans,
         )
 
         cosine_regressors, cosine_regressor_names = get_cosine_regressors(confounds_df)

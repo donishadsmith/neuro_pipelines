@@ -84,6 +84,15 @@
 </div>
 
 <div class="section">
+    <h2>Data Tables</h2>
+    <table>
+        <tr><th>Parameter</th><th></th></tr>
+        <tr><td>Full data table columns</td><td>{{ all_data_table_columns | join(", ") }}</td></tr>
+        <tr><td>Filtered data table columns</td><td>{{ filtered_data_table_columns | join(", ") }}</td></tr>
+    </table>
+</div>
+
+<div class="section">
     <h2>Group Mask</h2>
     <table>
         <tr><th>Parameter</th><th></th></tr>

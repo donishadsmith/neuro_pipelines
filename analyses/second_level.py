@@ -319,6 +319,10 @@ class DataContainer:
     def included_covariates(self) -> list[str]:
         return self.categorical_covariates + self.numerical_covariates
 
+    @property
+    def columns_to_keep(self) -> list[str]:
+        return list(self.grouping_columns) + self.included_covariates
+
     @staticmethod
     def get_glt_codes(cohort: str) -> str:
         glt_codes = {
@@ -433,6 +437,7 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
             if parent_path.name == "betas":
                 parent_path = parent_path.parent
 
+            # Files saved together and should both exist
             all_censored_file = parent_path / all_censored_file
             high_motion_file = (
                 all_censored_file.parent
@@ -450,6 +455,24 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
             else:
                 df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = np.nan
                 df.loc[df["session_id"] == ses_id, "n_dummy_scans"] = np.nan
+
+            # Files saved together and should both exist
+            fd_file = all_censored_file.parent / all_censored_file.name.replace(
+                "all_censored_volumes", "fd_after_censoring"
+            )
+            fd_before_file = all_censored_file.parent / all_censored_file.name.replace(
+                "all_censored_volumes", "fd_before_censoring"
+            )
+            if fd_file.exists() and fd_before_file.exists():
+                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.mean(
+                    np.loadtxt(fd_file)
+                )
+                df.loc[df["session_id"] == ses_id, "mean_fd_before_censoring"] = (
+                    np.mean(np.loadtxt(fd_before_file))
+                )
+            else:
+                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.nan
+                df.loc[df["session_id"] == ses_id, "mean_fd_before_censoring"] = np.nan
 
         sessions_dfs.append(df)
 
@@ -1277,6 +1300,8 @@ def main(
         )
         data_table.to_csv(data_table_filename, sep="\t", index=False, encoding="utf-8")
 
+        all_data_table_columns = data_table.columns.tolist()
+
         # Create a filtered version of data table
         data_table = data_table[important_columns]
         data_table_filename = (
@@ -1307,6 +1332,8 @@ def main(
             excluded_subjects=excluded_subjects,
             dropped_columns=set(drop_constant_column_names + missing_covariates),
             important_columns=important_columns,
+            all_data_table_columns=all_data_table_columns,
+            filtered_data_table_columns=important_columns,
         )
 
         if method == "parametric":

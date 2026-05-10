@@ -30,6 +30,8 @@ class CensorInfo:
     n_total: int
     percent_censored: float
     dummy_method: str
+    mean_fd_before_censoring: float
+    mean_fd_after_censoring: float
 
 
 EVENT_RELATED_TASKS = ["flanker", "simplegng", "complexgng"]
@@ -274,9 +276,23 @@ def check_censoring(
         f" {percent_censored}"
     )
 
+    fd_values = confounds_df["framewise_displacement"].to_numpy(copy=True)
+    fd_steady_state = fd_values[n_non_steady_state:]
+    mean_fd_before_censoring = np.mean(fd_steady_state)
+
+    fd_retained = fd_steady_state[kept.astype(bool)]
+    # If NaN, guaranteed for the run to be excluded
+    mean_fd_after_censoring = np.mean(fd_retained) if fd_retained.size > 0 else np.nan
+
+    LGR.info(
+        f"For SUBJECT: {subject}, SESSION: {session}, TASK: {task}, "
+        f"mean FD (excluding non-steady state volumes): {mean_fd_before_censoring:.4f} mm, "
+        f"mean FD (after censoring at FD > {fd_threshold} mm): {mean_fd_after_censoring:.4f} mm"
+    )
+
     censor_info = CensorInfo(
-        n_dummy_scans=n_non_steady_state,
-        n_censored=n_censored,
+        n_dummy_scans=int(n_non_steady_state),
+        n_censored=int(n_censored),
         n_total=int(kept.size),
         percent_censored=float(percent_censored),
         dummy_method=(
@@ -284,6 +300,8 @@ def check_censoring(
             if n_dummy_scans != "auto"
             else "(number of 'non_steady_state_outlier_XX' columns in fMRIPrep confounds TSV)"
         ),
+        mean_fd_before_censoring=float(mean_fd_before_censoring),
+        mean_fd_after_censoring=float(mean_fd_after_censoring),
     )
 
     if percent_censored > exclusion_criteria:

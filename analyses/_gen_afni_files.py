@@ -30,6 +30,22 @@ def create_censor_file(
     return censor_file
 
 
+def create_fd_file(
+    subject_dir, subject, session, task, space, confounds_df, censor_mask, n_dummy_scans
+):
+    fd_values = confounds_df["framewise_displacement"].to_numpy(copy=True)
+    fd_steady_state = fd_values[n_dummy_scans:]
+    fd_retained = fd_steady_state[censor_mask[n_dummy_scans:].astype(bool)]
+
+    prefix = f"sub-{subject}_ses-{session}_task-{task}_run-01_space-{space}"
+
+    fd_before_file = subject_dir / f"{prefix}_desc-fd_before_censoring.1D"
+    np.savetxt(fd_before_file, fd_steady_state, fmt="%.6f")
+
+    fd_after_file = subject_dir / f"{prefix}_desc-fd_after_censoring.1D"
+    np.savetxt(fd_after_file, fd_retained, fmt="%.6f")
+
+
 def create_nuisance_regressor_file(
     subject_dir,
     subject,

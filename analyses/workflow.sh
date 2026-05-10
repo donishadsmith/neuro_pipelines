@@ -68,7 +68,7 @@ export GPPI_FALTUNG_PENALTY_SYNTAX="012 0"               # Deconvolution penalty
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
 export CATEGORICAL_COVARIATES=""                        # Categorical covariates to include in model; separated by space (e.g., "sex race ethnicity")
-export NUMERICAL_COVARIATES=""                          # Numerical covariates to include in model; separated by space (e.g., "n_censored_volumes age"). Note, only number of censored volumes varies within person
+export NUMERICAL_COVARIATES=""                          # Numerical covariates to include in model; separated by space (e.g., "n_censored_volumes age mean_fd_after_censoring"). Note, only number of censored volumes varies within person
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
 export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
 export EXCLUDE_NIFTIS_FILE=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
@@ -183,7 +183,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # ===============
     # TROUBLESHOOTING NODE FAILURES:
     # First-level jobs run as parallel SLURM arrays and are most likely to encounter
-    # node-level issues, resulting in incomplete processing/failures (e.g., 
+    # node-level issues, resulting in incomplete processing/failures (e.g.,
     # account issues with Apptainer). SLURM appears to still mark these as COMPLETED
     # even if Apptainer failed on the node.
     #
