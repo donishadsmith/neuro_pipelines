@@ -122,10 +122,6 @@ if [[ -n $APRIORI_IMG_PATH ]]; then
 	CMD+=" --apriori_img_path $APRIORI_IMG_PATH"
 fi
 
-# hostname
-# id
-# getent passwd "$(id -u)" || echo "getent failed"
-
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD

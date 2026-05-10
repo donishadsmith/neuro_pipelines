@@ -9,6 +9,12 @@
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/identify_cluster_locations_%A_%a.err
 # --------------------------------------------------------------------------------------------
+if ! getent passwd $(id -u) > /dev/null 2>&1; then
+    echo "Can't determine user account information on $(hostname). Requeueing job"
+    scontrol requeue ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
+    exit 0
+fi
+
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
 METHOD=${METHOD:-parametric}
 WHEREAMI_ATLAS=${WHEREAMI_ATLAS:-"Haskins_Pediatric_Nonlinear_1.0"}
@@ -42,10 +48,6 @@ CMD="$PYTHON identify_cluster_locations.py \
     --method $METHOD \
     --atlas $WHEREAMI_ATLAS \
     --analysis_type $ANALYSIS_TYPE"
-
-# hostname
-# id
-# getent passwd "$(id -u)" || echo "getent failed"
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
