@@ -148,6 +148,9 @@
         binary condition vector (via <code>1deval</code>) and convolving the product with the selected HRF model. The PPI
         interaction term was then downsampled back to the original TR grid of {{ tr }} s.
     </p>
+
+    <h3>Seed Deconvolution Command</h3>
+    <pre>{{ deconvolve_seed_cmd }}</pre>
 </div>
 {% endif %}
 
@@ -194,6 +197,9 @@
 
     <h4>Upsampled Condition Regressor</h4>
     <img src="{{ condition.upsampled_regressor_plot }}" alt="{{ condition.name }} Upsampled Condition Regressor">
+
+    <h4>PPI Convolution Command</h4>
+    <pre>{{ condition.ppi_cmd }}</pre>
 
     <h4>Upsampled PPI Timeseries</h4>
     <img src="{{ condition.upsampled_ppi_plot }}" alt="{{ condition.name }} Upsampled PPI Timeseries">

@@ -1404,10 +1404,10 @@ def main(
             )
 
             report.add_context(
-                model_str=model_str,
-                centering_str=center_str,
-                glt_str=glt_str,
-                lmer_cmd=lmer_cmd,
+                model_str=model_str.replace("  ", " "),
+                centering_str=center_str.replace("  ", " "),
+                glt_str=glt_str.replace("  ", " "),
+                lmer_cmd=lmer_cmd.replace("  ", " "),
             )
 
             acf_parameters_filename = estimate_noise_smoothness(
@@ -1564,7 +1564,7 @@ def main(
                         matrix_report_info.get("collinear_column_names", [])
                     ),
                     "residual_dof": matrix_report_info.get("residual_dof"),
-                    "palm_cmd": palm_cmd,
+                    "palm_cmd": palm_cmd.replace("  ", " "),
                 }
                 if vs_in_code:
                     labels = get_group_labels(second_level_glt_code)

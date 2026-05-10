@@ -513,7 +513,7 @@ def deconvolve_seed_timeseries(
     padded_deconvolved_seed_timeseries_file.unlink()
     Path(f"{gamma_file_name}_tmp").unlink()
 
-    return deconvolved_seed_timeseries_file
+    return deconvolved_seed_timeseries_file, cmd
 
 
 def upsample_condition_regressor(
@@ -600,7 +600,7 @@ def create_convolved_ppi_term(
     LGR.info(f"Reconvolving upsampled PPI regressor: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
-    return ppi_regressor_file
+    return ppi_regressor_file, cmd
 
 
 def main(
@@ -874,7 +874,7 @@ def main(
             upsample_dt,
         )
 
-        deconvolved_seed_timeseries_file = deconvolve_seed_timeseries(
+        deconvolved_seed_timeseries_file, deconvolve_seed_cmd = deconvolve_seed_timeseries(
             upsampled_seed_timeseries_file,
             upsample_dt,
             pad_seconds,
@@ -890,6 +890,7 @@ def main(
         )
 
         report.add_context(
+            deconvolve_seed_cmd = deconvolve_seed_cmd,
             seed_timeseries_plot=embed_image(seed_timeseries_plot_filename),
             denoised_seed_timeseries_plot=embed_image(
                 denoised_seed_timeseries_plot_filename,
@@ -899,7 +900,7 @@ def main(
             ),
             deconvolved_seed_timeseries_plot=embed_image(
                 deconvolved_seed_timeseries_plot_filename,
-            ),
+            )
         )
 
         first_level_gltsym_codes = get_first_level_gltsym_codes(
@@ -945,7 +946,7 @@ def main(
                 upsample_dt,
             )
 
-            ppi_regressor_file = create_convolved_ppi_term(
+            ppi_regressor_file, ppi_cmd = create_convolved_ppi_term(
                 ppi_dir,
                 deconvolved_seed_timeseries_file,
                 upsampled_condition_regressor_file,
@@ -978,6 +979,7 @@ def main(
                     "upsampled_regressor_plot": embed_image(
                         upsampled_condition_regressor_plot_filename,
                     ),
+                    "ppi_cmd": ppi_cmd.replace("  ", " "),
                     "upsampled_ppi_plot": embed_image(upsampled_ppi_plot_filename),
                     "downsampled_ppi_plot": embed_image(
                         downsampled_ppi_regressor_plot_filename,
@@ -1013,7 +1015,7 @@ def main(
         )
 
         report.add_context(
-            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}",
+            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}".replace("  ", " "),
         )
 
         design_matrix_file = create_design_matrix(
