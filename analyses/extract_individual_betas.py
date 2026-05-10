@@ -503,6 +503,11 @@ def main(
                             columns=["InputFile"]
                         )
 
+                    if "acq_time" in beta_coefficient_df.columns:
+                        beta_coefficient_df = beta_coefficient_df.drop(
+                            columns=["acq_time"]
+                        )
+
                     beta_coefficient_df["Analysis_Method"] = f"{method} {analysis_type}"
 
                     beta_coefficient_df.columns = [
