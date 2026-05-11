@@ -40,6 +40,7 @@ sphere_radius = st.number_input(
     help="The radius of the sphere mask in mm.",
     min_value=3,
     max_value=10,
+    value=5,
     format="%d",
 )
 st.divider()
