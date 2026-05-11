@@ -278,7 +278,7 @@ def create_dynamic_deconvolve_cmd(
             "-stim_times {label} {timing_file} 'GAM' -stim_label {label} go ",
             "-stim_times {label} {timing_file} 'GAM' -stim_label {label} nogo ",
             "-stim_times {label} {timing_file} 'GAM' -stim_label {label} errors ",
-            "-stim_file {label}  {ppi_file} -stim_label {label} PPI_go ",
+            "-stim_file {label} {ppi_file} -stim_label {label} PPI_go ",
             "-stim_file {label} {ppi_file} -stim_label {label} PPI_nogo ",
             "-stim_file {label} {ppi_file} -stim_label {label} PPI_errors ",
         )
@@ -300,10 +300,16 @@ def create_dynamic_deconvolve_cmd(
 
     nonempty_files = np.array(files)[~empty_mask]
     keep_trial_regressors = [file.removesuffix(".1D") for file in nonempty_files]
+    if analysis_type == "gPPI":
+        keep_trial_regressors += [f"PPI_{trial_type}" for trial_type in keep_trial_regressors]
+        stim_string = f"{stims[0]} "
+        start_indx = 2
+    else:
+        stim_string = ""
+        start_indx = 1
 
     # Only keep stims without empty files
-    stim_string = ""
-    for label, regressor in enumerate(keep_trial_regressors, start=1):
+    for label, regressor in enumerate(keep_trial_regressors, start=start_indx):
         bool_list = [
             regressor == stim_string.rstrip().split(" ")[-1] for stim_string in stims
         ]
