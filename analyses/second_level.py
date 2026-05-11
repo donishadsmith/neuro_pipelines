@@ -1348,7 +1348,7 @@ def main(
         dose_sample_sizes, subject_dose_sample_sizes = get_sample_sizes(data_table)
 
         report.add_context(
-            first_level_glt_label=f"{first_level_glt_label} ({first_level_glt_label.replace('_vs_', '>')})",
+            first_level_glt_label=f"{first_level_glt_label} ({first_level_glt_label.replace('_vs_', ' > ')})",
             n_beta_files=len(retained_beta_files),
             n_subjects=len(retained_subjects),
             excluded_subjects=excluded_subjects,
