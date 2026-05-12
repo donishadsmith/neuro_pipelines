@@ -220,6 +220,7 @@ def drop_dose_rows(
         .unique()
         .tolist()
     )
+    target_doses = list(map(str, target_doses))
     data_table = data_table[data_table["dose"].astype(str).isin(target_doses)]
     if only_complete_cases:
         counts = data_table["Subj"].value_counts()
