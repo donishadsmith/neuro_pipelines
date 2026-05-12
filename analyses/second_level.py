@@ -635,6 +635,9 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
             dose_list = [f"{x}" for x in available_doses]
             mean_code = f"{value}*" + f" +{value}*".join(dose_list)
             glt_str += glt_code.format(mean_code=mean_code)
+        elif "_vs_" not in glt_code:
+            # In future if ever asked to look at single group
+            glt_str += glt_code if level_str in available_doses else ""
         else:
             dose_list = level_str.split("_vs_")
             if all(dose in available_doses for dose in dose_list):
