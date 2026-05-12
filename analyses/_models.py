@@ -302,7 +302,7 @@ def create_dynamic_deconvolve_cmd(
     keep_trial_regressors = [file.removesuffix(".1D") for file in nonempty_files]
     if analysis_type == "gPPI":
         keep_trial_regressors += [f"PPI_{trial_type}" for trial_type in keep_trial_regressors]
-        stim_string = f"{stims[0]} "
+        stim_string = f"{stims[0]} ".format(label=1)
         start_indx = 2
         stims = stims[1:]
     else:
