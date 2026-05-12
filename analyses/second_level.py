@@ -1030,7 +1030,7 @@ def create_concatenated_image(
     else:
         files_to_merge = glt_data_table["InputFile"].tolist()
         cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(files_to_merge)}"
-        LGR.info(f"Concatenating paired images: {cmd}")
+        LGR.info(f"Concatenating images: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
 
     return concatenated_filename
