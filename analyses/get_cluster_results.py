@@ -424,25 +424,24 @@ def plot_thresholded_img(
         kwargs.update({"bg_img": bg_img})
 
     for mode in ["ortho", "mosaic"]:
-        for bg_color, black_bg in [("black", True), ("white", False)]:
-            display = plot_stat_map(**kwargs, display_mode=mode, black_bg=black_bg)
+        display = plot_stat_map(**kwargs, display_mode=mode)
 
-            statistic = "Z-score" if method == "parametric" else "T-score"
-            display._cbar.set_label(f"{statistic} Intensity")
+        statistic = "Z-score" if method == "parametric" else "T-score"
+        display._cbar.set_label(f"{statistic} Intensity")
 
-            plot_filename = (
-                dst_dir
-                / "stat_plots"
-                / method
-                / (
-                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
-                    f"_displaymode-{mode}_background-{bg_color}_desc-{method}_cluster.png"
-                )
+        plot_filename = (
+            dst_dir
+            / "stat_plots"
+            / method
+            / (
+                f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+                f"_displaymode-{mode}_desc-{method}_cluster.png"
             )
-            plot_filename.parent.mkdir(parents=True, exist_ok=True)
-            display.savefig(plot_filename, dpi=720)
+        )
+        plot_filename.parent.mkdir(parents=True, exist_ok=True)
+        display.savefig(plot_filename, dpi=720)
 
-            display.close()
+        display.close()
 
 
 def create_seed_masks(
