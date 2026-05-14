@@ -102,7 +102,7 @@ if [[ $COHORT == "kids" ]]; then
     TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNIPediatricAsym/cohort-1"
     export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_label-GM_probseg.nii.gz"
     export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE}_desc-brain_mask.nii.gz"
-    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_T1w.nii.gz"
+    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${TEMPLATE_SPACE%2}1_desc-brain_T1w.nii.gz"
     # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
     export WHEREAMI_ATLAS="Haskins_Pediatric_Nonlinear_1.01"
 
@@ -116,7 +116,7 @@ else
     TEMPLATE_FLOW_PATH="/projects/bigos_lab/templateflow/tpl-MNI152NLin2009cAsym"
     export GM_PROBSEG_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-02_label-GM_probseg.nii.gz"
     export TEMPLATE_MASK_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-02_desc-brain_mask.nii.gz"
-    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-01_T1w.nii.gz"
+    export TEMPLATE_IMG_PATH="$TEMPLATE_FLOW_PATH/tpl-${BASE_SPACE}_res-01_desc-brain_T1w.nii.gz"
     export WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
 
     if [[ $TASKS == "all" ]]; then

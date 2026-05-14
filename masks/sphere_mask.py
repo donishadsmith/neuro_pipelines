@@ -19,13 +19,13 @@ COHORT_MAP = {
         "template_mask_path": Path(__file__).parent
         / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz",
         "template_img_path": Path(__file__).parent
-        / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-1_T1w.nii.gz",
+        / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-1_desc-brain_T1w.nii.gz",
     },
     "adults": {
         "template_mask_path": Path(__file__).parent
         / "templates/adults/tpl-MNI152NLin2009cAsym_res-02_desc-brain_mask.nii.gz",
         "template_img_path": Path(__file__).parent
-        / "templates/adults/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz",
+        / "templates/adults/tpl-MNI152NLin2009cAsym_res-01_desc-brain_T1w.nii.gz",
     },
 }
 

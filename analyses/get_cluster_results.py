@@ -419,29 +419,29 @@ def plot_thresholded_img(
         "vmax": vmax,
         "vmin": vmin,
     }
-    if template_img_path:
-        bg_img = nib.load(template_img_path)
-        kwargs.update({"bg_img": bg_img})
+    if template_img_path and Path(template_img_path).exists():
+        kwargs.update({"bg_img": template_img_path})
 
     for mode in ["ortho", "mosaic"]:
-        display = plot_stat_map(**kwargs, display_mode=mode)
+        for bg_color, black_bg in [("black", True), ("white", False)]:
+            display = plot_stat_map(**kwargs, display_mode=mode, black_bg=black_bg)
 
-        statistic = "Z-score" if method == "parametric" else "T-score"
-        display._cbar.set_label(f"{statistic} Intensity")
+            statistic = "Z-score" if method == "parametric" else "T-score"
+            display._cbar.set_label(f"{statistic} Intensity")
 
-        plot_filename = (
-            dst_dir
-            / "stat_plots"
-            / method
-            / (
-                f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
-                f"_displaymode-{mode}_desc-{method}_cluster.png"
+            plot_filename = (
+                dst_dir
+                / "stat_plots"
+                / method
+                / (
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+                    f"_displaymode-{mode}_background-{bg_color}_desc-{method}_cluster.png"
+                )
             )
-        )
-        plot_filename.parent.mkdir(parents=True, exist_ok=True)
-        display.savefig(plot_filename, dpi=720)
+            plot_filename.parent.mkdir(parents=True, exist_ok=True)
+            display.savefig(plot_filename, dpi=720)
 
-        display.close()
+            display.close()
 
 
 def create_seed_masks(
@@ -497,20 +497,25 @@ def create_seed_masks(
 
         nib.save(sphere_mask, sphere_filename)
 
-        display = plot_roi(
-            sphere_filename,
-            bg_img=template_img_path,
-            draw_cross=False,
-            cmap=ListedColormap(["red"]),
-            colorbar=False,
-        )
+        kwargs = {
+            "roi_img": sphere_filename,
+            "draw_cross": False,
+            "cmap": ListedColormap(["red"]),
+            "colorbar": False,
+        }
+        if template_img_path and Path(template_img_path).exists():
+            kwargs.update({"bg_img": template_img_path})
 
-        plot_filename = plot_parent_path / sphere_filename.name.replace(
-            ".nii.gz", ".png"
-        )
-        display.savefig(plot_filename, dpi=720)
+        for bg_color, black_bg in [("black", True), ("white", False)]:
+            display = plot_roi(**kwargs, black_bg=black_bg)
 
-        display.close()
+            end_name = f"_desc-sphere_mask_{coord_name}.nii.gz"
+            plot_filename = plot_parent_path / sphere_filename.name.replace(
+                end_name, f"_background-{bg_color}_desc-sphere_mask_{coord_name}.png"
+            )
+            display.savefig(plot_filename, dpi=720)
+
+            display.close()
 
 
 def main(
