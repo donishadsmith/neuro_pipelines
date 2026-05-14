@@ -512,7 +512,8 @@ def create_seed_masks(
 
             end_name = f"_desc-{method}_sphere_mask_{coord_name}.nii.gz"
             plot_filename = plot_parent_path / sphere_filename.name.replace(
-                end_name, f"_background-{bg_color}_desc-{method}_sphere_mask_{coord_name}.png"
+                end_name,
+                f"_background-{bg_color}_desc-{method}_sphere_mask_{coord_name}.png",
             )
             display.savefig(plot_filename, dpi=720)
 

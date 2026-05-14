@@ -7,6 +7,7 @@ from sphere_mask import run_pipeline
 
 from _general_utils import _convert_to_bool
 
+
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
         description="Pipeline for generating a-priori sphere masks for seed-based connectivity analyses."

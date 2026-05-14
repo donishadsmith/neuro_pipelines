@@ -79,7 +79,7 @@ def run_pipeline(
         draw_cross=False,
         cmap=ListedColormap(["red"]),
         colorbar=False,
-        black_bg=use_black_bg
+        black_bg=use_black_bg,
     )
 
     plot_filename = sphere_filename.parent / sphere_filename.name.replace(
