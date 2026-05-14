@@ -454,6 +454,7 @@ def create_seed_masks(
     sphere_radius,
 ):
     sphere_parent_path = dst_dir / "sphere_masks" / method
+    delete_dir(sphere_parent_path)
     sphere_parent_path.mkdir(parents=True, exist_ok=True)
 
     plot_parent_path = sphere_parent_path / "plots"
