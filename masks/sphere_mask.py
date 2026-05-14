@@ -35,6 +35,7 @@ def run_pipeline(
     cohort,
     mni_coordinate,
     sphere_radius,
+    use_black_bg,
 ):
     if not all([_is_float(x) for x in mni_coordinate]):
         mni_coordinate = list(map(str, mni_coordinate))
@@ -78,6 +79,7 @@ def run_pipeline(
         draw_cross=False,
         cmap=ListedColormap(["red"]),
         colorbar=False,
+        black_bg=use_black_bg
     )
 
     plot_filename = sphere_filename.parent / sphere_filename.name.replace(

@@ -47,6 +47,8 @@ st.divider()
 
 st.markdown("**Optional Arguments**")
 
+use_black_bg = st.checkbox("Use a black background in image.")
+
 if st.button("Browse for output directory"):
     folder = _select_content("directory")
     if folder:
@@ -59,6 +61,7 @@ kwargs = {
     "cohort": cohort,
     "mni_coordinate": [X, Y, Z],
     "sphere_radius": sphere_radius,
+    "use_black_bg": use_black_bg,
     "dst_dir": st.session_state.get("sphere_mask_dst_dir"),
 }
 

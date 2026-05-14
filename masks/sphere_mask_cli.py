@@ -1,7 +1,11 @@
-import argparse
+import argparse, sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sphere_mask import run_pipeline
 
+from _general_utils import _convert_to_bool
 
 def _get_cmd_args():
     parser = argparse.ArgumentParser(
@@ -27,6 +31,14 @@ def _get_cmd_args():
         required=True,
         type=float,
         help="The radius of the sphere mask in mm.",
+    )
+    parser.add_argument(
+        "--use_black_bg",
+        dest="dst_dir",
+        required=False,
+        default=False,
+        type=_convert_to_bool,
+        help="Whether or not to use a black background in an image.",
     )
     parser.add_argument(
         "--dst_dir",
