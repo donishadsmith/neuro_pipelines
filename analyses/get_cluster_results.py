@@ -423,52 +423,26 @@ def plot_thresholded_img(
         bg_img = nib.load(template_img_path)
         kwargs.update({"bg_img": bg_img})
 
-    if get_contrast_entity_key(first_level_glt_label) == "contrast":
-        first_level_code = first_level_glt_label.replace("_vs_", " > ")
-    else:
-        first_level_code = first_level_glt_label
+    for mode in ["ortho", "mosaic"]:
+        for bg_color, black_bg in [("black", True), ("white", False)]:
+            display = plot_stat_map(**kwargs, display_mode=mode, black_bg=black_bg)
 
-    suffix = " mg MPH" if _is_float(second_level_glt_code) else ""
+            statistic = "Z-score" if method == "parametric" else "T-score"
+            display._cbar.set_label(f"{statistic} Intensity")
 
-    if second_level_glt_code == "mean":
-        title = (
-            f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
-            "INTERCEPT: Mean across doses"
-        )
-    else:
-        first_label, second_label = get_group_labels(second_level_glt_code)
-        first_group = f"{first_label}{suffix}"
-        second_group = f"{second_label}{suffix}"
-        title = (
-            f"TASK: {task} FIRST LEVEL GLTLABEL: {first_level_code} "
-            f"GROUP CONTRAST: {first_group} > {second_group}"
-        )
-
-    for mode in ["ortho", "x", "y", "z", "mosaic"]:
-        display = plot_stat_map(**kwargs, display_mode=mode)
-
-        statistic = "Z-score" if method == "parametric" else "T-score"
-        display._cbar.set_label(f"{statistic} Intensity")
-
-        plot_filename_1 = (
-            dst_dir
-            / "stat_plots"
-            / method
-            / (
-                f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
-                f"_displaymode-{mode}_desc-{method}_cluster_plot_no_title.png"
+            plot_filename = (
+                dst_dir
+                / "stat_plots"
+                / method
+                / (
+                    f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+                    f"_displaymode-{mode}_background-{bg_color}_desc-{method}_cluster.png"
+                )
             )
-        )
-        plot_filename_1.parent.mkdir(parents=True, exist_ok=True)
-        display.savefig(plot_filename_1, dpi=720)
+            plot_filename.parent.mkdir(parents=True, exist_ok=True)
+            display.savefig(plot_filename, dpi=720)
 
-        display.title(title, bgcolor="black", color="white", size=10)
-
-        plot_filename_2 = str(plot_filename_1).replace("_no_title", "_with_title")
-
-        display.savefig(plot_filename_2, dpi=720)
-
-        display.close()
+            display.close()
 
 
 def create_seed_masks(
