@@ -109,6 +109,7 @@ from _first_level_utils import (
     create_diagnostic_condition_plots,
     filter_regressor_names,
     is_timing_file_empty,
+    plot_signal,
     summarize_timing_conditions,
     validate_first_level_inputs,
 )
@@ -124,7 +125,6 @@ from _utils import (
     get_beta_names,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
-    plot_signal,
     resample_seed_img,
 )
 
@@ -874,13 +874,15 @@ def main(
             upsample_dt,
         )
 
-        deconvolved_seed_timeseries_file, deconvolve_seed_cmd = deconvolve_seed_timeseries(
-            upsampled_seed_timeseries_file,
-            upsample_dt,
-            pad_seconds,
-            faltung_penalty_syntax,
-            afni_img_path,
-            task,
+        deconvolved_seed_timeseries_file, deconvolve_seed_cmd = (
+            deconvolve_seed_timeseries(
+                upsampled_seed_timeseries_file,
+                upsample_dt,
+                pad_seconds,
+                faltung_penalty_syntax,
+                afni_img_path,
+                task,
+            )
         )
         deconvolved_seed_timeseries_plot_filename = plot_signal(
             deconvolved_seed_timeseries_file,
@@ -890,7 +892,7 @@ def main(
         )
 
         report.add_context(
-            deconvolve_seed_cmd = deconvolve_seed_cmd,
+            deconvolve_seed_cmd=deconvolve_seed_cmd,
             seed_timeseries_plot=embed_image(seed_timeseries_plot_filename),
             denoised_seed_timeseries_plot=embed_image(
                 denoised_seed_timeseries_plot_filename,
@@ -900,7 +902,7 @@ def main(
             ),
             deconvolved_seed_timeseries_plot=embed_image(
                 deconvolved_seed_timeseries_plot_filename,
-            )
+            ),
         )
 
         first_level_gltsym_codes = get_first_level_gltsym_codes(
@@ -1015,7 +1017,9 @@ def main(
         )
 
         report.add_context(
-            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}".replace("  ", " "),
+            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}".replace(
+                "  ", " "
+            ),
         )
 
         design_matrix_file = create_design_matrix(

@@ -2,13 +2,13 @@ import json, sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import bids, numpy as np
+import bids, numpy as np, matplotlib.pyplot as plt
 from bidsaid._helpers import iterable_to_str
 from bidsaid.logging import setup_logger
 from bidsaid.qc import compute_n_dummy_scans, create_censor_mask
 
 from _denoising import get_acompcor_component_names
-from _utils import VALID_TASK_NAMES, _get_dataframe, embed_image, plot_signal
+from _utils import VALID_TASK_NAMES, _get_dataframe, embed_image
 from _report import HTMLReport
 
 LGR = setup_logger(__name__)
@@ -316,6 +316,36 @@ def check_censoring(
         )
 
     return censor_mask, censor_info
+
+
+def plot_signal(
+    signal_regressor_file,
+    tr,
+    plot_title,
+    upsample_dt=None,
+    figsize=(8, 6),
+    base_filename=None,
+):
+    dt = upsample_dt or tr
+
+    Y = np.loadtxt(signal_regressor_file).flatten()
+    max_time = len(Y) * dt
+    X = np.linspace(0, max_time, len(Y))
+
+    plt.figure(figsize=figsize)
+    plt.plot(X, Y)
+    plt.xlabel(f"Time (seconds) | dt = {dt}", fontsize=15)
+    plt.ylabel("Amplitude", fontsize=15)
+    plt.title(plot_title)
+
+    filename = base_filename or plot_title.replace(" ", "_").lower() + ".png"
+    save_filename = signal_regressor_file.parent / filename
+
+    LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
+    plt.savefig(save_filename, dpi=120, bbox_inches="tight")
+    plt.clf()
+
+    return save_filename
 
 
 def create_diagnostic_condition_plots(condition_filenames_dict, tr, fd_threshold):

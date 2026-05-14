@@ -3,7 +3,7 @@
 import base64, shutil, subprocess
 from pathlib import Path
 
-import nibabel as nib, numpy as np, matplotlib.pyplot as plt, pandas as pd
+import nibabel as nib, numpy as np, pandas as pd
 from nilearn.image import resample_to_img
 
 from bidsaid.logging import setup_logger
@@ -310,33 +310,3 @@ def embed_image(image_path):
     b64 = base64.b64encode(data).decode("utf-8")
 
     return f"data:image/png;base64,{b64}"
-
-
-def plot_signal(
-    signal_regressor_file,
-    tr,
-    plot_title,
-    upsample_dt=None,
-    figsize=(8, 6),
-    base_filename=None,
-):
-    dt = upsample_dt or tr
-
-    Y = np.loadtxt(signal_regressor_file).flatten()
-    max_time = len(Y) * dt
-    X = np.linspace(0, max_time, len(Y))
-
-    plt.figure(figsize=figsize)
-    plt.plot(X, Y)
-    plt.xlabel(f"Time (seconds) | dt = {dt}", fontsize=15)
-    plt.ylabel("Amplitude", fontsize=15)
-    plt.title(plot_title)
-
-    filename = base_filename or plot_title.replace(" ", "_").lower() + ".png"
-    save_filename = signal_regressor_file.parent / filename
-
-    LGR.info(f"Saving '{plot_title}' plot to: {save_filename}")
-    plt.savefig(save_filename, dpi=120, bbox_inches="tight")
-    plt.clf()
-
-    return save_filename

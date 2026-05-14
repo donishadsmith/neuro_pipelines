@@ -404,7 +404,9 @@ def main(
         )
 
         report.add_context(
-            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}".replace("  ", " "),
+            deconvolve_cmd=f"{deconvolve_cmd['num_stimts']} {deconvolve_cmd['args']}".replace(
+                "  ", " "
+            ),
         )
 
         design_matrix_file = create_design_matrix(
