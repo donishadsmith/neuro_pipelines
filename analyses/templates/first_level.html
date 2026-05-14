@@ -214,10 +214,12 @@
     <h2>Model Specification</h2>
     <p>
         The design matrix was created with AFNI <code>3dDeconvolve</code>
-        and the model was estimated with <code>3dREMLfit</code> to account for
-        temporal autocorrelation in the residuals, producing more accurate
-        standard errors and more valid t-statistics. The beta coefficients
-        themselves are unaffected by the temporal autocorrelation correction.
+        and the model was estimated with <code>3dREMLfit</code> using Generalized
+        Least Squares (GLSQ). This approach utilizes a voxelwise ARMA(1,1) model to
+        estimate and account for temporal autocorrelation , producing optimal,
+        pre-whitened beta coefficient estimates, along with more accurate standard
+        errors and valid t-statistics.
+
     </p>
     <h3>3dDeconvolve command</h3>
     <pre>{{ deconvolve_cmd }}</pre>
