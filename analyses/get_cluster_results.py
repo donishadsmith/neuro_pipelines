@@ -509,9 +509,9 @@ def create_seed_masks(
         for bg_color, black_bg in [("black", True), ("white", False)]:
             display = plot_roi(**kwargs, black_bg=black_bg)
 
-            end_name = f"_desc-sphere_mask_{coord_name}.nii.gz"
+            end_name = f"_desc-{method}_sphere_mask_{coord_name}.nii.gz"
             plot_filename = plot_parent_path / sphere_filename.name.replace(
-                end_name, f"_background-{bg_color}_desc-sphere_mask_{coord_name}.png"
+                end_name, f"_background-{bg_color}_desc-{method}_sphere_mask_{coord_name}.png"
             )
             display.savefig(plot_filename, dpi=720)
 
