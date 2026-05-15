@@ -21,7 +21,7 @@ def _convert_to_bool(arg: bool | str) -> bool:
 def _resolve_directories(bids_dir, temp_dir, caller):
     base_folder = {
         "BIDS Dataset": "BIDS_Dataset",
-        "BIDS Events": "BIDS Events",
+        "BIDS Events": "BIDS_Events",
         "Behavioral Data": "Behavioral_Data",
     }
     if not bids_dir:
