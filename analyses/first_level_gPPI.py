@@ -387,13 +387,13 @@ def denoise_seed_timeseries(
     return denoised_seed_timeseries_file
 
 
-def get_instruction_name(timing_dir, cohort, task, condition_filenames):
+def get_cue_name(timing_dir, cohort, task, condition_filenames):
     if task not in ["nback", "mtle", "mtlr"] and not (
         task == "nback" and cohort == "adult"
     ):
         return condition_filenames
     else:
-        return condition_filenames + [timing_dir / "instruction.1D"]
+        return condition_filenames + [timing_dir / "cue.1D"]
 
 
 def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
@@ -534,7 +534,7 @@ def upsample_condition_regressor(
 
     duration = (
         CONDITION_DURATIONS[cohort][task]
-        if not condition_name.startswith("instruction")
+        if not condition_name.startswith("cue")
         else CONDITION_DURATIONS[cohort][f"{condition_name}_{task}"]
     )
 
@@ -916,7 +916,7 @@ def main(
             for condition in get_beta_names(first_level_gltsym_codes)
             if "_vs_" not in condition
         ]
-        condition_filenames = get_instruction_name(
+        condition_filenames = get_cue_name(
             timing_dir,
             cohort,
             task,

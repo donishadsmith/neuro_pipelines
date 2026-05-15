@@ -15,7 +15,7 @@ from bidsaid.events import (
     PresentationBlockExtractor,
     PresentationEventExtractor,
     EPrimeBlockExtractor,
-    add_instruction_timing,
+    add_cue_timing,
 )
 from bidsaid.io import _copy_file
 from bidsaid.logging import setup_logger
@@ -431,7 +431,7 @@ def _create_nback_eprime_events_files(
                     input_df,
                     onset_column_name="StimDisplay.OnsetTime",
                     procedure_column_name="Procedure[Block]",
-                    block_cue_names=("1-back", "center", "2-back"),
+                    trial_types=("1-back", "center", "2-back"),
                     convert_to_seconds=[
                         "StimDisplay.OnsetTime",
                         "StimDisplay.OffsetTime",
@@ -439,7 +439,7 @@ def _create_nback_eprime_events_files(
                     ],
                     rest_block_codes="Rest",
                     quit_code="Quit",
-                    rest_code_frequency="variable",
+                    rest_code_pattern="variable",
                 )
             except:
                 LGR.exception(
@@ -482,13 +482,13 @@ def _create_nback_eprime_events_files(
                 lambda x: x if not np.isnan(x) else 34.0
             )
 
-            # Split instruction block, which is 2 seconds before each stimulus
-            event_df = add_instruction_timing(event_df, instruction_duration=2)
+            # Split cue from block, which is 2 seconds before each stimulus
+            event_df = add_cue_timing(event_df, cue_duration=2)
             event_df["trial_type"] = event_df["trial_type"].replace(
                 {
-                    "1-back_instruction": "instruction",
-                    "2-back_instruction": "instruction",
-                    "center_instruction": "instruction",
+                    "1-back_cue": "cue",
+                    "2-back_cue": "cue",
+                    "center_cue": "cue",
                 }
             )
 
@@ -519,7 +519,7 @@ def _create_nback_presentation_events_files(
             extractor = PresentationBlockExtractor(
                 text_file,
                 convert_to_seconds=["Time", "Duration"],
-                block_cue_names=["0back", "2back"],
+                trial_types=["0back", "2back"],
                 scanner_event_type="Pulse",
                 scanner_trigger_code="30",
             )
@@ -600,12 +600,12 @@ def _create_mtl_events_files(
             extractor = PresentationBlockExtractor(
                 input_df,
                 convert_to_seconds=["Time", "Duration"],
-                block_cue_names=(task_name),
+                trial_types=(task_name),
                 scanner_event_type="Pulse",
                 scanner_trigger_code="30",
                 rest_block_codes="rest",
                 quit_code="quit",
-                split_cue_as_instruction=True,
+                split_cue_from_block=True,
             )
         except:
             LGR.exception(
@@ -641,7 +641,7 @@ def _create_mtl_events_files(
 
         event_df = pd.DataFrame(events)
         event_df["trial_type"] = event_df["trial_type"].replace(
-            {f"{task_name}_instruction": "instruction"}
+            {f"{task_name}_cue": "cue"}
         )
 
         subject_id = re.search("(\d+).*_", excel_file.name).group(1)
@@ -719,14 +719,14 @@ def _create_princess_events_files(
                     onset_column_name="dagnacht.OnsetTime",
                     procedure_column_name="huizen",
                     trigger_column_name="eind.OnsetTime",
-                    block_cue_names=dutch_to_english.values(),
+                    trial_types=dutch_to_english.values(),
                     convert_to_seconds=[
                         "dagnacht.OnsetTime",
                         "eind.OnsetTime",
                         "feedback.OffsetTime",
                         "dagnacht.RT",
                     ],
-                    split_cue_as_instruction=False,
+                    split_cue_from_block=False,
                 )
             except:
                 LGR.exception(

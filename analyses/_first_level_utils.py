@@ -38,7 +38,7 @@ EVENT_RELATED_TASKS = ["flanker", "simplegng", "complexgng"]
 
 # Using constant durations instead of BIDS one, which have small
 # stimulus presentation delays
-# Instruction has the same duration for all three tasks but in the
+# cue has the same duration for all three tasks but in the
 # code for clarity
 CONDITION_DURATIONS = {
     "kids": {
@@ -47,9 +47,9 @@ CONDITION_DURATIONS = {
         "princess": 52,
         "mtle": 18,
         "mtlr": 18,
-        "instruction_nback": 2,
-        "instruction_mtle": 2,
-        "instruction_mtlr": 2,
+        "cue_nback": 2,
+        "cue_mtle": 2,
+        "cue_mtlr": 2,
     },
     "adults": {
         "flanker": 0.8,
@@ -58,8 +58,8 @@ CONDITION_DURATIONS = {
         "mtlr": 18,
         "simplegng": 0.3,
         "complexgng": 0.3,
-        "instruction_mtle": 2,
-        "instruction_mtlr": 2,
+        "cue_mtle": 2,
+        "cue_mtlr": 2,
     },
 }
 
