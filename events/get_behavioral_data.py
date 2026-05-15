@@ -75,9 +75,7 @@ def run_pipeline(
         behavioral_data_dict["session_id"].append(session_id)
 
         events_df = pd.read_csv(event_file, sep="\t")
-        trial_types = [
-            x for x in events_df["trial_type"].unique() if "instruction" not in x
-        ]
+        trial_types = [x for x in events_df["trial_type"].unique() if "cue" not in x]
 
         if index == 0:
             column_types = [
