@@ -381,12 +381,18 @@ def identify_clusters(
             for label_id in label_ids:
                 cluster_id = cluster_id_map[int(label_id)]
 
+                cluster_row = clusters_table.loc[
+                    clusters_table["Cluster ID"] == cluster_id
+                ]
+                coord = cluster_row[["X", "Y", "Z"]].values[0].tolist()
+                coord_name = "_".join([str(x) for x in coord])
+
                 label_mask_fdata = np.zeros_like(label_map.get_fdata())
                 label_mask_fdata[label_map.get_fdata() == label_id] = 1
 
                 label_mask_filename = label_base_dir / (
                     f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
-                    f"_clusterid-{cluster_id}_tail-{tail}_desc-{method}_cluster_mask.nii.gz"
+                    f"_clusterid-{cluster_id}_tail-{tail}_desc-{method}_cluster_mask_{coord_name}.nii.gz"
                 )
 
                 save_binary_mask(

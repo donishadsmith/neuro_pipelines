@@ -137,15 +137,19 @@ def resample_seed_img(seed_img, subject_nifti_img):
     return seed_img
 
 
-def get_coordinate_from_filename(seed_mask_path, replace_underscore=True):
-    seed_mask_path = Path(seed_mask_path)
+def get_coordinate_from_filename(filepath, replace_underscore=True):
+    filepath = Path(filepath)
     possible_coordinate = ""
-    if "_sphere_mask_" in seed_mask_path.name:
-        possible_coordinate = seed_mask_path.name.split("_sphere_mask_")[1]
-        suffix = "".join(seed_mask_path.suffixes[3:])
-        possible_coordinate = possible_coordinate.removesuffix(suffix)
-        if replace_underscore:
-            possible_coordinate = possible_coordinate.replace("_", ",")
+
+    for marker in ("_sphere_mask_", "_cluster_mask_", "_individual_betas_"):
+        if marker in filepath.name:
+            possible_coordinate = filepath.name.split(marker)[1]
+            suffix = "".join(filepath.suffixes[3:])
+            possible_coordinate = possible_coordinate.removesuffix(suffix)
+            if replace_underscore:
+                possible_coordinate = possible_coordinate.replace("_", ",")
+
+            break
 
     return possible_coordinate
 

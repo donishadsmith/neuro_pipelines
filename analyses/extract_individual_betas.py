@@ -104,18 +104,23 @@ def _get_cmd_args():
     return parser
 
 
-def get_cluster_region_info(cluster_result_file, cluster_id, tail):
-    df = pd.read_csv(cluster_result_file, sep=None, engine="python")
-    cluster_id_mask = df["Cluster ID"].astype(str) == cluster_id
-    tail_mask = df["Peak Stat"] > 0 if tail == "positive" else df["Peak Stat"] < 0
+def get_cluster_region_info(cluster_results_df, cluster_id, tail):
+    cluster_id_mask = cluster_results_df["Cluster ID"].astype(str) == cluster_id
+    tail_mask = (
+        cluster_results_df["Peak Stat"] > 0
+        if tail == "positive"
+        else cluster_results_df["Peak Stat"] < 0
+    )
     mask = (cluster_id_mask) & (tail_mask)
 
-    if "Region" in df.columns:
-        region_name = df.loc[mask, "Region"].tolist()[0]
+    if "Region" in cluster_results_df.columns:
+        region_name = cluster_results_df.loc[mask, "Region"].tolist()[0]
     else:
         region_name = cluster_id
 
-    mni_coord_list = list(map(str, df.loc[mask, ["X", "Y", "Z"]].values.tolist()[0]))
+    mni_coord_list = list(
+        map(str, cluster_results_df.loc[mask, ["X", "Y", "Z"]].values.tolist()[0])
+    )
     mni_coord = ", ".join(mni_coord_list)
 
     return region_name, mni_coord
@@ -140,8 +145,8 @@ def save_tabular_data(
         / first_level_glt_label
         / beta_name
         / cluster_mask_filename.name.replace(
-            "cluster_mask.nii.gz", "individual_betas.csv"
-        )
+            "_cluster_mask_", "_individual_betas_"
+        ).replace(".nii.gz", ".csv")
     )
     data_filename.parent.mkdir(parents=True, exist_ok=True)
 
@@ -196,7 +201,7 @@ def get_individual_interpretations(
 
 
 def add_info_to_data_table(
-    analysis_dir,
+    cluster_results_df,
     cluster_mask_filename,
     data_table,
     beta_name,
@@ -205,16 +210,7 @@ def add_info_to_data_table(
 ):
 
     tail = get_entity_value(cluster_mask_filename.name, entity="tail")
-    file_desc = cluster_mask_filename.name.split(f"tail-{tail}_")[-1]
-    file_desc = file_desc.replace("cluster_mask", "cluster_results").replace(
-        ".nii.gz", ".csv"
-    )
     cluster_id = get_entity_value(cluster_mask_filename.name, entity="clusterid")
-    cluster_result_file = next(
-        analysis_dir.rglob(
-            f"{cluster_mask_filename.name.split('_clusterid-')[0]}_{file_desc}"
-        )
-    )
 
     data_table[f"{analysis_type.upper()}_Individual_Beta_Interpretation"] = (
         get_individual_interpretations(
@@ -255,14 +251,11 @@ def add_info_to_data_table(
             else f"mean {interpretation.removeprefix('increased')} across doses < 0"
         )
 
-    if cluster_result_file:
-        region_name, mni_coord = get_cluster_region_info(
-            cluster_result_file, cluster_id, tail
-        )
-        data_table["Cluster_Region_ID"] = region_name
-        data_table["Cluster_MNI_Coordinate"] = mni_coord
-    else:
-        data_table["Cluster_Region_ID"] = cluster_id
+    region_name, mni_coord = get_cluster_region_info(
+        cluster_results_df, cluster_id, tail
+    )
+    data_table["Cluster_Region_ID"] = region_name
+    data_table["Cluster_MNI_Coordinate"] = mni_coord
 
 
 def get_subject_beta_filenames(
@@ -324,6 +317,19 @@ def compute_average_betas(
     return average_betas
 
 
+def get_cluster_results_df(analysis_dir, cluster_mask_filename):
+    tail = get_entity_value(cluster_mask_filename.name, entity="tail")
+    file_desc = cluster_mask_filename.name.split(f"tail-{tail}_")[-1]
+    file_desc = file_desc.split("_cluster_mask")[0] + "_cluster_results.csv"
+    cluster_result_file = next(
+        analysis_dir.rglob(
+            f"{cluster_mask_filename.name.split('_clusterid-')[0]}_{file_desc}"
+        )
+    )
+
+    return pd.read_csv(cluster_result_file, sep=None, engine="python")
+
+
 def main(
     analysis_dir,
     dst_dir,
@@ -378,7 +384,7 @@ def main(
             cluster_mask_filenames = list(
                 analysis_dir.rglob(
                     f"*task-{task}_{entity_key}-{first_level_glt_label}"
-                    f"_gltcode-{second_level_glt_code}*desc-{method}_cluster_mask.nii.gz"
+                    f"_gltcode-{second_level_glt_code}*desc-{method}_cluster_mask_*.nii.gz"
                 )
             )
             if not cluster_mask_filenames:
@@ -387,6 +393,10 @@ def main(
                     f"{first_level_glt_label}, SECOND LEVEL GLTCODE: {second_level_glt_code}"
                 )
                 continue
+
+            cluster_results_df = get_cluster_results_df(
+                analysis_dir, cluster_mask_filenames[0]
+            )
 
             truncated_df = drop_dose_rows(
                 data_table,
@@ -421,7 +431,7 @@ def main(
                     )
 
                     add_info_to_data_table(
-                        analysis_dir,
+                        cluster_results_df,
                         cluster_mask_filename,
                         beta_coefficient_df,
                         beta_name,

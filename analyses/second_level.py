@@ -1,6 +1,5 @@
 import argparse, shutil, subprocess, sys
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 
 import bids, nibabel as nib, numpy as np, pandas as pd
@@ -527,11 +526,6 @@ def get_sample_sizes(data_table):
     )
 
     return dose_sample_sizes_string, subject_dose_sample_sizes_string
-
-
-@lru_cache()
-def get_layout(bids_dir, deriv_dir):
-    return bids.BIDSLayout(bids_dir, derivatives=deriv_dir or None)
 
 
 def create_group_mask(
@@ -1236,6 +1230,8 @@ def main(
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
 
+    layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or None)
+
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
     report_dir = Path(analysis_dir) / "reports" / "second_level"
@@ -1375,7 +1371,7 @@ def main(
             LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
             group_mask_filename = create_group_mask(
                 dst_dir,
-                get_layout(bids_dir, deriv_dir),
+                layout,
                 task,
                 space,
                 group_mask_threshold,
@@ -1469,7 +1465,7 @@ def main(
                 LGR.info(f"Creating group mask with threshold: {group_mask_threshold}")
                 group_mask_filename = create_group_mask(
                     dst_dir,
-                    get_layout(bids_dir, deriv_dir),
+                    layout,
                     task,
                     space,
                     group_mask_threshold,
