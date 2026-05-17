@@ -619,7 +619,7 @@ def main(
                 cluster_threshold=cluster_size,
             )
             thresholded_filename = str(zcore_map_filename).replace(
-                "-z_map", "-parametric_cluster_corrected"
+                f"-parametric_z_map", "-parametric_cluster_corrected"
             )
             LGR.info(f"Saving thresholded image to: {thresholded_filename}")
             nib.save(thresholded_img, thresholded_filename)
