@@ -271,8 +271,8 @@ def _get_cmd_args():
         help="Number of cores to use for 3dlmer when method is parametric.",
     )
     parser.add_argument(
-        "--exclude_nifti_files",
-        dest="exclude_nifti_files",
+        "--exclude_niftis_file",
+        dest="exclude_niftis_file",
         default=None,
         required=False,
         type=convert_none(),
@@ -358,11 +358,11 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
     )
 
 
-def exclude_beta_files(beta_files, exclude_nifti_files):
-    if not exclude_nifti_files:
+def exclude_beta_files(beta_files, exclude_niftis_file):
+    if not exclude_niftis_file:
         return beta_files
 
-    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_files)[
+    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
         "nifti_prefix_filename"
     ].tolist()
 
@@ -1225,7 +1225,7 @@ def main(
     tfce_C,
     nonparametric_cluster_correction_p,
     n_cores,
-    exclude_nifti_files,
+    exclude_niftis_file,
     categorical_covariates,
     numerical_covariates,
 ):
@@ -1297,7 +1297,7 @@ def main(
         all_subjects = set(get_subjects(beta_files))
         beta_files = exclude_beta_files(
             beta_files,
-            exclude_nifti_files,
+            exclude_niftis_file,
         )
         if not beta_files:
             LGR.warning(f"No beta files found for {first_level_glt_label}")
