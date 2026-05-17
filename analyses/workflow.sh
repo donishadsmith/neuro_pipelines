@@ -61,18 +61,18 @@ export FWHM=6                                            # Choose integer
 export FILTER_CORRECT_TRIALS=false                       # Filter event-related tasks for correctness set to true or false
 
 # GPPI SPECIFIC PARAMETERS
-export GPPI_UPSAMPLE_DT=0.1						         # Choose float, Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.
+export GPPI_UPSAMPLE_DT=0.1						         # Choose float, Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution. Set to "None" for no upsampling.
 export GPPI_PAD_SECONDS=30.0                             # Choose float, pads timeseries for deconvolution for gPPI
 export GPPI_FALTUNG_PENALTY_SYNTAX="012 0"               # Deconvolution penalty syntax. See: https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTfitter.html"
 
 # ------------------------------------------------
 # PARAMETERS FOR SECOND LEVEL
 # ------------------------------------------------
-export CATEGORICAL_COVARIATES=""                        # Categorical covariates to include in model; separated by space (e.g., "sex race ethnicity")
-export NUMERICAL_COVARIATES=""                          # Numerical covariates to include in model; separated by space (e.g., "n_censored_volumes age mean_fd_after_censoring"). Note, only number of censored volumes varies within person
+export CATEGORICAL_COVARIATES="None"                    # Categorical covariates to include in model; separated by space (e.g., "sex race ethnicity"), set to "None" to use no covariates
+export NUMERICAL_COVARIATES="None"                      # Numerical covariates to include in model; separated by space (e.g., "n_censored_volumes age mean_fd_after_censoring"), set to "None" to use no covariates
 export GM_MASK_THRESHOLD=0.20                           # Choose a float between 0.20-0.30; Uses a gray matter probability mask to threshold group mask
-export APRIORI_IMG_PATH=""                              # Path to an apriori mask to restrict search space, leave as "" to not specify a path
-export EXCLUDE_NIFTIS_FILE=""                           # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, , leave as "" to not specify a path
+export APRIORI_IMG_PATH="None"                          # Path to an apriori mask to restrict search space, set to "None" to not specify a path
+export EXCLUDE_NIFTIS_FILE="None"                       # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, set to "None" to not specify a path
                                                         # should contain a single column named 'nifti_prefix_filename'
 export PARAMETRIC_VOXEL_CORRECTION_P=0.001              # Cluster forming threshold for parametric method
 export PARAMETRIC_CLUSTER_CORRECTION_P=0.05             # Cluster correction threshold for parametric method

@@ -98,7 +98,7 @@ from _gen_afni_files import (
     create_timing_files,
     create_nuisance_regressor_file,
 )
-from _argparse_typing import n_dummy_type, boolean_flags
+from _argparse_typing import n_dummy_type, boolean_flags, convert_none
 from _first_level_utils import (
     CONDITION_DURATIONS,
     EVENT_RELATED_TASKS,
@@ -263,9 +263,12 @@ def _get_cmd_args():
         "--upsample_dt",
         dest="upsample_dt",
         default=0.1,
-        type=float,
+        type=convert_none(float),
         required=False,
-        help="Time resolution to upsample seed timeseries (and condition times) to prior to deconvolution.",
+        help=(
+            "Time resolution to upsample seed timeseries (and condition times) to prior "
+            "to deconvolution. Set to 'none' to skip upsampling"
+        ),
     )
     parser.add_argument(
         "--pad_seconds",
@@ -295,6 +298,7 @@ def _get_cmd_args():
         dest="exclude_niftis_file",
         default=None,
         required=False,
+        type=convert_none(),
         help=(
             "Path to a file containing prefixes of the filename of the NIfTI images to exclude. "
             "Can list the fill name of the file (no parent directories) to exlude that specific file "
@@ -433,18 +437,19 @@ def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
 
 
 def deconvolve_seed_timeseries(
-    upsampled_seed_timeseries_file,
-    upsample_dt,
+    seed_timeseries_file,
+    dt,
     pad_seconds,
     faltung_penalty_syntax,
     afni_img_path,
     task,
+    input_desc="upsampled",
 ):
-    gamma_file_name = upsampled_seed_timeseries_file.parent / "GammaHR.1D"
+    gamma_file_name = seed_timeseries_file.parent / "GammaHR.1D"
     deconvolved_seed_timeseries_file = (
-        upsampled_seed_timeseries_file.parent
-        / upsampled_seed_timeseries_file.name.replace(
-            "_desc-upsampled",
+        seed_timeseries_file.parent
+        / seed_timeseries_file.name.replace(
+            f"_desc-{input_desc}",
             "_desc-deconvolved",
         )
     )
@@ -458,21 +463,21 @@ def deconvolve_seed_timeseries(
     )
 
     # Use some padding for smooth ramp up at ends
-    pad_length = int(pad_seconds / upsample_dt)
-    padded_upsampled_seed_timeseries_file = (
-        upsampled_seed_timeseries_file.parent
-        / upsampled_seed_timeseries_file.name.replace(
-            "_desc-upsampled",
-            "_desc-upsampled_padded",
+    pad_length = int(pad_seconds / dt)
+    padded_seed_timeseries_file = (
+        seed_timeseries_file.parent
+        / seed_timeseries_file.name.replace(
+            f"_desc-{input_desc}",
+            f"_desc-{input_desc}_padded",
         )
     )
     padded_arr = np.pad(
-        np.loadtxt(upsampled_seed_timeseries_file),
+        np.loadtxt(seed_timeseries_file),
         pad_width=pad_length,
         mode="reflect",
     )
     np.savetxt(
-        padded_upsampled_seed_timeseries_file,
+        padded_seed_timeseries_file,
         padded_arr.reshape(-1, 1),
         fmt="%f",
     )
@@ -480,24 +485,24 @@ def deconvolve_seed_timeseries(
     # https://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDeconvolve.html
     # https://doi.org/10.1002/hbm.26047
     # Creating 30 second hrf
-    hrf_model = "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({upsample_dt},1)"
+    hrf_model = "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({dt},1)"
 
     hrf_cmd = (
-        f"3dDeconvolve -nodata {int(30 / upsample_dt)} {upsample_dt} -polort -1 "
+        f"3dDeconvolve -nodata {int(30 / dt)} {dt} -polort -1 "
         f"-num_stimts 1 -stim_times 1 '1D: 0' '{hrf_model}' "
         f"-x1D {gamma_file_name}_tmp -x1D_stop -quiet && "
         f"1dcat {gamma_file_name}_tmp > {gamma_file_name}"
     )
 
-    # Perform deconvolution to estimate the neural response given the upsampled seed timeseries
+    # Perform deconvolution to estimate the neural response given the seed timeseries
     # and an hrf response function, while also adding a penalty for better/smoother estimation
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "{hrf_cmd} && '
-        f"3dTfitter -RHS {padded_upsampled_seed_timeseries_file} "
+        f"3dTfitter -RHS {padded_seed_timeseries_file} "
         f'-FALTUNG {gamma_file_name} {padded_deconvolved_seed_timeseries_file} {faltung_penalty_syntax}"'
     )
 
-    LGR.info(f"Deconvolving upsampled seed timeseries: {cmd}")
+    LGR.info(f"Deconvolving seed timeseries (dt={dt}): {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
     deconvolved_arr = np.loadtxt(padded_deconvolved_seed_timeseries_file)[
@@ -509,11 +514,21 @@ def deconvolve_seed_timeseries(
         fmt="%f",
     )
 
-    padded_upsampled_seed_timeseries_file.unlink()
+    padded_seed_timeseries_file.unlink()
     padded_deconvolved_seed_timeseries_file.unlink()
     Path(f"{gamma_file_name}_tmp").unlink()
 
     return deconvolved_seed_timeseries_file, cmd
+
+
+def mean_center_condition_vector(condition_regressor_file, save_filename):
+    condition_vector = np.loadtxt(condition_regressor_file)
+    condition_vector -= condition_vector.mean()
+    np.savetxt(
+        save_filename,
+        condition_vector.reshape(-1, 1),
+        fmt="%f",
+    )
 
 
 def upsample_condition_regressor(
@@ -551,12 +566,8 @@ def upsample_condition_regressor(
     subprocess.run(cmd, shell=True, check=True)
 
     # Now mean center the task regressor
-    condition_vector = np.loadtxt(upsampled_condition_regressor_file)
-    condition_vector -= condition_vector.mean()
-    np.savetxt(
-        upsampled_condition_regressor_file,
-        condition_vector.reshape(-1, 1),
-        fmt="%f",
+    mean_center_condition_vector(
+        upsampled_condition_regressor_file, upsampled_condition_regressor_file
     )
 
     return upsampled_condition_regressor_file
@@ -565,39 +576,40 @@ def upsample_condition_regressor(
 def create_convolved_ppi_term(
     ppi_dir,
     deconvolved_seed_timeseries_file,
-    upsampled_condition_regressor_file,
+    condition_regressor_file,
     afni_img_path,
-    upsample_dt,
+    dt,
+    condition_desc="upsampled",
 ):
     neural_interaction_file = (
         deconvolved_seed_timeseries_file.parent
-        / upsampled_condition_regressor_file.name.replace(
-            "_desc-upsampled",
+        / condition_regressor_file.name.replace(
+            f"_desc-{condition_desc}",
             "_desc-neural_interaction",
         )
     )
-    ppi_regressor_file = ppi_dir / upsampled_condition_regressor_file.name.replace(
-        "_desc-upsampled",
-        "_desc-PPI_upsampled",
+    ppi_regressor_file = ppi_dir / condition_regressor_file.name.replace(
+        f"_desc-{condition_desc}",
+        f"_desc-PPI_{condition_desc}",
     )
 
     numout = np.loadtxt(deconvolved_seed_timeseries_file).size
     gamma_file_name = deconvolved_seed_timeseries_file.parent / "GammaHR.1D"
 
     # PPI = ([neural signal * binary_condition_vector] * hrf)(t)
-    convolution_cmd = f"waver -FILE {upsample_dt} {gamma_file_name} -peak 1 -input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"
+    convolution_cmd = f"waver -FILE {dt} {gamma_file_name} -peak 1 -input {neural_interaction_file} -numout {numout} > {ppi_regressor_file}"
 
     # Create the interaction, which simply zeroes the parts when the condition is not active
     # Then reconvolve the interaction term to get the estimated HRF, ensure no extended tail due to convolution
     # So regressor can be properly downsampled
     cmd = (
         f'apptainer exec -B /projects:/projects {afni_img_path} bash -c "1deval '
-        f"-a {deconvolved_seed_timeseries_file} -b {upsampled_condition_regressor_file} "
+        f"-a {deconvolved_seed_timeseries_file} -b {condition_regressor_file} "
         f"-expr 'a*b' > {neural_interaction_file} && "
         f'{convolution_cmd}"'
     )
 
-    LGR.info(f"Reconvolving upsampled PPI regressor: {cmd}")
+    LGR.info(f"Reconvolving PPI regressor: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
     return ppi_regressor_file, cmd
@@ -811,21 +823,25 @@ def main(
         # gPPI preparation
         seed_mask_path = Path(seed_mask_path)
 
+        do_upsample = upsample_dt is not None
+        effective_dt = upsample_dt if do_upsample else tr
+
         hrf_model_type = (
-            "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({upsample_dt}, 1)"
+            "GAM" if task in EVENT_RELATED_TASKS else f"BLOCK({effective_dt}, 1)"
         )
         hrf_model_desc = (
             "A standard Gamma (GAM) function was used to model the impulse response for this event-related task."
             if task in EVENT_RELATED_TASKS
-            else f"A custom {upsample_dt}s duration BLOCK function was simulated via 3dDeconvolve to model the impulse response for this block-design task."
+            else f"A custom {effective_dt}s duration BLOCK function was simulated via 3dDeconvolve to model the impulse response for this block-design task."
         )
 
         report.add_context(
             seed_mask_path=str(seed_mask_path),
             seed_coordinate=get_coordinate_from_filename(seed_mask_path),
+            do_upsample=do_upsample,
             upsample_dt=upsample_dt,
             pad_seconds=pad_seconds,
-            pad_length=int(pad_seconds / upsample_dt),
+            pad_length=int(pad_seconds / effective_dt),
             faltung_penalty_syntax=faltung_penalty_syntax,
             tr=tr,
             hrf_model_type=hrf_model_type,
@@ -860,28 +876,35 @@ def main(
             "Denoised Seed Timeseries",
         )
 
-        upsampled_seed_timeseries_file = resample_data(
-            denoised_seed_timeseries_file,
-            tr,
-            afni_img_path,
-            upsample_dt,
-            method="upsample",
-        )
-        upsampled_seed_timeseries_plot_filename = plot_signal(
-            upsampled_seed_timeseries_file,
-            tr,
-            "Upsampled Seed Timeseries",
-            upsample_dt,
-        )
+        if do_upsample:
+            seed_input_for_deconvolution = resample_data(
+                denoised_seed_timeseries_file,
+                tr,
+                afni_img_path,
+                upsample_dt,
+                method="upsample",
+            )
+            upsampled_seed_timeseries_plot_filename = plot_signal(
+                seed_input_for_deconvolution,
+                tr,
+                "Upsampled Seed Timeseries",
+                upsample_dt,
+            )
+            seed_input_desc = "upsampled"
+        else:
+            seed_input_for_deconvolution = denoised_seed_timeseries_file
+            upsampled_seed_timeseries_plot_filename = None
+            seed_input_desc = "denoised"
 
         deconvolved_seed_timeseries_file, deconvolve_seed_cmd = (
             deconvolve_seed_timeseries(
-                upsampled_seed_timeseries_file,
-                upsample_dt,
+                seed_input_for_deconvolution,
+                effective_dt,
                 pad_seconds,
                 faltung_penalty_syntax,
                 afni_img_path,
                 task,
+                input_desc=seed_input_desc,
             )
         )
         deconvolved_seed_timeseries_plot_filename = plot_signal(
@@ -897,8 +920,10 @@ def main(
             denoised_seed_timeseries_plot=embed_image(
                 denoised_seed_timeseries_plot_filename,
             ),
-            upsampled_seed_timeseries_plot=embed_image(
-                upsampled_seed_timeseries_plot_filename,
+            upsampled_seed_timeseries_plot=(
+                embed_image(upsampled_seed_timeseries_plot_filename)
+                if upsampled_seed_timeseries_plot_filename
+                else None
             ),
             deconvolved_seed_timeseries_plot=embed_image(
                 deconvolved_seed_timeseries_plot_filename,
@@ -932,60 +957,92 @@ def main(
             cond_name = condition_filename.name.removesuffix(".1D")
             condition_names.append(cond_name)
 
-            upsampled_condition_regressor_file = upsample_condition_regressor(
-                condition_filename,
-                cohort,
-                task,
-                tr,
-                n_volumes,
-                upsample_dt,
-                afni_img_path,
-            )
-            upsampled_condition_regressor_plot_filename = plot_signal(
-                upsampled_condition_regressor_file,
-                tr,
-                f"{cond_name.capitalize()} Upsampled Condition Regressor",
-                upsample_dt,
-            )
+            if do_upsample:
+                condition_regressor_file = upsample_condition_regressor(
+                    condition_filename,
+                    cohort,
+                    task,
+                    tr,
+                    n_volumes,
+                    upsample_dt,
+                    afni_img_path,
+                )
+                condition_regressor_plot_filename = plot_signal(
+                    condition_regressor_file,
+                    tr,
+                    f"{cond_name.capitalize()} Upsampled Condition Regressor",
+                    upsample_dt,
+                )
+                condition_desc = "upsampled"
+            else:
+                binary_vector_file = condition_filenames_dict[cond_name][
+                    "noncensored_binary_vector"
+                ]
+                condition_dir = timing_dir / "condition_regressors"
+                condition_dir.mkdir(parents=True, exist_ok=True)
+                condition_regressor_file = (
+                    condition_dir / f"{cond_name}_desc-centered.1D"
+                )
+                mean_center_condition_vector(
+                    binary_vector_file, condition_regressor_file
+                )
+                condition_regressor_plot_filename = plot_signal(
+                    condition_regressor_file,
+                    tr,
+                    f"{cond_name.capitalize()} Mean-Centered Condition Regressor",
+                )
+                condition_desc = "centered"
 
             ppi_regressor_file, ppi_cmd = create_convolved_ppi_term(
                 ppi_dir,
                 deconvolved_seed_timeseries_file,
-                upsampled_condition_regressor_file,
+                condition_regressor_file,
                 afni_img_path,
-                upsample_dt,
-            )
-            upsampled_ppi_plot_filename = plot_signal(
-                ppi_regressor_file,
-                tr,
-                f"{cond_name.capitalize()} Upsampled PPI Timeseries",
-                upsample_dt,
+                effective_dt,
+                condition_desc=condition_desc,
             )
 
-            downsampled_ppi_regressor_file = resample_data(
-                ppi_regressor_file,
-                tr,
-                afni_img_path,
-                upsample_dt,
-                method="downsample",
-            )
-            downsampled_ppi_regressor_plot_filename = plot_signal(
-                downsampled_ppi_regressor_file,
-                tr,
-                f"{cond_name.capitalize()} Downsampled PPI Timeseries",
-            )
+            if do_upsample:
+                ppi_plot_filename = plot_signal(
+                    ppi_regressor_file,
+                    tr,
+                    f"{cond_name.capitalize()} Upsampled PPI Timeseries",
+                    upsample_dt,
+                )
+                final_ppi_regressor_file = resample_data(
+                    ppi_regressor_file,
+                    tr,
+                    afni_img_path,
+                    upsample_dt,
+                    method="downsample",
+                )
+                final_ppi_plot_filename = plot_signal(
+                    final_ppi_regressor_file,
+                    tr,
+                    f"{cond_name.capitalize()} Downsampled PPI Timeseries",
+                )
+            else:
+                ppi_plot_filename = None
+                final_ppi_regressor_file = ppi_dir / f"PPI_{cond_name}.1D"
+                ppi_regressor_file.rename(final_ppi_regressor_file)
+                final_ppi_plot_filename = plot_signal(
+                    final_ppi_regressor_file,
+                    tr,
+                    f"{cond_name.capitalize()} PPI Timeseries",
+                )
 
             condition_plots.append(
                 {
                     "name": cond_name,
-                    "upsampled_regressor_plot": embed_image(
-                        upsampled_condition_regressor_plot_filename,
+                    "do_upsample": do_upsample,
+                    "condition_regressor_plot": embed_image(
+                        condition_regressor_plot_filename,
                     ),
                     "ppi_cmd": ppi_cmd.replace("  ", " "),
-                    "upsampled_ppi_plot": embed_image(upsampled_ppi_plot_filename),
-                    "downsampled_ppi_plot": embed_image(
-                        downsampled_ppi_regressor_plot_filename,
+                    "ppi_plot": (
+                        embed_image(ppi_plot_filename) if ppi_plot_filename else None
                     ),
+                    "final_ppi_plot": embed_image(final_ppi_plot_filename),
                 }
             )
 

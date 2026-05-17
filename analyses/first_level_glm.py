@@ -32,7 +32,7 @@ from _gen_afni_files import (
     create_timing_files,
     create_nuisance_regressor_file,
 )
-from _argparse_typing import n_dummy_type, boolean_flags
+from _argparse_typing import n_dummy_type, boolean_flags, convert_none
 from _first_level_utils import (
     InvalidRunError,
     check_censoring,
@@ -180,6 +180,7 @@ def _get_cmd_args():
         dest="exclude_niftis_file",
         default=None,
         required=False,
+        type=convert_none(),
         help=(
             "File containing prefixes of the filename of the NIfTI images to exclude. "
             "Can list the fill name of the file (no parent directories) to exlude that specific file "

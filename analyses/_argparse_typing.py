@@ -17,3 +17,13 @@ def n_dummy_type(x):
 
 def boolean_flags(x):
     return True if x.lower() in ["t", "true", "1", "y", "yes"] else False
+
+
+def convert_none(cast=str):
+    def _convert(x):
+        if str(x).lower() == "none":
+            return None
+
+        return cast(x)
+
+    return _convert
