@@ -97,14 +97,20 @@ CMD="$PYTHON second_level.py \
 	--analysis_type $ANALYSIS_TYPE \
     --n_cores $SLURM_CPUS_PER_TASK \
 	--exclude_niftis_file $EXCLUDE_NIFTIS_FILE \
-	--categorical_covariates $CATEGORICAL_COVARIATES \
-	--numerical_covariates $NUMERICAL_COVARIATES \
 	--gm_probseg_img_path $GM_PROBSEG_IMG_PATH \
 	--gm_mask_threshold $GM_MASK_THRESHOLD \
 	--apriori_img_path $APRIORI_IMG_PATH"
 
 if [[ -n $FIRST_LEVEL_GLT_LABEL ]]; then
 	CMD+=" --first_level_glt_label $FIRST_LEVEL_GLT_LABEL"
+fi
+
+if [[ ${CATEGORICAL_COVARIATES,,} != "none" ]]; then
+	CMD+=" --categorical_covariates $CATEGORICAL_COVARIATES"
+fi
+
+if [[ ${NUMERICAL_COVARIATES,,} != "none" ]]; then
+	CMD+=" --numerical_covariates $NUMERICAL_COVARIATES"
 fi
 
 if [[ $METHOD == "nonparametric" ]]; then

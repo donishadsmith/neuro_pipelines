@@ -167,7 +167,6 @@ def _get_cmd_args():
         default=[],
         required=False,
         nargs="*",
-        type=convert_none(),
         help=(
             "Categorical covariates to include in the second level model (e.g., sex race ethnicity). "
             "For nonparametric only, these covariates will be dummy-coded and mean-centered to prevent "
@@ -182,7 +181,6 @@ def _get_cmd_args():
         default=["n_censored_volumes"],
         required=False,
         nargs="*",
-        type=convert_none(),
         help=(
             "Numerical covariates to include in the second level model (e.g., n_censored_volumes age). "
             "These will be mean-centered for both parametric and nonparametric methods. "
