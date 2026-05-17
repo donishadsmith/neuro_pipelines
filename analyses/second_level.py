@@ -82,7 +82,7 @@ def _get_cmd_args():
         dest="gm_probseg_img_path",
         default=None,
         required=False,
-        type=convert_none,
+        type=convert_none(),
         help=(
             "The probability mask for gray matter voxels. Should approximately be in same space as the template."
             "Used to exclude non-gray matter voxels in the group mask and exclude false activations from "
@@ -102,7 +102,7 @@ def _get_cmd_args():
         dest="apriori_img_path",
         default=None,
         required=False,
-        type=convert_none,
+        type=convert_none(),
         help=(
             "Reduce the search space to the mask. If ``gm_probseg_img_path`` is supplied, the intersected group "
             "mask is restricted to the gray matter mask then restricted to the apriori mask. Note that "
@@ -167,7 +167,7 @@ def _get_cmd_args():
         default=[],
         required=False,
         nargs="*",
-        type=convert_none,
+        type=convert_none(),
         help=(
             "Categorical covariates to include in the second level model (e.g., sex race ethnicity). "
             "For nonparametric only, these covariates will be dummy-coded and mean-centered to prevent "
@@ -182,7 +182,7 @@ def _get_cmd_args():
         default=["n_censored_volumes"],
         required=False,
         nargs="*",
-        type=convert_none,
+        type=convert_none(),
         help=(
             "Numerical covariates to include in the second level model (e.g., n_censored_volumes age). "
             "These will be mean-centered for both parametric and nonparametric methods. "
@@ -271,11 +271,11 @@ def _get_cmd_args():
         help="Number of cores to use for 3dlmer when method is parametric.",
     )
     parser.add_argument(
-        "--exclude_nifti_file",
-        dest="exclude_nifti_file",
+        "--exclude_nifti_files",
+        dest="exclude_nifti_files",
         default=None,
         required=False,
-        type=convert_none,
+        type=convert_none(),
         help=(
             "Path to a file containing prefixes of the filename of the NIfTI images to exclude. "
             "Can list the fill name of the file (no parent directories) to exlude that specific file "
@@ -358,11 +358,11 @@ def get_beta_files(analysis_dir, task, first_level_glt_label):
     )
 
 
-def exclude_beta_files(beta_files, exclude_nifti_file):
-    if not exclude_nifti_file:
+def exclude_beta_files(beta_files, exclude_nifti_files):
+    if not exclude_nifti_files:
         return beta_files
 
-    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_file)[
+    excluded_niftis_prefixes = _get_dataframe(exclude_nifti_files)[
         "nifti_prefix_filename"
     ].tolist()
 
@@ -1225,7 +1225,7 @@ def main(
     tfce_C,
     nonparametric_cluster_correction_p,
     n_cores,
-    exclude_nifti_file,
+    exclude_nifti_files,
     categorical_covariates,
     numerical_covariates,
 ):
@@ -1297,7 +1297,7 @@ def main(
         all_subjects = set(get_subjects(beta_files))
         beta_files = exclude_beta_files(
             beta_files,
-            exclude_nifti_file,
+            exclude_nifti_files,
         )
         if not beta_files:
             LGR.warning(f"No beta files found for {first_level_glt_label}")
