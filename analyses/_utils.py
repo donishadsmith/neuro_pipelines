@@ -58,7 +58,7 @@ TASK_CONTRASTS = {
 
 # For the kids data, its fully within crossover design so [10 - placebo] - [5 - placebo]) = 10 - 5
 CONTRAST_CODES = {
-    "kids": ("5_vs_0", "10_vs_0", "10_vs_5", "mean"),
+    "kids": ("5_vs_0", "10_vs_0", "10_vs_5", "mph_vs_placebo", "mean"),
     "adults": ("mph_vs_placebo", "mean"),
 }
 
@@ -202,9 +202,18 @@ def get_nontarget_dose(second_level_glt_code, cohort):
     if second_level_glt_code == "mean":
         return []
 
+    # For kids mph_vs_placebo, all three original doses (0, 5, 10) are needed
+    # since 5 and 10 are averaged into a single mph image at the second level
+    if cohort == "kids" and second_level_glt_code == "mph_vs_placebo":
+        return []
+
     doses = {"kids": {"0", "5", "10"}, "adults": {"mph", "placebo"}}
 
     return list(doses[cohort].difference(second_level_glt_code.split("_vs_")))
+
+
+def needs_complete_cases(method):
+    return False if method == "parametric" else True
 
 
 def drop_dose_rows(

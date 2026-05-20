@@ -212,6 +212,15 @@
     </table>
 
     {% if contrast.is_comparison %}
+    {% if contrast.averaged_within_subjects %}
+    <p>
+        For each subject, beta images from the 5 mg and 10 mg doses were averaged into a
+        single methylphenidate (mph) image. The 0 mg (placebo) image was retained as-is.
+        Only subjects with all three original dose levels (0, 5, 10 mg) were included to
+        prevent imbalanced averaging. Numerical covariates were similarly averaged across
+        the collapsed dose levels.
+    </p>
+    {% endif %}
     <p>
         Only subjects with the both doses (i.e., {{ dose_list | join(", ") }}) were included in
         the paired two-sample test.

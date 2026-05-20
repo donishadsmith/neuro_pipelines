@@ -29,6 +29,7 @@ from _utils import (
     get_nontarget_dose,
     get_group_labels,
     save_binary_mask,
+    needs_complete_cases,
 )
 
 LGR = setup_logger(__name__)
@@ -331,6 +332,7 @@ class DataContainer:
                 "-gltCode 5_vs_0 'dose : 1*5 -1*0' ",
                 "-gltCode 10_vs_0 'dose : 1*10 -1*0' ",
                 "-gltCode 10_vs_5 'dose : 1*10 -1*5' ",
+                "-gltCode mph_vs_placebo 'dose : 0.5*10 +0.5*5 -1*0' ",
                 "-gltCode mean 'dose : {mean_code}' ",
             ),
             "adults": (
@@ -395,6 +397,77 @@ def drop_constant_columns(data_table):
     return data_table.drop(columns=constant_columns), constant_columns
 
 
+def needs_within_subject_averaging(cohort, second_level_glt_code):
+    if second_level_glt_code == "mean" or (
+        cohort == "kids" and second_level_glt_code == "mph_vs_placebo"
+    ):
+        return True
+    else:
+        return False
+
+
+def sort_data_table(data_table, subject_only=False):
+    sort_cols = ["Subj"] if subject_only else ["Subj", "dose"]
+
+    return data_table.sort_values(sort_cols).reset_index(drop=True)
+
+
+def recode_doses(glt_data_table, cohort, second_level_glt_code):
+    if not (cohort == "kids" and second_level_glt_code == "mph_vs_placebo"):
+        return glt_data_table
+
+    glt_data_table = glt_data_table.copy()
+    glt_data_table["dose"] = glt_data_table["dose"].astype(str)
+    glt_data_table["dose"] = glt_data_table["dose"].apply(
+        lambda x: "placebo" if x == "0" else "mph"
+    )
+
+    LGR.info(
+        f"Recoded kids dose column for {second_level_glt_code}: "
+        f"5 to mph, 10 to mph, and 0 to placebo "
+        f"Dose value counts after recoding:\n{glt_data_table['dose'].value_counts().to_string()}"
+    )
+
+    return glt_data_table
+
+
+def collapse_within_subject_doses(glt_data_table, datacontainer, second_level_glt_code):
+    groupby_keys = ["Subj"] if second_level_glt_code == "mean" else ["Subj", "dose"]
+
+    glt_data_table, categorical_cols, numerical_cols = set_column_types(
+        glt_data_table, datacontainer
+    )
+    glt_data_table = filter_glt_data_table(
+        glt_data_table, categorical_cols, numerical_cols
+    )
+
+    agg_rules = {col: "mean" for col in numerical_cols}
+    agg_rules.update({col: "first" for col in categorical_cols})
+
+    if agg_rules:
+        collapsed_data_table = (
+            glt_data_table.groupby(groupby_keys, sort=True).agg(agg_rules).reset_index()
+        )
+    else:
+        collapsed_data_table = (
+            glt_data_table[groupby_keys]
+            .drop_duplicates()
+            .sort_values(groupby_keys)
+            .reset_index(drop=True)
+        )
+
+    collapsed_data_table = collapsed_data_table.sort_values(groupby_keys).reset_index(
+        drop=True
+    )
+
+    LGR.info(
+        f"Collapsed within-subject doses using groupby {groupby_keys}: "
+        f"{len(glt_data_table)} rows became {len(collapsed_data_table)} rows"
+    )
+
+    return collapsed_data_table
+
+
 def replace_whitespace_with_underscores(data_table):
     for column in data_table.columns:
         if is_object_dtype(data_table[column]) or is_string_dtype(data_table[column]):
@@ -411,7 +484,17 @@ def order_columns_names(columns):
     )
 
 
-def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
+def standardize_doses(data_table, cohort):
+    if cohort != "kids":
+        return data_table
+
+    data_table = data_table.dropna(subset=["dose"])
+    data_table["dose"] = data_table["dose"].astype(int).astype(str)
+
+    return data_table
+
+
+def create_data_table(bids_dir, datacontainer, subject_list, beta_files, cohort):
     bids_dir = Path(bids_dir)
     participants_df = pd.read_csv(bids_dir / "participants.tsv", sep="\t")
 
@@ -484,14 +567,12 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     column_names = order_columns_names(data_table.columns)
     data_table = data_table.loc[:, column_names]
     data_table = data_table.dropna(how="all", axis=1)
-    if pd.to_numeric(data_table["dose"], errors="coerce").notna().all():
-        data_table["dose"] = data_table["dose"].astype(int).astype(str)
-    else:
-        data_table["dose"] = data_table["dose"].astype(str)
+    data_table = standardize_doses(data_table, cohort)
 
-    for numerical_var in datacontainer.numerical_covariates:
-        if numerical_var in data_table.columns:
-            data_table[numerical_var] = data_table[numerical_var].astype(float)
+    for numerical_var in set(datacontainer.numerical_covariates).intersection(
+        data_table.columns
+    ):
+        data_table[numerical_var] = data_table[numerical_var].astype(float)
 
     data_table = replace_whitespace_with_underscores(data_table)
 
@@ -507,7 +588,7 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files):
     filtered_important_columns = order_columns_names(filtered_important_columns)
     data_table = data_table.dropna(subset=important_columns, axis=0)
 
-    return data_table, constant_columns, filtered_important_columns
+    return sort_data_table(data_table), constant_columns, filtered_important_columns
 
 
 def get_sample_sizes(data_table):
@@ -696,13 +777,7 @@ def generate_matrices_filenames(
     return matrices_filenames_dict
 
 
-def create_design_matrix(
-    glt_data_table,
-    datacontainer,
-    include_intercept,
-    average_within_subjects=False,
-    second_level_glt_code=None,
-):
+def set_column_types(glt_data_table, datacontainer):
     categorical_cols = list(
         set(datacontainer.categorical_covariates).intersection(glt_data_table.columns)
     )
@@ -713,25 +788,37 @@ def create_design_matrix(
     for col in categorical_cols:
         glt_data_table[col] = glt_data_table[col].astype(str)
 
-    # Assumed to be the mean glt code
+    for col in numerical_cols:
+        glt_data_table[col] = glt_data_table[col].astype(float)
+
+    return glt_data_table, categorical_cols, numerical_cols
+
+
+def filter_glt_data_table(glt_data_table, categorical_cols, numerical_cols):
+    cols_to_keep = ["Subj", "dose"] + categorical_cols + numerical_cols
+
+    return glt_data_table[cols_to_keep]
+
+
+def create_design_matrix(
+    glt_data_table,
+    datacontainer,
+    include_intercept,
+    average_within_subjects=False,
+    second_level_glt_code=None,
+):
+    glt_data_table, categorical_cols, numerical_cols = set_column_types(
+        glt_data_table, datacontainer
+    )
+
     if average_within_subjects:
-        numeric_table = (
-            glt_data_table.groupby("Subj")
-            .mean(numeric_only=True)
-            .reset_index(drop=True)
+        glt_data_table = collapse_within_subject_doses(
+            glt_data_table, datacontainer, second_level_glt_code
         )
-        if "Subj" in numeric_table.columns:
-            numeric_table = numeric_table.drop(columns=["Subj"])
-
-        categorical_table = (
-            glt_data_table.groupby("Subj")[categorical_cols]
-            .first()
-            .reset_index(drop=True)
+    else:
+        glt_data_table = filter_glt_data_table(
+            glt_data_table, categorical_cols, numerical_cols
         )
-        if "Subj" in categorical_table.columns:
-            categorical_table = categorical_table.drop(columns=["Subj"])
-
-        glt_data_table = pd.concat([numeric_table, categorical_table], axis=1)
 
     design_components = {}
     mean_center = lambda arr: arr - arr.mean()
@@ -846,6 +933,7 @@ def create_mean_matrices(
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
+    average_within_subjects,
 ):
     """
     Takes the data table and creates matrices for PALM specifically for means
@@ -865,7 +953,8 @@ def create_mean_matrices(
         glt_data_table,
         datacontainer,
         include_intercept=True,
-        average_within_subjects=(second_level_glt_code == "mean"),
+        average_within_subjects=average_within_subjects,
+        second_level_glt_code=second_level_glt_code,
     )
     design_matrix.to_csv(
         matrices_filenames_dict["design_matrix_file"],
@@ -899,6 +988,7 @@ def create_comparison_matrices(
     entity_key,
     first_level_glt_label,
     second_level_glt_code,
+    average_within_subjects,
 ):
     """
     Takes the data table and creates matrices for PALM specifically for comparisons
@@ -914,6 +1004,11 @@ def create_comparison_matrices(
         output_dir, task, entity_key, first_level_glt_label, second_level_glt_code
     )
 
+    if average_within_subjects:
+        glt_data_table = collapse_within_subject_doses(
+            glt_data_table, datacontainer, second_level_glt_code
+        )
+
     glt_data_table, constant_columns_names = drop_within_subject_constant_regressors(
         datacontainer, glt_data_table
     )
@@ -925,6 +1020,7 @@ def create_comparison_matrices(
         glt_data_table,
         datacontainer,
         include_intercept=False,
+        average_within_subjects=False,
         second_level_glt_code=second_level_glt_code,
     )
     design_matrix.to_csv(
@@ -967,6 +1063,40 @@ def compute_n_permutation(glt_data_table):
     return set_permutations(true_max_permutation), true_max_permutation
 
 
+def create_mean_image(
+    subject_temp_merged_filename,
+    subject_mean_image_filename,
+    fsl_merge_call,
+    fsl_maths_call,
+    subject_files,
+):
+    subprocess.run(
+        f"{fsl_merge_call} -t {subject_temp_merged_filename} {' '.join(subject_files)}",
+        shell=True,
+        check=True,
+    )
+    subprocess.run(
+        f"{fsl_maths_call} {subject_temp_merged_filename} -Tmean {subject_mean_image_filename}",
+        shell=True,
+        check=True,
+    )
+
+    subject_temp_merged_filename.unlink()
+
+    return subject_mean_image_filename
+
+
+def concatenate_all_images(fsl_merge_call, concatenated_filename, files_to_merge):
+    cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(files_to_merge)}"
+    LGR.info(f"Concatenating images: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+
+def delete_images(image_filenames):
+    for image_filename in image_filenames:
+        Path(image_filename).unlink()
+
+
 def create_concatenated_image(
     output_dir,
     glt_data_table,
@@ -994,43 +1124,79 @@ def create_concatenated_image(
         else f"apptainer exec -B /projects:/projects {fsl_img_path} fslmaths"
     )
 
+    has_duplicate_dose_rows = (
+        "dose" in glt_data_table.columns
+        and glt_data_table.groupby(["Subj", "dose"]).size().max() > 1
+    )
+
     if second_level_glt_code == "mean":
-        LGR.info("Averaging doses within subjects for the mean contrast.")
+        LGR.info("Averaging all doses within subjects for the mean contrast.")
+
+        sorted_table = sort_data_table(glt_data_table, subject_only=True)
 
         subject_mean_images = []
-        for subject, group in glt_data_table.groupby("Subj"):
+        for subject, group in sorted_table.groupby("Subj", sort=True):
             subject_files = group["InputFile"].tolist()
             subject_temp_merged = (
-                concatenated_filename.parent / f"temp_{subject}_merged.nii.gz"
+                concatenated_filename.parent / f"temp_{prefix}_{subject}_merged.nii.gz"
             )
             subject_mean_img = (
-                concatenated_filename.parent / f"temp_{subject}_mean.nii.gz"
+                concatenated_filename.parent / f"temp_{prefix}_{subject}_mean.nii.gz"
             )
 
-            subprocess.run(
-                f"{fsl_merge_call} -t {subject_temp_merged} {' '.join(subject_files)}",
-                shell=True,
-                check=True,
+            subject_mean_img = create_mean_image(
+                subject_temp_merged,
+                subject_mean_img,
+                fsl_merge_call,
+                fsl_maths_call,
+                subject_files,
             )
-            subprocess.run(
-                f"{fsl_maths_call} {subject_temp_merged} -Tmean {subject_mean_img}",
-                shell=True,
-                check=True,
-            )
-
             subject_mean_images.append(str(subject_mean_img))
-            subject_temp_merged.unlink()
 
-        cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(subject_mean_images)}"
-        subprocess.run(cmd, shell=True, check=True)
+        concatenate_all_images(
+            fsl_merge_call, concatenated_filename, subject_mean_images
+        )
+        delete_images(subject_mean_images)
 
-        for img in subject_mean_images:
-            Path(img).unlink()
+    elif has_duplicate_dose_rows:
+        LGR.info(
+            "Detected duplicate Subj + dose rows. Averaging images within "
+            f"Subj + dose groups for {second_level_glt_code}."
+        )
+
+        sorted_table = sort_data_table(glt_data_table)
+
+        images_to_concat = []
+        temp_files = []
+        for (subject, dose), group in sorted_table.groupby(["Subj", "dose"], sort=True):
+            group_files = group["InputFile"].tolist()
+            if len(group_files) > 1:
+                subject_temp_merged = (
+                    concatenated_filename.parent
+                    / f"temp_{prefix}_{subject}_{dose}_merged.nii.gz"
+                )
+                subject_mean_img = (
+                    concatenated_filename.parent
+                    / f"temp_{prefix}_{subject}_{dose}_mean.nii.gz"
+                )
+
+                subject_mean_img = create_mean_image(
+                    subject_temp_merged,
+                    subject_mean_img,
+                    fsl_merge_call,
+                    fsl_maths_call,
+                    group_files,
+                )
+                images_to_concat.append(str(subject_mean_img))
+                temp_files.append(subject_mean_img)
+            else:
+                images_to_concat.append(group_files[0])
+
+        concatenate_all_images(fsl_merge_call, concatenated_filename, images_to_concat)
+        delete_images(temp_files)
     else:
         files_to_merge = glt_data_table["InputFile"].tolist()
-        cmd = f"{fsl_merge_call} -t {concatenated_filename} {' '.join(files_to_merge)}"
-        LGR.info(f"Concatenating images: {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
+        concatenate_all_images(fsl_merge_call, concatenated_filename, files_to_merge)
 
     return concatenated_filename
 
@@ -1303,7 +1469,7 @@ def main(
 
         subject_list = set(get_subjects(beta_files))
         data_table, drop_constant_column_names, important_columns = create_data_table(
-            bids_dir, datacontainer, subject_list, beta_files
+            bids_dir, datacontainer, subject_list, beta_files, cohort
         )
         retained_subjects = set(
             [sub.removeprefix("sub-") for sub in data_table["Subj"].unique()]
@@ -1449,18 +1615,35 @@ def main(
                 glt_data_table, removed_subjects = drop_dose_rows(
                     data_table,
                     get_nontarget_dose(second_level_glt_code, cohort),
-                    only_complete_cases=True,
+                    only_complete_cases=needs_complete_cases(method),
                     return_removed_subjects=True,
                 )
 
+                glt_data_table = recode_doses(
+                    glt_data_table, cohort, second_level_glt_code
+                )
+
                 glt_data_table, constant_columns = drop_constant_columns(glt_data_table)
-                n_files = len(glt_data_table["InputFile"].tolist())
-                if second_level_glt_code == "mean":
-                    n_files /= 2
+                glt_data_table = sort_data_table(glt_data_table)
+                n_subjects = len(glt_data_table["Subj"].unique())
+
+                if average_within_subjects := needs_within_subject_averaging(
+                    cohort, second_level_glt_code
+                ):
+                    if second_level_glt_code == "mean":
+                        # All doses averaged into one image per subject
+                        n_files = n_subjects
+                    else:
+                        # Duplicate dose rows averaged (e.g., two mph → one mph),
+                        # distinct dose levels remain (e.g., mph + placebo = 2)
+                        n_dose_levels = glt_data_table["dose"].nunique()
+                        n_files = n_subjects * n_dose_levels
+                else:
+                    n_files = len(glt_data_table["InputFile"].tolist())
 
                 LGR.warning(
                     f"Using {n_files} files "
-                    f"from {len(glt_data_table['Subj'].unique())} subjects for analysis "
+                    f"from {n_subjects} subjects for analysis "
                     f"using {second_level_glt_code}"
                 )
 
@@ -1493,6 +1676,7 @@ def main(
                     entity_key,
                     first_level_glt_label,
                     second_level_glt_code,
+                    average_within_subjects,
                 )
                 max_permutations, true_max_permutations = (
                     compute_n_permutation(glt_data_table)
@@ -1551,7 +1735,7 @@ def main(
                 contrast_info = {
                     "glt_code": second_level_glt_code,
                     "n_files": n_files,
-                    "n_subjects": len(glt_data_table["Subj"].unique()),
+                    "n_subjects": n_subjects,
                     "dose_list": glt_data_table["dose"].unique().tolist(),
                     "max_permutations": max_permutations,
                     "true_max_permutations": true_max_permutations,
@@ -1566,6 +1750,7 @@ def main(
                     ),
                     "residual_dof": matrix_report_info.get("residual_dof"),
                     "palm_cmd": palm_cmd.replace("  ", " "),
+                    "averaged_within_subjects": average_within_subjects,
                 }
                 if vs_in_code:
                     labels = get_group_labels(second_level_glt_code)

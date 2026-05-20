@@ -18,6 +18,7 @@ from _utils import (
     get_second_level_glt_codes,
     get_nontarget_dose,
     resample_seed_img,
+    needs_complete_cases,
 )
 
 LGR = setup_logger(__name__)
@@ -401,7 +402,7 @@ def main(
             truncated_df = drop_dose_rows(
                 data_table,
                 get_nontarget_dose(second_level_glt_code, cohort),
-                only_complete_cases=(method == "nonparametric"),
+                only_complete_cases=needs_complete_cases(method),
             )
             # The individual conditions for gPPI are main effects and should not be interpreted
             # since there is an interaction term in the model
