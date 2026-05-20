@@ -1712,12 +1712,14 @@ def main(
                     tfce_C,
                     use_native_palm,
                 )
-                for img_path in Path(output_prefix).parent.glob("*.nii"):
+                for img_path in Path(output_prefix).parent.glob(
+                    f"*{first_level_glt_label}*.nii"
+                ):
                     if img_path.exists():
                         compress_image(
                             img_path,
                             dst_dir=Path(output_prefix).parent,
-                            remove_src_file=True,
+                            removse_src_file=True,
                         )
 
                 threshold_palm_output(
