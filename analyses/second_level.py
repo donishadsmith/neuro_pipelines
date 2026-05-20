@@ -1719,7 +1719,7 @@ def main(
                         compress_image(
                             img_path,
                             dst_dir=Path(output_prefix).parent,
-                            removse_src_file=True,
+                            remove_src_file=True,
                         )
 
                 threshold_palm_output(
