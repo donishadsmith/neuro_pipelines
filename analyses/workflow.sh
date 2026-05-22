@@ -20,6 +20,7 @@
 # PIPELINE FLOW VARIABLES (Set to true or false)
 # ==============================================
 RUN_FIRST_LEVEL=true                                    # Runs the individual first level analysis
+RUN_EXTRACT_INDEPENDENT_ROI_BETAS=false                 # Extracts betas from independent (a-priori) sphere ROIs
 RUN_SECOND_LEVEL=true                                   # Runs the group level second level analysis
 RUN_CLUSTER_RESULTS=true                                # Determines the significant clusters and outputs to a table and various masks
 RUN_CLUSTER_MNI_LOCATIONS=true                          # Determines the MNI region name of each cluster and adds to table created from RUN_CLUSTER_RESULTS
@@ -35,6 +36,7 @@ export FMRIPREP_VERSION="25.2.3"                        # Version of fMRIPrep be
 export ANALYSIS_TYPE="glm"                              # Choose "glm" or "gPPI"
 export METHOD="parametric"                              # Choose "parametric" or "nonparametric"
 export SEED_MASK_PATH=""                                # Add path if using gPPI
+export INDEPENDENT_ROI_DIR=""                           # Add path of the independent ROI directory
 export COHORT="kids"                                    # Choose "kids" or "adults"
 
 # For first level
@@ -141,6 +143,13 @@ else
     FIRST_LEVEL_SCRIPT="first_level_glm.sb"
 fi
 
+if [[ $RUN_EXTRACT_INDEPENDENT_ROI_BETAS == true ]]; then
+    if [[ -z $INDEPENDENT_ROI_DIR ]]; then
+        echo "INDEPENDENT_ROI_DIR must be set when RUN_EXTRACT_INDEPENDENT_ROI_BETAS is true"
+        exit 1
+    fi
+fi
+
 [[ ${#SUBJECTS_IDS[@]} -eq 0 ]] && N_SUBJECTS=$(( $NUM_SUBJECTS -1 )) || N_SUBJECTS=$(( ${#SUBJECTS_IDS[@]} -1 ))
 
 for CURRENT_TASK in "${TASKS[@]}"; do
@@ -170,6 +179,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     fi
 
     JOB_ID_1=""
+    JOB_ID_ROI=""
     SECOND_LEVEL_JOB_IDS=""
     JOB_ID_3=""
     JOB_ID_4=""
@@ -204,6 +214,18 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         echo -e "- FIRST LEVEL JOB SUBMITTED (JOB ID: $JOB_ID_1)\n"
     else
         echo -e "- SKIPPING FIRST LEVEL JOB\n"
+    fi
+
+    # =================================
+    # RUN_EXTRACT_INDEPENDENT_ROI_BETAS
+    # =================================
+    if [[ $RUN_EXTRACT_INDEPENDENT_ROI_BETAS == true ]]; then
+        [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_1" || DEPENDENCY_STR=""
+        JOB_ID_ROI=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" extract_independent_roi_betas.sb $CURRENT_TASK)
+
+        echo -e "- EXTRACT INDEPENDENT ROI BETAS SUBMITTED (JOB ID: $JOB_ID_ROI)\n"
+    else
+        echo -e "- SKIPPING EXTRACT INDEPENDENT ROI BETAS JOB\n"
     fi
 
     # =======================================================

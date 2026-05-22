@@ -30,6 +30,8 @@ Then execute in the following order:
 4. ``identify_cluster_locations.sb``
 5. ``extract_individual_betas.sb``
 
+**Note:** ``extract_independent_roi_betas.sb`` can be executed at any point in the pipeline as long as ``first_level_glm.sb`` or ``first_level_gPPI.sb`` have been executed first.
+
 ### Running All Subjects / Tasks
 
 ```bash

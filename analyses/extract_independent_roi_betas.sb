@@ -1,0 +1,78 @@
+#!/bin/bash
+#SBATCH --job-name=extract_independent_roi_betas
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --time=12:00:00
+# Outputs --------------------------------------------------------------------------------------
+#SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_independent_roi_betas_%A_%a.out
+#SBATCH --error=/projects/bigos_lab/mph-study/code/logs/extract_independent_roi_betas_%A_%a.err
+# -----------------------------------------------------------------------------------------------
+BAD_NODES_FILE="/projects/bigos_lab/mph-study/code/logs/bad_nodes_${SLURM_ARRAY_JOB_ID}.txt"
+
+if ! getent passwd $(id -u) > /dev/null 2>&1; then
+    echo $(hostname) >> $BAD_NODES_FILE
+    sort -u -o $BAD_NODES_FILE $BAD_NODES_FILE
+    echo "Can't determine user account information on $(hostname). Requeueing job"
+    SCONTROL_STRING="update JobId=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} ExcNodeList=$(paste -sd, $BAD_NODES_FILE)"
+    scontrol requeue ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
+    scontrol $SCONTROL_STRING
+    exit 0
+fi
+
+ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm}                     # glm or gPPI
+COHORT=${COHORT:-"kids"}                                # kids or adults
+BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"
+ANALYSIS_DIR="$BIDS_DIR/derivatives/$ANALYSIS_TYPE"
+PYTHON="/projects/bigos_lab/envs/py313/bin/python"
+EXCLUDE_NIFTIS_FILE=${EXCLUDE_NIFTIS_FILE:-"None"}
+SEED_MASK_PATH=${SEED_MASK_PATH:-"None"}
+INDEPENDENT_ROI_DIR=${INDEPENDENT_ROI_DIR:-""}
+GLM_DIR="$BIDS_DIR/derivatives/glm"
+
+DEFAULT_TASKS=("nback" "mtle" "mtlr" "princess" "flanker")
+
+TASKS=( $@ )
+if [ ${#TASKS[@]} -eq 0 ]; then
+    TASK="${DEFAULT_TASKS[$SLURM_ARRAY_TASK_ID]}"
+else
+    TASK="${TASKS[$SLURM_ARRAY_TASK_ID]}"
+fi
+
+DST_DIR="$ANALYSIS_DIR/$TASK"
+mkdir -p $DST_DIR
+
+if [[ -z $INDEPENDENT_ROI_DIR ]]; then
+    echo "INDEPENDENT_ROI_DIR must be set."
+    exit 1
+fi
+
+CMD="$PYTHON extract_independent_roi_betas.py \
+    --bids_dir $BIDS_DIR \
+    --analysis_dir $ANALYSIS_DIR \
+    --dst_dir $DST_DIR \
+    --independent_roi_dir $INDEPENDENT_ROI_DIR \
+    --cohort $COHORT \
+    --task $TASK \
+    --analysis_type $ANALYSIS_TYPE"
+
+if [[ ${EXCLUDE_NIFTIS_FILE,,} != "none" ]]; then
+    CMD+=" --exclude_niftis_file $EXCLUDE_NIFTIS_FILE"
+fi
+
+if [[ ${SEED_MASK_PATH,,} != "none" && $ANALYSIS_TYPE == "gPPI" ]]; then
+    CMD+=" --seed_mask_path $SEED_MASK_PATH"
+    if [[ -d $GLM_DIR ]]; then
+        CMD+=" --glm_dir $GLM_DIR"
+    fi
+fi
+
+echo Task ID: $SLURM_ARRAY_TASK_ID
+echo Commandline: $CMD
+eval $CMD
+
+echo Exit Code: $?
+date
+exit $?

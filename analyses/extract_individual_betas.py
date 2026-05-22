@@ -1,24 +1,50 @@
+"""
+Useful Notes for the Group Contrasts
+------------------------------------
+For all group contrasts (Group A - Group B, so does not include the mean contrast),
+since significant clusters and the subsequent averaged betas of these clusters are
+derived from the group contrast, Those averagef cluster betas will be highly correlated group (predictor)
+variable (i.e., dose). Consequently, they should not be used in analysis, where
+one variable is regressed onto the other (e.g., linear regression, correlation, mediation).
+This is circularity and will result in inflated correlation/beta values.
+
+https://www.nature.com/articles/nn.2303
+
+Interaction effects (i.e. group * average_cluster_beta -> Y) can be done for exploratory behavioral analyses.
+The variance of average_cluster_beta will be larger due to the group differences, which would technically
+reduce the standard error of the beta coefficient. However, since group and averaged cluster betas will be collinear, the variance inflation factor
+(VIF) will likely be higher, which will inflate the beta coefficient standard errors by (SE) * sqrt(VIF).
+This will make it more difficult to detect effects.
+
+https://en.wikipedia.org/wiki/Variance_inflation_factor
+"""
+
 import argparse
 from pathlib import Path
 
-import nibabel as nib, numpy as np, pandas as pd
+import pandas as pd
 
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 from bidsaid.parsers import _is_float
 
 from _utils import (
+    compute_average_betas,
     create_condition_label_str,
     delete_dir,
     drop_dose_rows,
+    format_beta_df,
     get_beta_names,
     get_contrast_entity_key,
     get_coordinate_from_filename,
     get_first_level_gltsym_codes,
+    get_individual_interpretations,
     get_second_level_glt_codes,
     get_nontarget_dose,
-    resample_seed_img,
+    get_subject_beta_filenames,
     needs_complete_cases,
+    save_tabular_data,
+    validate_optional_path,
 )
 
 LGR = setup_logger(__name__)
@@ -127,80 +153,6 @@ def get_cluster_region_info(cluster_results_df, cluster_id, tail):
     return region_name, mni_coord
 
 
-def save_tabular_data(
-    data_table,
-    dst_dir,
-    method,
-    cluster_mask_filename,
-    first_level_glt_label,
-    second_level_glt_code,
-    beta_name,
-    add_condition_entity_key,
-    save_excel_version,
-):
-    data_filename = (
-        dst_dir
-        / "individual_betas"
-        / method
-        / second_level_glt_code
-        / first_level_glt_label
-        / beta_name
-        / cluster_mask_filename.name.replace(
-            "_cluster_mask_", "_individual_betas_"
-        ).replace(".nii.gz", ".csv")
-    )
-    data_filename.parent.mkdir(parents=True, exist_ok=True)
-
-    if add_condition_entity_key:
-        data_filename = data_filename.parent / data_filename.name.replace(
-            first_level_glt_label, f"{first_level_glt_label}_condition-{beta_name}"
-        )
-
-    data_table.to_csv(data_filename, sep=",", index=None)
-    if save_excel_version:
-        data_table.to_excel(str(data_filename).replace(".csv", ".xlsx"), index=False)
-
-
-def get_individual_interpretations(
-    data_table, beta_name, mask_origin, analysis_type, remove_PPI_prefix=False
-):
-    if remove_PPI_prefix:
-        beta_name = beta_name.replace("PPI_", "")
-
-    betas = data_table[
-        f"{analysis_type.upper()}_Individual_{mask_origin.capitalize()}_Beta"
-    ].to_numpy(copy=True)
-    if "_vs_" in beta_name:
-        first_condition_label, second_condition_label = beta_name.split("_vs_")
-        interpretations = np.where(
-            np.isnan(betas) | (betas == 0),
-            "NaN",
-            np.where(
-                betas > 0,
-                f"{first_condition_label} > {second_condition_label}",
-                f"{second_condition_label} > {first_condition_label}",
-            ),
-        )
-    else:
-        descriptions = (
-            ("activation", "deactivation")
-            if "PPI_" not in beta_name
-            else (
-                "increased connectivity with seed roi",
-                "decreased connectivity with seed roi",
-            )
-        )
-        interpretations = np.where(
-            np.isnan(betas) | (betas == 0),
-            "NaN",
-            np.where(betas > 0, descriptions[0], descriptions[1]),
-        )
-
-    interpretations[interpretations == "NaN"] = np.nan
-
-    return interpretations.tolist()
-
-
 def add_info_to_data_table(
     cluster_results_df,
     cluster_mask_filename,
@@ -259,65 +211,6 @@ def add_info_to_data_table(
     data_table["Cluster_MNI_Coordinate"] = mni_coord
 
 
-def get_subject_beta_filenames(
-    data_table,
-    first_level_glt_label,
-    beta_name,
-    parent_path=None,
-):
-    subject_beta_filenames = data_table["InputFile"].tolist()
-
-    if first_level_glt_label == beta_name:
-        return subject_beta_filenames
-
-    subject_beta_filenames = [
-        str(file).replace(f"_desc-{first_level_glt_label}", f"_desc-{beta_name}")
-        for file in subject_beta_filenames
-    ]
-
-    if parent_path:
-        subject_beta_filenames = [
-            next(parent_path.rglob(f"*{Path(file).name}*"), None)
-            for file in subject_beta_filenames
-        ]
-        subject_beta_filenames = [
-            str(file) if file else float("NaN") for file in subject_beta_filenames
-        ]
-
-    return subject_beta_filenames
-
-
-def compute_average_betas(
-    data_table,
-    subject_beta_filenames,
-    mask_filename,
-    mask_origin="cluster",
-):
-    subjects = data_table["Subj"].tolist()
-    doses = data_table["dose"].tolist()
-    average_betas = np.full(data_table.shape[0], np.nan)
-    mask_img = nib.load(mask_filename)
-
-    if mask_origin == "seed":
-        mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filenames[0]))
-
-    for subject, dose, subject_beta_filename in zip(
-        subjects, doses, subject_beta_filenames
-    ):
-        subject_mask = (data_table["Subj"] == subject) & (data_table["dose"] == dose)
-        if pd.isna(subject_beta_filename):
-            average_betas[subject_mask] = float("NaN")
-            continue
-
-        subject_beta_filename = Path(subject_beta_filename)
-        beta_img = nib.load(subject_beta_filename)
-        beta_img_fdata = beta_img.get_fdata()
-        average_beta = beta_img_fdata[mask_img.get_fdata() == 1].mean()
-        average_betas[subject_mask] = average_beta
-
-    return average_betas
-
-
 def get_cluster_results_df(analysis_dir, cluster_mask_filename):
     tail = get_entity_value(cluster_mask_filename.name, entity="tail")
     file_desc = cluster_mask_filename.name.split(f"tail-{tail}_")[-1]
@@ -344,15 +237,8 @@ def main(
 ):
     analysis_dir = Path(analysis_dir)
     dst_dir = Path(dst_dir)
-    if glm_dir and Path(glm_dir).exists():
-        glm_dir = Path(glm_dir)
-    else:
-        glm_dir = None
-
-    if seed_mask_path and Path(seed_mask_path).exists():
-        seed_mask_path = Path(seed_mask_path)
-    else:
-        seed_mask_path = None
+    glm_dir = validate_optional_path(glm_dir)
+    seed_mask_path = validate_optional_path(seed_mask_path)
 
     delete_dir(dst_dir / "individual_betas" / method)
 
@@ -499,40 +385,27 @@ def main(
                                     remove_PPI_prefix=True,
                                 )
 
-                    if analysis_type == "gPPI":
-                        beta_coefficient_df["GPPI_Units_of_Beta_Coefficient"] = (
-                            "unitless"
-                        )
-
-                    if "GLM_Individual_Cluster_Beta" in beta_coefficient_df.columns:
-                        beta_coefficient_df["GLM_Units_of_Beta_Coefficient"] = (
-                            "percent (percent signal change)"
-                        )
-
-                    if "InputFile" in beta_coefficient_df.columns:
-                        beta_coefficient_df = beta_coefficient_df.drop(
-                            columns=["InputFile"]
-                        )
-
-                    if "acq_time" in beta_coefficient_df.columns:
-                        beta_coefficient_df = beta_coefficient_df.drop(
-                            columns=["acq_time"]
-                        )
-
-                    beta_coefficient_df["Analysis_Method"] = f"{method} {analysis_type}"
-
-                    beta_coefficient_df.columns = [
-                        col.replace(" ", "_") for col in beta_coefficient_df.columns
-                    ]
+                    beta_coefficient_df = format_beta_df(
+                        analysis_type, beta_coefficient_df, method
+                    )
 
                     add_condition_entity_key = beta_name != first_level_glt_label
+                    output_dir = (
+                        dst_dir
+                        / "individual_betas"
+                        / method
+                        / second_level_glt_code
+                        / first_level_glt_label
+                        / beta_name
+                    )
+                    output_csv_name = cluster_mask_filename.name.replace(
+                        "_cluster_mask_", "_individual_betas_"
+                    ).replace(".nii.gz", ".csv")
                     save_tabular_data(
                         beta_coefficient_df,
-                        dst_dir,
-                        method,
-                        cluster_mask_filename,
+                        output_dir,
+                        output_csv_name,
                         first_level_glt_label,
-                        second_level_glt_code,
                         beta_name,
                         add_condition_entity_key,
                         save_excel_version,

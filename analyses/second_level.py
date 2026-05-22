@@ -10,7 +10,6 @@ from pandas.api.types import is_object_dtype, is_string_dtype
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 from bidsaid.io import compress_image
-from bidsaid.qc import get_n_censored_volumes
 
 from _argparse_typing import convert_none
 from _denoising import remove_collinear_columns
@@ -21,14 +20,17 @@ from _second_level_utils import (
     threshold_palm_output,
 )
 from _utils import (
-    _get_dataframe,
     drop_dose_rows,
+    exclude_beta_files,
+    get_beta_files,
+    get_qc_info,
     get_contrast_entity_key,
     get_first_level_gltsym_codes,
     get_second_level_glt_codes,
     get_nontarget_dose,
     get_group_labels,
     save_binary_mask,
+    standardize_doses,
     needs_complete_cases,
 )
 
@@ -348,41 +350,6 @@ class DataContainer:
         return ["dose"] + self.included_covariates
 
 
-def get_beta_files(analysis_dir, task, first_level_glt_label):
-    return sorted(
-        list(
-            Path(analysis_dir).rglob(
-                f"*{task}*_desc-{first_level_glt_label}_betas.nii.gz"
-            )
-        )
-    )
-
-
-def exclude_beta_files(beta_files, exclude_niftis_file):
-    if not exclude_niftis_file:
-        return beta_files
-
-    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
-        "nifti_prefix_filename"
-    ].tolist()
-
-    LGR.info(
-        (
-            "Beta image files starting with the following prefixes "
-            f"will be excluded: {excluded_niftis_prefixes}"
-        )
-    )
-
-    return [
-        beta_file
-        for beta_file in beta_files
-        if not any(
-            Path(beta_file).name.startswith(excluded_niftis_prefix)
-            for excluded_niftis_prefix in excluded_niftis_prefixes
-        )
-    ]
-
-
 def get_subjects(beta_files):
     return sorted([get_entity_value(file.name, "sub") for file in beta_files])
 
@@ -484,16 +451,6 @@ def order_columns_names(columns):
     )
 
 
-def standardize_doses(data_table, cohort):
-    if cohort != "kids":
-        return data_table
-
-    data_table = data_table.dropna(subset=["dose"])
-    data_table["dose"] = data_table["dose"].astype(int).astype(str)
-
-    return data_table
-
-
 def create_data_table(bids_dir, datacontainer, subject_list, beta_files, cohort):
     bids_dir = Path(bids_dir)
     participants_df = pd.read_csv(bids_dir / "participants.tsv", sep="\t")
@@ -513,50 +470,10 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files, cohort)
                 subject_beta_file, "ses", return_entity_prefix=True
             )
             df.loc[df["session_id"] == ses_id, "InputFile"] = subject_beta_file
-            all_censored_file = (
-                Path(subject_beta_file).name.split("desc-")[0]
-                + "desc-all_censored_volumes.1D"
-            )
-            parent_path = Path(subject_beta_file).parent
-            if parent_path.name == "betas":
-                parent_path = parent_path.parent
 
-            # Files saved together and should both exist
-            all_censored_file = parent_path / all_censored_file
-            high_motion_file = (
-                all_censored_file.parent
-                / all_censored_file.name.replace(
-                    "all_censored_volumes", "high_motion_outliers_only"
-                )
-            )
-            if all_censored_file.exists() and high_motion_file.exists():
-                n_high_motion = get_n_censored_volumes(high_motion_file)
-                n_dummy_scans = (
-                    get_n_censored_volumes(all_censored_file) - n_high_motion
-                )
-                df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = n_high_motion
-                df.loc[df["session_id"] == ses_id, "n_dummy_scans"] = n_dummy_scans
-            else:
-                df.loc[df["session_id"] == ses_id, "n_censored_volumes"] = np.nan
-                df.loc[df["session_id"] == ses_id, "n_dummy_scans"] = np.nan
-
-            # Files saved together and should both exist
-            fd_before_file = all_censored_file.parent / all_censored_file.name.replace(
-                "all_censored_volumes", "fd_before_censoring"
-            )
-            fd_after_file = all_censored_file.parent / all_censored_file.name.replace(
-                "all_censored_volumes", "fd_after_censoring"
-            )
-            if fd_before_file.exists() and fd_after_file.exists():
-                df.loc[df["session_id"] == ses_id, "mean_fd_before_censoring"] = (
-                    np.mean(np.loadtxt(fd_before_file))
-                )
-                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.mean(
-                    np.loadtxt(fd_after_file)
-                )
-            else:
-                df.loc[df["session_id"] == ses_id, "mean_fd_before_censoring"] = np.nan
-                df.loc[df["session_id"] == ses_id, "mean_fd_after_censoring"] = np.nan
+            qc_info = get_qc_info(subject_beta_file)
+            for key, value in qc_info.items():
+                df.loc[df["session_id"] == ses_id, key] = value
 
         sessions_dfs.append(df)
 

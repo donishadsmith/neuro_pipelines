@@ -8,6 +8,7 @@ from nilearn.image import resample_to_img
 
 from bidsaid.logging import setup_logger
 from bidsaid.metadata import needs_resampling
+from bidsaid.qc import get_n_censored_volumes
 
 LGR = setup_logger(__name__)
 
@@ -141,7 +142,8 @@ def get_coordinate_from_filename(filepath, replace_underscore=True):
     filepath = Path(filepath)
     possible_coordinate = ""
 
-    for marker in ("_sphere_mask_", "_cluster_mask_", "_individual_betas_"):
+    markers = ("_sphere_mask_", "-sphere_mask_", "_cluster_mask_", "_individual_betas_")
+    for marker in markers:
         if marker in filepath.name:
             possible_coordinate = filepath.name.split(marker)[1]
             suffix = "".join(filepath.suffixes[3:])
@@ -323,3 +325,241 @@ def embed_image(image_path):
     b64 = base64.b64encode(data).decode("utf-8")
 
     return f"data:image/png;base64,{b64}"
+
+
+def get_beta_files(analysis_dir, task, first_level_glt_label):
+    return sorted(
+        list(
+            Path(analysis_dir).rglob(
+                f"*{task}*_desc-{first_level_glt_label}_betas.nii.gz"
+            )
+        )
+    )
+
+
+def exclude_beta_files(beta_files, exclude_niftis_file):
+    if not exclude_niftis_file:
+        return beta_files
+
+    excluded_niftis_prefixes = _get_dataframe(exclude_niftis_file)[
+        "nifti_prefix_filename"
+    ].tolist()
+
+    LGR.info(
+        (
+            "Beta image files starting with the following prefixes "
+            f"will be excluded: {excluded_niftis_prefixes}"
+        )
+    )
+
+    return [
+        beta_file
+        for beta_file in beta_files
+        if not any(
+            Path(beta_file).name.startswith(excluded_niftis_prefix)
+            for excluded_niftis_prefix in excluded_niftis_prefixes
+        )
+    ]
+
+
+def get_subject_beta_filenames(
+    data_table,
+    first_level_glt_label,
+    beta_name,
+    parent_path=None,
+    input_file_col="InputFile",
+):
+    subject_beta_filenames = data_table[input_file_col].tolist()
+
+    if first_level_glt_label == beta_name:
+        return subject_beta_filenames
+
+    subject_beta_filenames = [
+        str(file).replace(f"_desc-{first_level_glt_label}", f"_desc-{beta_name}")
+        for file in subject_beta_filenames
+    ]
+
+    if parent_path:
+        subject_beta_filenames = [
+            next(parent_path.rglob(f"*{Path(file).name}*"), None)
+            for file in subject_beta_filenames
+        ]
+        subject_beta_filenames = [
+            str(file) if file else float("NaN") for file in subject_beta_filenames
+        ]
+
+    return subject_beta_filenames
+
+
+def compute_average_betas(
+    data_table,
+    subject_beta_filenames,
+    mask_filename,
+    mask_origin="cluster",
+    subject_col="Subj",
+):
+    subjects = data_table[subject_col].tolist()
+    doses = data_table["dose"].tolist()
+    average_betas = np.full(data_table.shape[0], np.nan)
+    mask_img = nib.load(mask_filename)
+
+    if mask_origin == "seed":
+        mask_img = resample_seed_img(mask_img, nib.load(subject_beta_filenames[0]))
+
+    for subject, dose, subject_beta_filename in zip(
+        subjects, doses, subject_beta_filenames
+    ):
+        subject_mask = (data_table[subject_col] == subject) & (
+            data_table["dose"] == dose
+        )
+        if pd.isna(subject_beta_filename):
+            average_betas[subject_mask] = float("NaN")
+            continue
+
+        subject_beta_filename = Path(subject_beta_filename)
+        beta_img = nib.load(subject_beta_filename)
+        beta_img_fdata = beta_img.get_fdata()
+        average_beta = beta_img_fdata[mask_img.get_fdata() == 1].mean()
+        average_betas[subject_mask] = average_beta
+
+    return average_betas
+
+
+def get_individual_interpretations(
+    data_table, beta_name, mask_origin, analysis_type, remove_PPI_prefix=False
+):
+    if remove_PPI_prefix:
+        beta_name = beta_name.replace("PPI_", "")
+
+    betas = data_table[
+        f"{analysis_type.upper()}_Individual_{mask_origin.capitalize()}_Beta"
+    ].to_numpy(copy=True)
+    if "_vs_" in beta_name:
+        first_condition_label, second_condition_label = beta_name.split("_vs_")
+        interpretations = np.where(
+            np.isnan(betas) | (betas == 0),
+            "NaN",
+            np.where(
+                betas > 0,
+                f"{first_condition_label} > {second_condition_label}",
+                f"{second_condition_label} > {first_condition_label}",
+            ),
+        )
+    else:
+        descriptions = (
+            ("activation", "deactivation")
+            if "PPI_" not in beta_name
+            else (
+                "increased connectivity with seed roi",
+                "decreased connectivity with seed roi",
+            )
+        )
+        interpretations = np.where(
+            np.isnan(betas) | (betas == 0),
+            "NaN",
+            np.where(betas > 0, descriptions[0], descriptions[1]),
+        )
+
+    interpretations[interpretations == "NaN"] = np.nan
+
+    return interpretations.tolist()
+
+
+def get_qc_info(subject_beta_file):
+    all_censored_file_name = (
+        Path(subject_beta_file).name.split("desc-")[0] + "desc-all_censored_volumes.1D"
+    )
+    parent_path = Path(subject_beta_file).parent
+    if parent_path.name == "betas":
+        parent_path = parent_path.parent
+
+    all_censored_file = parent_path / all_censored_file_name
+    high_motion_file = all_censored_file.parent / all_censored_file.name.replace(
+        "all_censored_volumes", "high_motion_outliers_only"
+    )
+    fd_before_file = all_censored_file.parent / all_censored_file.name.replace(
+        "all_censored_volumes", "fd_before_censoring"
+    )
+    fd_after_file = all_censored_file.parent / all_censored_file.name.replace(
+        "all_censored_volumes", "fd_after_censoring"
+    )
+
+    info = {}
+    if all_censored_file.exists() and high_motion_file.exists():
+        n_high_motion = get_n_censored_volumes(high_motion_file)
+        n_dummy_scans = get_n_censored_volumes(all_censored_file) - n_high_motion
+        info["n_censored_volumes"] = n_high_motion
+        info["n_dummy_scans"] = n_dummy_scans
+    else:
+        info["n_censored_volumes"] = np.nan
+        info["n_dummy_scans"] = np.nan
+
+    if fd_before_file.exists() and fd_after_file.exists():
+        info["mean_fd_before_censoring"] = float(np.mean(np.loadtxt(fd_before_file)))
+        info["mean_fd_after_censoring"] = float(np.mean(np.loadtxt(fd_after_file)))
+    else:
+        info["mean_fd_before_censoring"] = np.nan
+        info["mean_fd_after_censoring"] = np.nan
+
+    return info
+
+
+def standardize_doses(data_table, cohort):
+    data_table = data_table.dropna(subset=["dose"])
+
+    if cohort != "kids":
+        return data_table
+
+    data_table["dose"] = data_table["dose"].astype(int).astype(str)
+
+    return data_table
+
+
+def validate_optional_path(path):
+    return Path(path) if path and Path(path).exists() else None
+
+
+def save_tabular_data(
+    data_table,
+    output_dir,
+    output_csv_name,
+    first_level_glt_label,
+    beta_name,
+    add_condition_entity_key,
+    save_excel_version,
+):
+    data_filename = output_dir / output_csv_name
+    data_filename.parent.mkdir(parents=True, exist_ok=True)
+
+    if add_condition_entity_key:
+        data_filename = data_filename.parent / data_filename.name.replace(
+            first_level_glt_label, f"{first_level_glt_label}_condition-{beta_name}"
+        )
+
+    data_table.to_csv(data_filename, sep=",", index=None)
+    if save_excel_version:
+        data_table.to_excel(str(data_filename).replace(".csv", ".xlsx"), index=False)
+
+
+def format_beta_df(analysis_type, beta_coefficient_df, method=None):
+    if analysis_type == "gPPI":
+        beta_coefficient_df["GPPI_Units_of_Beta_Coefficient"] = "unitless"
+
+    if any(col.startswith("GLM") for col in beta_coefficient_df.columns):
+        beta_coefficient_df["GLM_Units_of_Beta_Coefficient"] = (
+            "percent (percent signal change)"
+        )
+
+    for drop_col in ["InputFile", "acq_time"]:
+        if drop_col in beta_coefficient_df.columns:
+            beta_coefficient_df = beta_coefficient_df.drop(columns=[drop_col])
+
+    beta_coefficient_df["Analysis_Type"] = (
+        f"{method} {analysis_type}" if method else analysis_type
+    )
+
+    beta_coefficient_df.columns = [
+        col.replace(" ", "_") for col in beta_coefficient_df.columns
+    ]
+
+    return beta_coefficient_df
