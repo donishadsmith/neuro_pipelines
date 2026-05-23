@@ -17,6 +17,8 @@ reduce the standard error of the beta coefficient. However, since group and aver
 This will make it more difficult to detect effects.
 
 https://en.wikipedia.org/wiki/Variance_inflation_factor
+
+Note: Everything here applies to any variable (continuous or categorical) that are used to identify clusters.
 """
 
 import argparse
