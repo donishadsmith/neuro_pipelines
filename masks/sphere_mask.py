@@ -3,7 +3,10 @@ Better to use git submodule/lfs or fetch via OSF or AWS; however, this increases
 which defeats the purpose of the app and there may be firewall issues associated with downloading.
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 import nibabel as nib, numpy as np
 from nilearn.masking import _unmask_3d
@@ -14,6 +17,8 @@ from matplotlib.colors import ListedColormap
 from bidsaid._helpers import iterable_to_str
 from bidsaid.files import get_entity_value
 from bidsaid.parsers import _is_float
+
+from _general_utils import _check_coordinate
 
 COHORT_MAP = {
     "kids": {
@@ -116,9 +121,7 @@ def run_pipeline(
     transform_method,
     use_black_bg,
 ):
-    if not all([_is_float(x) for x in coordinate]):
-        coordinate = list(map(str, coordinate))
-        raise ValueError(f"Invalid MNI coordinate: {','.join(coordinate)}")
+    _check_coordinate(coordinate)
 
     coordinate = list(map(float, coordinate))
     template_mask_path = COHORT_MAP[cohort]["template_mask_path"]

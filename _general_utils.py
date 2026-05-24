@@ -5,6 +5,7 @@ from typing import Optional
 import pandas as pd
 from bidsaid.path_utils import is_valid_date
 from bidsaid.logging import setup_logger
+from bidsaid.parsers import _is_float
 
 LGR = setup_logger(__name__)
 
@@ -225,3 +226,9 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
         return pd.read_excel(subjects_visits_file)
     else:
         return pd.read_csv(subjects_visits_file, sep=None, engine="python")
+
+
+def _check_coordinate(coordinate):
+    if not all([_is_float(x) for x in coordinate]):
+        coordinate = list(map(str, coordinate))
+        raise ValueError(f"Invalid MNI coordinate: {','.join(coordinate)}")

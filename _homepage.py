@@ -74,3 +74,6 @@ with col3:
 
     st.page_link("masks/sphere_mask_app.py", label="**Sphere Mask**")
     st.caption("Create an a-priori sphere mask for seed-based connectivity.")
+
+    st.page_link("afni_whereami/whereami_app.py", label="**AFNI WhereAmI**")
+    st.caption("Lookup MNI coordinates with AFNI's ``whereami``.")
