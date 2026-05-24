@@ -27,13 +27,19 @@ cohort = st.selectbox(
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    X = st.number_input("X", help="MNI X coordinate.", format="%d", value=0)
+    X = st.number_input(
+        "X", help="X coordinate in MNI or Talairach.", format="%d", value=0
+    )
 
 with col2:
-    Y = st.number_input("Y", help="MNI Y coordinate.", format="%d", value=0)
+    Y = st.number_input(
+        "Y", help="Y coordinate in MNI or Talairach.", format="%d", value=0
+    )
 
 with col3:
-    Z = st.number_input("Z", help="MNI Z coordinate.", format="%d", value=0)
+    Z = st.number_input(
+        "Z", help="Z coordinate in MNI or Talairach.", format="%d", value=0
+    )
 
 sphere_radius = st.number_input(
     "Sphere radius",
@@ -43,7 +49,29 @@ sphere_radius = st.number_input(
     value=5,
     format="%d",
 )
+
+original_coordinate_space = st.selectbox(
+    "Original Coordinate Space",
+    ("MNI", "Talairach"),
+    help="The original space of the coordinate.",
+)
+
+if original_coordinate_space == "Talairach":
+    transform_method = st.selectbox(
+        "Talairach to MNI transform method",
+        ("Lancaster", "Brett"),
+        help=(
+            "The method to use to transform the Talairach coordinate to MNI space. "
+            "Use the Lancaster method unless the paper is pre-2007/2008 or specifically "
+            "states that the Brett transform was used."
+        ),
+    )
+else:
+    # Just to ensure its initialized
+    transform_method = "Lancaster"
+
 st.divider()
+
 
 st.markdown("**Optional Arguments**")
 
@@ -59,8 +87,10 @@ if st.session_state.get("sphere_mask_dst_dir"):
 
 kwargs = {
     "cohort": cohort,
-    "mni_coordinate": [X, Y, Z],
+    "coordinate": [X, Y, Z],
     "sphere_radius": sphere_radius,
+    "original_coordinate_space": original_coordinate_space,
+    "transform_method": transform_method,
     "use_black_bg": use_black_bg,
     "dst_dir": st.session_state.get("sphere_mask_dst_dir"),
 }
@@ -69,7 +99,10 @@ st.divider()
 
 if st.button("Run Pipeline", type="primary"):
     with st.spinner("Processing..."):
-        sphere_filename, plot_filename = run_pipeline(**kwargs)
+        sphere_filename, plot_filename, output_text = run_pipeline(**kwargs)
+
+    if output_text:
+        st.success(output_text)
 
     st.success(f"Sphere mask created at: {sphere_filename}")
     st.success(f"Sphere plot created at: {plot_filename}")

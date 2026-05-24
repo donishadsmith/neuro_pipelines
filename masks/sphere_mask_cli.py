@@ -20,11 +20,11 @@ def _get_cmd_args():
         help="The name of the cohort.",
     )
     parser.add_argument(
-        "--mni_coordinate",
-        dest="mni_coordinate",
+        "--coordinate",
+        dest="coordinate",
         required=True,
         nargs=3,
-        help="The MNI coordinate.",
+        help="The coordinate in MNI or Talairach space.",
     )
     parser.add_argument(
         "--sphere_radius",
@@ -32,6 +32,28 @@ def _get_cmd_args():
         required=True,
         type=float,
         help="The radius of the sphere mask in mm.",
+    )
+    parser.add_argument(
+        "--original_coordinate_space",
+        dest="original_coordinate_space",
+        required=False,
+        default="MNI",
+        choices=["MNI", "Talairach"],
+        type=str,
+        help="The original space of the coordinate.",
+    )
+    parser.add_argument(
+        "--transform_method",
+        dest="transform_method",
+        required=False,
+        default="Lancaster",
+        choices=["Lancaster", "Brett"],
+        type=str,
+        help=(
+            "Method for transforming the Talairach coordinate to MNI space. "
+            "Use the Lancaster method unless the paper is pre-2007/2008 or specifically "
+            "states that the Brett transform was used."
+        ),
     )
     parser.add_argument(
         "--use_black_bg",
