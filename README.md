@@ -17,6 +17,7 @@ Neuroimaging pipelines tailored for specific tasks and scan protocols in a multi
 - Miscellaneous utilities
 - Extracting Conners 4 data
 - Organizing NIH toolbox data
+- Lookup brain regions for MNI coordinates
 
 ## Installation
 
