@@ -376,11 +376,11 @@ def create_diagnostic_condition_plots(condition_filenames_dict, tr, fd_threshold
 
 def summarize_timing_conditions(timing_dir, task):
     conditions = []
-    for tf in sorted(timing_dir.glob("*.1D")):
-        data = np.loadtxt(tf, delimiter=" ")
+    for timing_file in sorted(timing_dir.glob("*.1D")):
+        data = np.loadtxt(timing_file, delimiter=" ")
         conditions.append(
             {
-                "name": tf.stem,
+                "name": timing_file.stem,
                 "n_events": int(data.size) if data.size > 0 else 0,
             }
         )
