@@ -37,7 +37,7 @@ mkdir -p $DST_DIR
 TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
 
 PYTHON="/projects/bigos_lab/envs/py313/bin/python"
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.1.02.simg"
 EXCLUDE_NIFTIS_FILE=${EXCLUDE_NIFTIS_FILE:-"None"}    # Path to a text file containing prefixes of the filename of the NIfTI images to exclude, set to "None" to not specify a path
 
 TEMPLATE_SPACE=${TEMPLATE_SPACE:-"MNIPediatricAsym_cohort-1_res-2"}

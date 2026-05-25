@@ -16,8 +16,6 @@ st.divider()
 
 st.markdown("**Required Arguments**")
 
-cohort = st.selectbox("Cohort", ("kids", "adults"), help="Determines the atlas used.")
-
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -29,15 +27,10 @@ with col2:
 with col3:
     Z = st.number_input("Z", help="Z coordinate in MNI space.", format="%d", value=0)
 
-kwargs = {
-    "cohort": cohort,
-    "mni_coordinate": [X, Y, Z],
-}
-
 st.divider()
 
 if st.button("Run Pipeline", type="primary"):
     with st.spinner("Processing..."):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.text(run_pipeline(**kwargs), text_alignment="center")
+            st.text(run_pipeline(mni_coordinate=[X, Y, Z]), text_alignment="center")

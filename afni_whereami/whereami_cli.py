@@ -8,13 +8,6 @@ def _get_cmd_args():
         description="Pipeline for looking up MNI coordinates with AFNI's whereami."
     )
     parser.add_argument(
-        "--cohort",
-        dest="cohort",
-        required=True,
-        choices=["kids", "adults"],
-        help="The name of the cohort.",
-    )
-    parser.add_argument(
         "--mni_coordinate",
         dest="mni_coordinate",
         required=True,

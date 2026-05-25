@@ -6,21 +6,15 @@ on Oracle Cloud. It's the free tier so the instance only has 1 GB ram and 1 OCPU
 import subprocess
 from fastapi import FastAPI
 
-ATLAS_NAMES = {
-    "kids": "Haskins_Pediatric_Nonlinear_1.01",
-    "adults": "FS.afni.MNI2009c_asym",
-}
-
 app = FastAPI()
 
 
 @app.post("/")
 def whereami(request_data: dict):
-    atlas = ATLAS_NAMES[request_data["cohort"]]
     cmd = (
         f"podman exec afni whereami "
         f"{request_data['x']} {request_data['y']} {request_data['z']} "
-        f"-lpi -space MNI -atlas {atlas}"
+        f"-lpi -space MNI_2009c_asym -atlas FS.afni.MNI2009c_asym -atlas Brodmann_Pijn_AFNI"
     )
     output = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 

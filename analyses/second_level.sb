@@ -39,7 +39,7 @@ PYTHON="/projects/bigos_lab/envs/py313/bin/python"
 EXCLUDE_NIFTIS_FILE=${EXCLUDE_NIFTIS_FILE:-"None"}
 
 FSL_IMG_PATH="/projects/bigos_lab/apptainer-images/fsl-palm.sif"
-AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.0.09.simg"
+AFNI_IMG_PATH="/projects/bigos_lab/apptainer-images/afni-26.1.02.simg"
 
 # NBACK (glm or gPPI)
 # "1-back_vs_0-back" or "PPI_1-back_vs_PPI_0-back"

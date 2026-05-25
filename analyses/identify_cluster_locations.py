@@ -85,7 +85,7 @@ def _get_cmd_args():
 def identify_mni_regions(afni_img_path, coord_filename, atlas):
     cmd = (
         f"apptainer exec -B /scratch:/scratch -B /projects:/projects {afni_img_path} whereami "
-        f"-lpi -coord_file {coord_filename} -space MNI -atlas {atlas}"
+        f"-lpi -coord_file {coord_filename} -space MNI_2009c_asym -atlas {atlas}"
     )
     std_output = subprocess.run(
         cmd, shell=True, check=True, capture_output=True, text=True

@@ -14,11 +14,10 @@ def get_server():
         return f.read().strip()
 
 
-def run_pipeline(cohort, mni_coordinate):
+def run_pipeline(mni_coordinate):
     _check_coordinate(mni_coordinate)
 
     request_data = {
-        "cohort": cohort,
         "x": mni_coordinate[0],
         "y": mni_coordinate[1],
         "z": mni_coordinate[2],
