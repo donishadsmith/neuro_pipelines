@@ -133,6 +133,10 @@ if [[ $ANALYSIS_TYPE == "gPPI" ]]; then
         exit 1
     fi
 
+    if [[ $SEED_MASK_PATH != *"sphere_mask"* ]]; then
+	    echo "'sphere_mask' not in $SEED_MASK_PATH. Ignore message if intentional."
+    fi
+
     FIRST_LEVEL_SCRIPT="first_level_gPPI.sb"
 else
     FIRST_LEVEL_SCRIPT="first_level_glm.sb"

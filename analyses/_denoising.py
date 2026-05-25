@@ -5,6 +5,8 @@ import numpy as np
 
 from bidsaid.logging import setup_logger
 
+from _utils import delete_file
+
 LGR = setup_logger(__name__)
 
 
@@ -82,6 +84,10 @@ def percent_signal_change(
     percent_change_nifti_file = subject_dir / Path(nifti_file).name.replace(
         "preproc_bold", "psc"
     )
+
+    delete_file(mean_file)
+    delete_file(percent_change_nifti_file)
+
     censor_data = np.loadtxt(censor_file)
     kept_indices = np.where(censor_data == 1)[0]
     selector = ",".join(map(str, kept_indices))
@@ -154,9 +160,7 @@ def get_new_matrix_and_names(drop_columns, regressor_arr, regressor_positions):
 
 def perform_spatial_smoothing(subject_dir, afni_img_path, nifti_file, mask_file, fwhm):
     smoothed_nifti_file = subject_dir / str(nifti_file).replace("psc", "smoothed")
-
-    if smoothed_nifti_file.exists():
-        smoothed_nifti_file.unlink()
+    delete_file(smoothed_nifti_file)
 
     cmd = (
         f"apptainer exec -B /projects:/projects {afni_img_path} 3dBlurToFWHM "

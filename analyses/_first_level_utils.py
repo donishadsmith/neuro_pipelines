@@ -4,6 +4,7 @@ from pathlib import Path
 
 import bids, numpy as np, matplotlib.pyplot as plt
 from bidsaid._helpers import iterable_to_str
+from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 from bidsaid.qc import compute_n_dummy_scans, create_censor_mask
 
@@ -47,9 +48,9 @@ CONDITION_DURATIONS = {
         "princess": 52,
         "mtle": 18,
         "mtlr": 18,
-        "cue_nback": 2,
-        "cue_mtle": 2,
-        "cue_mtlr": 2,
+        "nback_cue": 2,
+        "mtle_cue": 2,
+        "mtlr_cue": 2,
     },
     "adults": {
         "flanker": 0.8,
@@ -58,8 +59,8 @@ CONDITION_DURATIONS = {
         "mtlr": 18,
         "simplegng": 0.3,
         "complexgng": 0.3,
-        "cue_mtle": 2,
-        "cue_mtlr": 2,
+        "mtle_cue": 2,
+        "mtlr_cue": 2,
     },
 }
 
@@ -436,3 +437,15 @@ def is_timing_file_empty(timing_file):
         return True
 
     return np.loadtxt(timing_file, delimiter=" ").size == 0
+
+
+def seed_mask_name_check(seed_filename):
+    if "sphere_mask" not in (seed_basename := Path(seed_filename).name):
+        LGR.warning(
+            f"'sphere_mask' is not in the seed mask filename: {seed_basename}\n"
+            "Ignore warning if intentional."
+        )
+
+
+def get_sphere_radius(seed_filename):
+    return get_entity_value(seed_filename, entity="radius")

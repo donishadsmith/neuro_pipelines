@@ -16,7 +16,6 @@ from matplotlib.colors import ListedColormap
 
 from bidsaid._helpers import iterable_to_str
 from bidsaid.files import get_entity_value
-from bidsaid.parsers import _is_float
 
 from _general_utils import _check_coordinate
 
@@ -154,7 +153,9 @@ def run_pipeline(
     coord_name = "_".join([str(x) for x in coordinate])
     tpl = get_entity_value(template_mask_path, "tpl", return_entity_prefix=True)
     res = get_entity_value(template_mask_path, "res", return_entity_prefix=True)
-    sphere_name = f"{tpl}_{res}_desc-sphere_mask_{coord_name}.nii.gz"
+    sphere_name = (
+        f"{tpl}_{res}_radius-{sphere_radius}mm_desc-sphere_mask_{coord_name}.nii.gz"
+    )
     sphere_filename = (Path(dst_dir) if dst_dir else Path().home()) / sphere_name
     sphere_filename.parent.mkdir(parents=True, exist_ok=True)
 

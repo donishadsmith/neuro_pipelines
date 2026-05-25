@@ -496,11 +496,12 @@ def create_seed_masks(
         sphere_mask = resample_seed_img(sphere_mask, thresholded_img)
 
         coord_name = "_".join([str(x) for x in coord])
-        sphere_name = (
-            cluster_table_filename.name.replace("_cluster_results.csv", "_sphere_mask_")
-            + f"{coord_name}.nii.gz"
+        end_name = cluster_table_filename.name.split("desc-")[-1]
+        end_name = f"radius-{sphere_radius}mm_" + end_name.replace(
+            "_cluster_results.csv", "_sphere_mask_"
         )
-        sphere_filename = sphere_parent_path / sphere_name
+        end_name += ".nii.gz"
+        sphere_filename = sphere_parent_path / end_name
 
         nib.save(sphere_mask, sphere_filename)
 

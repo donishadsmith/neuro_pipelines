@@ -6,7 +6,7 @@ from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
 from nilearn.image import new_img_like
 
-from _utils import get_contrast_entity_key
+from _utils import get_contrast_entity_key, delete_file
 
 LGR = setup_logger(__name__)
 
@@ -27,15 +27,14 @@ def estimate_noise_smoothness(
         / f"task-{task}_{entity_key}-{first_level_gltlabel}_desc-acf_parameters.txt"
     )
     acf_parameters_filename.parent.mkdir(parents=True, exist_ok=True)
-    if acf_parameters_filename.exists():
-        acf_parameters_filename.unlink()
+    delete_file(acf_parameters_filename)
 
     tmp_dir = acf_parameters_filename.parent / f"temp_3dFWHMx_{first_level_gltlabel}"
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = (
         f"cd {tmp_dir} && "
-        f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dFWHMx "
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dFWHMx "
         f"-mask {group_mask_filename} "
         f"-input {residual_filename} "
         f"-acf > {acf_parameters_filename}"
@@ -65,7 +64,7 @@ def perform_cluster_simulation(
     output_filename_prefix.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = (
-        f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dClustSim "
+        f"apptainer exec -B /projects:/projects {afni_img_path} 3dClustSim "
         f"-mask {group_mask_filename} "
         f"-prefix {output_filename_prefix} "
         f"-acf $(awk 'NR == 2 {{print $1, $2, $3}}' {acf_parameters_filename})"

@@ -30,6 +30,10 @@ FMRIPREP_VERSION=${FMRIPREP_VERSION:-"25.2.3"}
 
 # Can be the sphere mask or another binary mask
 SEED_MASK_PATH=${SEED_MASK_PATH:-}
+if [[ $SEED_MASK_PATH != *"sphere_mask"* ]]; then
+	echo "'sphere_mask' not in $SEED_MASK_PATH. Ignore message if intentional"
+fi
+
 TASK=${TASK:-nback} # nback, mtle, mtlr, princess, flanker
 
 COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
@@ -100,8 +104,8 @@ echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
 
+md5sum $ANALYSIS_DIR/sub-*${SUBJECT#sub-}*/ses-*/betas/*${TASK}*_betas.nii.gz
+
 echo Exit Code: $?
 date
 exit $?
-
-md5sum $ANALYSIS_DIR/sub-*${SUBJECT#sub-}*/ses-*/betas/*${TASK}*_betas.nii.gz

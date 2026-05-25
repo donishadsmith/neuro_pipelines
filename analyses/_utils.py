@@ -12,6 +12,13 @@ from bidsaid.qc import get_n_censored_volumes
 
 LGR = setup_logger(__name__)
 
+
+def delete_file(filename):
+    filename = Path(filename)
+    if filename.exists():
+        filename.unlink()
+
+
 VALID_TASK_NAMES = {
     "kids": ["nback", "mtlr", "mtle", "flanker", "princess"],
     "adults": ["nback", "mtlr", "mtle", "flanker", "simplegng", "complexgng"],
@@ -175,8 +182,8 @@ def create_beta_files(
         beta_file = beta_dir / stats_file.name.replace(
             "stats", beta_name.replace("#0_Coef", "_betas")
         )
-        if beta_file.exists() and overwrite:
-            beta_file.unlink()
+        if overwrite:
+            delete_file(beta_file)
 
         cmd = (
             f"apptainer exec -B /projects:/projects {afni_img_path} 3dbucket "
@@ -193,10 +200,7 @@ def create_beta_files(
 
         if out_dir and beta_file.exists():
             path = Path(out_dir) / beta_file.name
-            if path.exists():
-                LGR.info("Replacing old file with new file.")
-                path.unlink()
-
+            delete_file(path)
             shutil.move(beta_file, out_dir)
 
 

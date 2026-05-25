@@ -108,8 +108,10 @@ from _first_level_utils import (
     collect_session_files,
     create_diagnostic_condition_plots,
     filter_regressor_names,
+    get_sphere_radius,
     is_timing_file_empty,
     plot_signal,
+    seed_mask_name_check,
     summarize_timing_conditions,
     validate_first_level_inputs,
 )
@@ -638,6 +640,8 @@ def main(
     faltung_penalty_syntax,
     exclude_niftis_file,
 ):
+    seed_mask_name_check(seed_mask_path)
+
     report_dir, layout, sessions = validate_first_level_inputs(
         dst_dir,
         bids_dir,
@@ -838,6 +842,7 @@ def main(
         report.add_context(
             seed_mask_path=str(seed_mask_path),
             seed_coordinate=get_coordinate_from_filename(seed_mask_path),
+            seed_radius=get_sphere_radius(seed_mask_path),
             do_upsample=do_upsample,
             upsample_dt=upsample_dt,
             pad_seconds=pad_seconds,

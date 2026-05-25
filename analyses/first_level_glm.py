@@ -242,7 +242,9 @@ def main(
         mask_file = session_files.mask_file
         nifti_file = session_files.nifti_file
 
-        subject_dir = Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func"
+        subject_dir = (
+            Path(dst_dir) / f"sub-{subject}" / f"ses-{session}" / "func" / task
+        )
         subject_dir.mkdir(parents=True, exist_ok=True)
 
         confounds_df = pd.read_csv(confounds_tsv_file, sep="\t").fillna(0)
@@ -351,6 +353,7 @@ def main(
             event_file,
             task,
             filter_correct_trials,
+            append_task_name=False,
         )
 
         tr = get_tr(nifti_file)
