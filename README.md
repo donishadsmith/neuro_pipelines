@@ -61,7 +61,8 @@ streamlit run app.py
 ```
 
 ![image](assets/hub.png)
-![image](assets/app.png)
+![image](assets/app1.png)
+![image](assets/app2.png)
 
 ### HPC (Conda)
 

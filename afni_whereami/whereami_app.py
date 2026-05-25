@@ -38,4 +38,6 @@ st.divider()
 
 if st.button("Run Pipeline", type="primary"):
     with st.spinner("Processing..."):
-        st.text(run_pipeline(**kwargs))
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text(run_pipeline(**kwargs), text_alignment="center")

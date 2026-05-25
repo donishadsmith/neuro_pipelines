@@ -43,6 +43,8 @@ def _resolve_directories(bids_dir, temp_dir, caller):
 
     temp_dir.mkdir(parents=True, exist_ok=True)
 
+    LGR.info(f"Output Directory: {bids_dir}; Temporary Directory: {temp_dir}")
+
     return bids_dir, temp_dir
 
 
