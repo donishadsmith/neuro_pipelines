@@ -1,4 +1,4 @@
-import subprocess
+import shutil, subprocess
 from pathlib import Path
 
 import nibabel as nib, numpy as np
@@ -30,14 +30,11 @@ def estimate_noise_smoothness(
     if acf_parameters_filename.exists():
         acf_parameters_filename.unlink()
 
-    curr_dir = Path.cwd()
-    for filename in ["3dFWHMx.1D", "3dFWHMx.1D.png"]:
-        curr_filename = curr_dir / filename
-        if curr_filename.exists():
-            curr_filename.unlink()
+    tmp_dir = acf_parameters_filename.parent / f"temp_3dFWHMx_{first_level_gltlabel}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use -acf for more accurate false positive rate
     cmd = (
+        f"cd {tmp_dir} && "
         f"apptainer exec --no-home -B /projects:/projects {afni_img_path} 3dFWHMx "
         f"-mask {group_mask_filename} "
         f"-input {residual_filename} "
@@ -46,6 +43,8 @@ def estimate_noise_smoothness(
 
     LGR.info(f"Running 3dFWHMx: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
+
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return acf_parameters_filename
 

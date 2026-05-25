@@ -103,3 +103,5 @@ eval $CMD
 echo Exit Code: $?
 date
 exit $?
+
+md5sum $ANALYSIS_DIR/sub-*${SUBJECT#sub-}*/ses-*/betas/*${TASK}*_betas.nii.gz

@@ -563,10 +563,12 @@ def main(
         )
     )
 
+    appended_cluster_correction = False
+
     for first_level_glt_label, second_level_glt_code in first_level_glt_label_list:
         report_path = (
             second_level_report_dir
-            / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_report.html"
+            / f"task-{task}_contrast-{first_level_glt_label}_desc-{method}_{analysis_type}_report.html"
         )
 
         entity_key = get_contrast_entity_key(first_level_glt_label)
@@ -601,16 +603,18 @@ def main(
                 parametric_cluster_correction_p,
             )
 
-            HTMLReport.append_section(
-                report_path,
-                "sections/parametric_cluster_correction.html",
-                {
-                    "parametric_voxel_correction_p": parametric_voxel_correction_p,
-                    "parametric_cluster_correction_p": parametric_cluster_correction_p,
-                    "parametric_connectivity": parametric_connectivity,
-                    "parametric_cluster_size_threshold": cluster_size,
-                },
-            )
+            if not appended_cluster_correction:
+                HTMLReport.append_section(
+                    report_path,
+                    "sections/parametric_cluster_correction.html",
+                    {
+                        "parametric_voxel_correction_p": parametric_voxel_correction_p,
+                        "parametric_cluster_correction_p": parametric_cluster_correction_p,
+                        "parametric_connectivity": parametric_connectivity,
+                        "parametric_cluster_size_threshold": cluster_size,
+                    },
+                )
+                appended_cluster_correction = True
 
             thresholded_img = threshold_img(
                 nib.load(zcore_map_filename),
