@@ -89,11 +89,6 @@ export NONPARAMETRIC_CONNECTIVITY=6                     # The connectivity for p
 # ------------------------------------------------
 export SPHERE_RADIUS=5.0                                # Used to create masks, choose integer
 
-# -------------------------------------------------------
-# PARAMETER USED FOR IDENTIFYING MNI LOCATION OF CLUSTERS
-# -------------------------------------------------------
-export AFNI_ORIENT="lpi"                                # Orientation of images -lpi/-spm -rai/-dicom
-
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
 # ======================================

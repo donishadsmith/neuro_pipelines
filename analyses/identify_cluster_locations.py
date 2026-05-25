@@ -63,16 +63,6 @@ def _get_cmd_args():
         help="The type of analysis performed (glm or gPPI).",
     )
     parser.add_argument(
-        "--orient",
-        dest="orient",
-        required=False,
-        default=None,
-        help=(
-            "The orientation to use. If not set, it will first get the environmental variable "
-            "AFNI_ORIENT and if this is empty will default to 'lpi'."
-        ),
-    )
-    parser.add_argument(
         "--atlas",
         dest="atlas",
         required=True,
@@ -92,14 +82,10 @@ def _get_cmd_args():
     return parser
 
 
-def identify_mni_regions(afni_img_path, coord_filename, orient, atlas):
-    orient = orient or os.getenv("AFNI_ORIENT", "lpi")
-
-    LGR.info(f"Using the following orientation: {orient}")
-
+def identify_mni_regions(afni_img_path, coord_filename, atlas):
     cmd = (
         f"apptainer exec -B /scratch:/scratch -B /projects:/projects {afni_img_path} whereami "
-        f"-{orient.lower()} -coord_file {coord_filename} -space MNI -atlas {atlas}"
+        f"-lpi -coord_file {coord_filename} -space MNI -atlas {atlas}"
     )
     std_output = subprocess.run(
         cmd, shell=True, check=True, capture_output=True, text=True
@@ -147,7 +133,6 @@ def add_region_information_to_data(
     scratch_dir,
     afni_img_path,
     task,
-    orient,
     atlas,
     save_excel_version,
 ):
@@ -164,7 +149,7 @@ def add_region_information_to_data(
         index=False,
     )
 
-    data = identify_mni_regions(afni_img_path, coord_filename, orient, atlas)
+    data = identify_mni_regions(afni_img_path, coord_filename, atlas)
 
     # Delete columns if exist in data
     for col in data:
@@ -189,7 +174,6 @@ def main(
     cohort,
     task,
     analysis_type,
-    orient,
     atlas,
     save_excel_version,
 ):
@@ -230,7 +214,6 @@ def main(
             scratch_dir,
             afni_img_path,
             task,
-            orient,
             atlas,
             save_excel_version,
         )
