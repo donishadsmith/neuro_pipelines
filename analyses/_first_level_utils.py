@@ -450,6 +450,6 @@ def seed_mask_name_check(seed_filename):
 def get_sphere_radius(seed_filename):
     radius = get_entity_value(seed_filename, entity="radius")
     if radius:
-        radius = str(radius).removesuffix("mm")
+        radius = str(radius).rstrip("m")
 
     return radius
