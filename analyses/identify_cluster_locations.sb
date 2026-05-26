@@ -23,7 +23,7 @@ fi
 
 ANALYSIS_TYPE=${ANALYSIS_TYPE:-glm} # glm or gPPI
 METHOD=${METHOD:-parametric}
-WHEREAMI_ATLAS=${WHEREAMI_ATLAS:-"Haskins_Pediatric_Nonlinear_1.0"}
+WHEREAMI_ATLAS=${WHEREAMI_ATLAS:-"FS.afni.MNI2009c_asym"}
 
 COHORT=${COHORT:-"kids"}                            # Choose "kids" or "adults"
 BIDS_DIR="/projects/bigos_lab/mph-study/$COHORT/dset"

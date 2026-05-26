@@ -93,7 +93,7 @@ export SPHERE_RADIUS=5.0                                # Used to create masks, 
 # PARAMETERS USED FOR IDENTIFYING CLUSTERS
 # ------------------------------------------------
 # Options - https://afni.nimh.nih.gov/pub/dist/doc/program_help/whereami.html
-WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
+export WHEREAMI_ATLAS="FS.afni.MNI2009c_asym"
 
 # ======================================
 # *** ONLY SET PARAMETERS ABOVE THIS ***
