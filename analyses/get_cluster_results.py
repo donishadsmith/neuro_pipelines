@@ -499,7 +499,7 @@ def create_seed_masks(
         start_name = cluster_table_filename.name.split("desc-")[0]
         end_name = cluster_table_filename.name.split("desc-")[-1]
         end_name += f"radius-{sphere_radius}mm_" + end_name.replace(
-            "_cluster_results.csv", f"_sphere_mask__{coord_name}"
+            "_cluster_results.csv", f"_sphere_mask_{coord_name}"
         )
         end_name += ".nii.gz"
         sphere_filename = sphere_parent_path / start_name + end_name
