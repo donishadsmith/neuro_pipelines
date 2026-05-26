@@ -123,15 +123,15 @@
         <tr><td>Coordinate</td><td>{{ seed_coordinate }}</td></tr>
         {% endif %}
         {% if seed_radius %}
-        <tr><td>Sphere Radius (mm)</td><td>{{ seed_radius }}</td></tr>
+        <tr><td>Sphere radius (mm)</td><td>{{ seed_radius }}</td></tr>
         {% endif %}
         {% if do_upsample %}
         <tr><td>Upsample dt</td><td>{{ upsample_dt }} s</td></tr>
         {% else %}
         <tr><td>Upsample dt</td><td>None (operating at native TR = {{ tr }} s)</td></tr>
         {% endif %}
-        <tr><td>Pad Seconds</td><td>{{ pad_seconds }} s</td></tr>
-        <tr><td>HRF Model Type</td><td><code>{{ hrf_model_type }}</code></td></tr>
+        <tr><td>Pad seconds</td><td>{{ pad_seconds }} s</td></tr>
+        <tr><td>HRF model type</td><td><code>{{ hrf_model_type }}</code></td></tr>
     </table>
 
 <p>
