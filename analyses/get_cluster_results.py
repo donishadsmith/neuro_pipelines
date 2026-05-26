@@ -501,7 +501,7 @@ def create_seed_masks(
             + f"{coord_name}.nii.gz"
         )
         sphere_name = sphere_name.replace(
-            "_desc", f"radius-{sphere_radius}mm_{method}_desc"
+            "_desc", f"_radius-{sphere_radius}mm_{method}_desc"
         )
         sphere_filename = sphere_parent_path / sphere_name
 
