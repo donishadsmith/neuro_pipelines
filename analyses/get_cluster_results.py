@@ -500,9 +500,7 @@ def create_seed_masks(
             cluster_table_filename.name.replace("_cluster_results.csv", "_sphere_mask_")
             + f"{coord_name}.nii.gz"
         )
-        sphere_name = sphere_name.replace(
-            "_desc", f"_radius-{sphere_radius}mm_{method}_desc"
-        )
+        sphere_name = sphere_name.replace("_desc", f"_radius-{sphere_radius}mm_desc")
         sphere_filename = sphere_parent_path / sphere_name
 
         nib.save(sphere_mask, sphere_filename)
