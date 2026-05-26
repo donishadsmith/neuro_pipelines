@@ -92,8 +92,6 @@ echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
 
-md5sum $ANALYSIS_DIR/sub-*${SUBJECT#sub-}*/ses-*/betas/*${TASK}*_betas.nii.gz
-
 echo Exit Code: $?
 date
 exit $?
