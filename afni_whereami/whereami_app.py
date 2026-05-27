@@ -11,7 +11,11 @@ from whereami import run_pipeline
 st.title("AFNI WhereAmI Pipeline")
 st.divider()
 
-st.markdown("Pipeline for looking up MNI coordinates with AFNI's ``whereami``.")
+st.markdown(
+    "Pipeline for looking up MNI coordinates with AFNI's ``whereami``. "
+    "Uses the Freesurfer MNI2009c DK parcellation and the "
+    "Brodmann atlas for MNI 2009c - Pijnenburg AFNI version."
+)
 
 st.divider()
 

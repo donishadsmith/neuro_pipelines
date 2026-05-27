@@ -1,4 +1,5 @@
 import requests, re, sys
+from functools import lru_cache
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -19,19 +20,31 @@ def get_server():
         return f.read().strip()
 
 
+# Could use diskcache for long term storage but if the parcellations ever change
+# then that cache would need to be manually cleared vs just restarting streamlit
+# CLI path will still repeatedly send requests to server but Streamlit path
+# is most likely to be used
+@lru_cache(maxsize=1024)
+def query_afni(x, y, z, server_url):
+    request_data = {
+        "x": x,
+        "y": y,
+        "z": z,
+    }
+    # Verification is overkill but good practice
+    response = requests.post(f"{server_url}/", json=request_data, verify=CERT_PATH)
+
+    return response.json()["output"]
+
+
 def run_pipeline(cohort, mni_coordinate):
     _check_coordinate(mni_coordinate)
 
-    request_data = {
-        "x": mni_coordinate[0],
-        "y": mni_coordinate[1],
-        "z": mni_coordinate[2],
-    }
-    # Verification is overkill but good practice
-    response = requests.post(f"{get_server()}/", json=request_data, verify=CERT_PATH)
-
-    output_text = response.json()["output"]
-    output_text = [x.strip() for x in output_text.split("\n")]
+    # public ip is reserved but just in case it changes, add in signature
+    response = query_afni(
+        mni_coordinate[0], mni_coordinate[1], mni_coordinate[2], get_server()
+    )
+    output_text = [x.strip() for x in response.split("\n")]
     target_str = "Atlas FS.afni.MNI2009c_asym: Freesurfer MNI2009c DK parcellation"
 
     is_focus_point = False
@@ -78,4 +91,4 @@ def run_pipeline(cohort, mni_coordinate):
     else:
         sphere_radius_text = f"within {sphere_radius}mm" if sphere_radius else None
 
-    return response.json()["output"], display, sphere_radius_text
+    return response, display, sphere_radius_text
