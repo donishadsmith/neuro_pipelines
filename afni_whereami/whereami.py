@@ -1,4 +1,4 @@
-import requests, sys
+import requests, re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -11,6 +11,7 @@ from matplotlib.colors import ListedColormap
 from _general_utils import _check_coordinate, _create_sphere_mask, get_template_images
 
 SERVER_URL_PATH = Path(__file__).parent.parent / "server_url.txt"
+CERT_PATH = Path(__file__).parent.parent / "cert.pem"
 
 
 def get_server():
@@ -26,7 +27,8 @@ def run_pipeline(cohort, mni_coordinate):
         "y": mni_coordinate[1],
         "z": mni_coordinate[2],
     }
-    response = requests.post(f"{get_server()}/", json=request_data, verify=False)
+    # Verification is overkill but good practice
+    response = requests.post(f"{get_server()}/", json=request_data, verify=CERT_PATH)
 
     output_text = response.json()["output"]
     output_text = [x.strip() for x in output_text.split("\n")]
@@ -43,7 +45,7 @@ def run_pipeline(cohort, mni_coordinate):
         distance_info = output_text[distance_info_index]
         if "Focus point" not in distance_info:
             sphere_radius = float(
-                [x for x in distance_info.split(":")[0] if x.isdigit()][0]
+                re.search(r"\d+(\.\d+)?", distance_info.split(":")[0]).group()
             )
         else:
             sphere_radius = 1.0
