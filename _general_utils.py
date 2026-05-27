@@ -2,12 +2,31 @@ import csv, tempfile, re
 from pathlib import Path
 from typing import Optional
 
-import pandas as pd
+import nibabel as nib, numpy as np, pandas as pd
+from nilearn.masking import _unmask_3d
+from nilearn.maskers import nifti_spheres_masker
+
 from bidsaid.path_utils import is_valid_date
 from bidsaid.logging import setup_logger
 from bidsaid.parsers import _is_float
 
 LGR = setup_logger(__name__)
+
+
+COHORT_MAP = {
+    "kids": {
+        "template_mask_path": Path(__file__).parent
+        / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz",
+        "template_img_path": Path(__file__).parent
+        / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-1_desc-brain_T1w.nii.gz",
+    },
+    "adults": {
+        "template_mask_path": Path(__file__).parent
+        / "templates/adults/tpl-MNI152NLin2009cAsym_res-02_desc-brain_mask.nii.gz",
+        "template_img_path": Path(__file__).parent
+        / "templates/adults/tpl-MNI152NLin2009cAsym_res-01_desc-brain_T1w.nii.gz",
+    },
+}
 
 
 def _convert_to_bool(arg: bool | str) -> bool:
@@ -234,3 +253,30 @@ def _check_coordinate(coordinate):
     if not all([_is_float(x) for x in coordinate]):
         coordinate = list(map(str, coordinate))
         raise ValueError(f"Invalid MNI coordinate: {','.join(coordinate)}")
+
+
+def get_template_images(cohort):
+    return (
+        COHORT_MAP[cohort]["template_mask_path"],
+        COHORT_MAP[cohort]["template_img_path"],
+    )
+
+
+def _create_sphere_mask(coordinate, sphere_radius, template_mask):
+    # https://neurostars.org/t/create-a-10mm-sphere-roi-mask-around-a-given-coordinate/28853/3
+    _, A = nifti_spheres_masker.apply_mask_and_get_affinity(
+        seeds=[tuple(coordinate)],
+        niimg=None,
+        radius=sphere_radius,
+        allow_overlap=False,
+        mask_img=template_mask,
+    )
+
+    sphere_mask = _unmask_3d(
+        X=A.toarray().flatten(), mask=template_mask.get_fdata().astype(bool)
+    ).astype(np.int8)
+
+    hdr = template_mask.header.copy()
+    hdr.set_data_dtype(np.int8)
+
+    return nib.nifti1.Nifti1Image(sphere_mask, template_mask.affine, hdr)

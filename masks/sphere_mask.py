@@ -9,30 +9,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import nibabel as nib, numpy as np
-from nilearn.masking import _unmask_3d
-from nilearn.maskers import nifti_spheres_masker
 from nilearn.plotting import plot_roi
 from matplotlib.colors import ListedColormap
 
 from bidsaid._helpers import iterable_to_str
 from bidsaid.files import get_entity_value
 
-from _general_utils import _check_coordinate
-
-COHORT_MAP = {
-    "kids": {
-        "template_mask_path": Path(__file__).parent
-        / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-2_desc-brain_mask.nii.gz",
-        "template_img_path": Path(__file__).parent
-        / "templates/kids/tpl-MNIPediatricAsym_cohort-1_res-1_desc-brain_T1w.nii.gz",
-    },
-    "adults": {
-        "template_mask_path": Path(__file__).parent
-        / "templates/adults/tpl-MNI152NLin2009cAsym_res-02_desc-brain_mask.nii.gz",
-        "template_img_path": Path(__file__).parent
-        / "templates/adults/tpl-MNI152NLin2009cAsym_res-01_desc-brain_T1w.nii.gz",
-    },
-}
+from _general_utils import _check_coordinate, _create_sphere_mask, get_template_images
 
 
 # https://github.com/fieldtrip/fieldtrip/blob/master/private/tal2mni.m
@@ -123,32 +106,14 @@ def run_pipeline(
     _check_coordinate(coordinate)
 
     coordinate = list(map(float, coordinate))
-    template_mask_path = COHORT_MAP[cohort]["template_mask_path"]
-    template_img_path = COHORT_MAP[cohort]["template_img_path"]
+
+    template_mask_path, template_img_path = get_template_images(cohort)
 
     template_mask = nib.load(template_mask_path)
 
     original_coordinate = coordinate
     if original_coordinate_space != "MNI":
         coordinate = transform_dict[transform_method](coordinate)
-
-    # https://neurostars.org/t/create-a-10mm-sphere-roi-mask-around-a-given-coordinate/28853/3
-    _, A = nifti_spheres_masker.apply_mask_and_get_affinity(
-        seeds=[tuple(coordinate)],
-        niimg=None,
-        radius=sphere_radius,
-        allow_overlap=False,
-        mask_img=template_mask,
-    )
-
-    sphere_mask = _unmask_3d(
-        X=A.toarray().flatten(), mask=template_mask.get_fdata().astype(bool)
-    ).astype(np.int8)
-
-    hdr = template_mask.header.copy()
-    hdr.set_data_dtype(np.int8)
-
-    sphere_mask = nib.nifti1.Nifti1Image(sphere_mask, template_mask.affine, hdr)
 
     coord_name = "_".join([str(x) for x in coordinate])
     tpl = get_entity_value(template_mask_path, "tpl", return_entity_prefix=True)
@@ -159,6 +124,7 @@ def run_pipeline(
     sphere_filename = (Path(dst_dir) if dst_dir else Path().home()) / sphere_name
     sphere_filename.parent.mkdir(parents=True, exist_ok=True)
 
+    sphere_mask = _create_sphere_mask(coordinate, sphere_radius, template_mask)
     nib.save(sphere_mask, sphere_filename)
 
     display = plot_roi(
