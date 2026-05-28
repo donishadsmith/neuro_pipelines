@@ -1,6 +1,6 @@
 """
 For documentation: a copy of the Python file running fastapi that is hosted on a continuously running instance
-on Oracle Cloud. It's the free tier so the instance only has 1 GB ram and 1 OCPU.
+on Oracle Cloud. It's the free tier so the instance only has 1 GB ram and 1 OCPU (VM.Standard.E2.1.Micro)
 
 https://www.freedesktop.org/software/systemd/man/latest/loginctl.html
 https://man7.org/linux/man-pages/man2/fallocate.2.html
