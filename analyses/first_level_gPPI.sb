@@ -102,7 +102,7 @@ echo Subject: ${SUBJECT#sub-}
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
-timeout -k 5m 5h eval $CMD
+timeout -k 5m 5h $CMD
 EXITCODE=$?
 if [ $EXITCODE -eq 124 ] || [ $EXITCODE -eq 137 ]; then
     echo $(hostname) >> $BAD_NODES_FILE

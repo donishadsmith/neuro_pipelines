@@ -131,10 +131,10 @@ echo Commandline: $CMD
 
 if [[ $METHOD == "nonparametric" ]]; then
 	STALL_LIMIT="48"
-	timeout -k 5m 48h eval $CMD
+	timeout -k 5m 48h $CMD
 else
 	STALL_LIMIT="5"
-	timeout -k 5m 5h eval $CMD
+	timeout -k 5m 5h $CMD
 fi
 
 EXITCODE=$?
