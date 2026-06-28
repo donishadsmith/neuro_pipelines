@@ -233,7 +233,7 @@ def _create_flanker_events_files(
         )
 
         # Getting subject ID and organising files to get subject ID
-        subject_id = re.search("(\d+).*_", excel_file.name).group(1)
+        subject_id = re.search(r"(\d+).*_", excel_file.name).group(1)
         session_id = _get_presentation_session(
             subject_id,
             excel_file,
@@ -380,7 +380,7 @@ def _create_gng_events_files(
         event_df = event_df[(event_df["onset"] + event_df["duration"]) <= 245]
 
         # Getting subject ID and organising files to get subject ID
-        subject_id = re.search("(\d+).*-", log_file.name).group(1)
+        subject_id = re.search(r"(\d+).*-", log_file.name).group(1)
         session_id = _get_presentation_session(
             subject_id,
             log_file,
@@ -562,7 +562,7 @@ def _create_nback_presentation_events_files(
             }
         )
 
-        subject_id = re.search("^(\d+).*_", text_file.name).group(1)
+        subject_id = re.search(r"^(\d+).*_", text_file.name).group(1)
         session_id = _get_presentation_session(
             subject_id,
             text_file,
@@ -644,7 +644,7 @@ def _create_mtl_events_files(
             {f"{task_name}_cue": "cue"}
         )
 
-        subject_id = re.search("(\d+).*_", excel_file.name).group(1)
+        subject_id = re.search(r"(\d+).*_", excel_file.name).group(1)
         session_id = _get_presentation_session(
             subject_id,
             excel_file,
