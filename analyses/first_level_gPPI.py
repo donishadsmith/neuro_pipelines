@@ -551,8 +551,8 @@ def upsample_condition_regressor(
 
     duration = (
         CONDITION_DURATIONS[cohort][task]
-        if not condition_name.startswith("cue")
-        else CONDITION_DURATIONS[cohort][f"{condition_name}_{task}"]
+        if not condition_name.endswith("_cue")
+        else CONDITION_DURATIONS[cohort][condition_name]
     )
 
     cmd = (
