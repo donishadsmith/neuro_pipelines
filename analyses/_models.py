@@ -223,10 +223,10 @@ def get_task_deconvolve_adults_cmd(
     elif task in ["mtle", "mtlr"]:
         mtl_type = "encoding" if task == "mtle" else "retrieval"
         stims = (
-            f"-stim_times {{label}} {timing_dir / 'cue.1D'} 'BLOCK(2, 1)' -stim_label {{label}} cue ",
+            f"-stim_times {{label}} {timing_dir / f'{task}_cue.1D'} 'BLOCK(2, 1)' -stim_label {{label}} {task}_cue ",
             f"-stim_times {{label}} {timing_dir / f'neutral_{mtl_type}.1D'} 'BLOCK(18, 1)' -stim_label {{label}} {f'neutral_{mtl_type}'} ",
             f"-stim_times {{label}} {timing_dir / f'aversive_{mtl_type}.1D'} 'BLOCK(18, 1)' -stim_label {{label}} {f'aversive_{mtl_type}'} ",
-            f"-stim_file {{label}} {ppi_dir / 'PPI_cue.1D'} -stim_label {{label}} PPI_cue ",
+            f"-stim_file {{label}} {ppi_dir / f'PPI_{task}_cue.1D'} -stim_label {{label}} PPI_{task}_cue ",
             f"-stim_file {{label}} {ppi_dir / f'PPI_neutral_{mtl_type}.1D'} -stim_label {{label}} {f'PPI_neutral_{mtl_type}'} ",
             f"-stim_file {{label}} {ppi_dir / f'PPI_aversive_{mtl_type}.1D'} -stim_label {{label}} {f'PPI_aversive_{mtl_type}'} ",
         )
