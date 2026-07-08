@@ -231,7 +231,7 @@ def get_task_deconvolve_adults_cmd(
             f"-stim_file {{label}} {ppi_dir / f'PPI_aversive_{mtl_type}.1D'} -stim_label {{label}} {f'PPI_aversive_{mtl_type}'} ",
         )
         gltsyms = (
-            "-gltsym 'SYM: +1*PPI_aversive_encoding -1*PPI_neutral_encoding' -glt_label 1 PPI_aversive_encoding_vs_PPI_neutral_encoding ",
+            f"-gltsym 'SYM: +1*PPI_aversive_{mtl_type} -1*PPI_neutral_{mtl_type}' -glt_label 1 PPI_aversive_{mtl_type}_vs_PPI_neutral_{mtl_type} ",
         )
 
     return construct_deconvolve_cmd(
