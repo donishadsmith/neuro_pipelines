@@ -399,7 +399,7 @@ def get_cue_name(timing_dir, cohort, task, condition_filenames):
     ):
         return condition_filenames
     else:
-        return condition_filenames + [timing_dir / "cue.1D"]
+        return condition_filenames + [timing_dir / f"{task}_cue.1D"]
 
 
 def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
