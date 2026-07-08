@@ -150,11 +150,11 @@ def get_task_deconvolve_kids_cmd(
 
     if task == "nback":
         stims = (
-            f"-stim_times {{label}} {timing_dir / 'cue.1D'} 'BLOCK(2, 1)' -stim_label {{label}} cue ",
+            f"-stim_times {{label}} {timing_dir / 'nback_cue.1D'} 'BLOCK(2, 1)' -stim_label {{label}} nback_cue ",
             f"-stim_times {{label}} {timing_dir / 'center.1D'} 'BLOCK(32, 1)' -stim_label {{label}} center ",
             f"-stim_times {{label}} {timing_dir / '1-back.1D'} 'BLOCK(32, 1)' -stim_label {{label}} 1-back ",
             f"-stim_times {{label}} {timing_dir / '2-back.1D'} 'BLOCK(32, 1)' -stim_label {{label}} 2-back ",
-            f"-stim_file {{label}} {ppi_dir / 'PPI_cue.1D'} -stim_label {{label}} PPI_cue ",
+            f"-stim_file {{label}} {ppi_dir / 'PPI_nback_cue.1D'} -stim_label {{label}} PPI_nback_cue ",
             f"-stim_file {{label}} {ppi_dir / 'PPI_center.1D'} -stim_label {{label}} PPI_center ",
             f"-stim_file {{label}} {ppi_dir / 'PPI_1-back.1D'} -stim_label {{label}} PPI_1-back ",
             f"-stim_file {{label}} {ppi_dir / 'PPI_2-back.1D'} -stim_label {{label}} PPI_2-back ",
@@ -167,9 +167,9 @@ def get_task_deconvolve_kids_cmd(
     elif task in ["mtle", "mtlr"]:
         mtl_type = "encoding" if task == "mtle" else "retrieval"
         stims = (
-            f"-stim_times {{label}} {timing_dir / 'cue.1D'} 'BLOCK(2, 1)' -stim_label {{label}} cue ",
+            f"-stim_times {{label}} {timing_dir / f'{task}_cue.1D'} 'BLOCK(2, 1)' -stim_label {{label}} {task}_cue ",
             f"-stim_times {{label}} {timing_dir / f'neutral_{mtl_type}.1D'} 'BLOCK(18, 1)' -stim_label {{label}} {f'neutral_{mtl_type}'} ",
-            f"-stim_file {{label}} {ppi_dir / f'PPI_cue.1D'} -stim_label {{label}} PPI_cue ",
+            f"-stim_file {{label}} {ppi_dir / f'PPI_{task}_cue.1D'} -stim_label {{label}} PPI_{task}_cue ",
             f"-stim_file {{label}} {ppi_dir / f'PPI_neutral_{mtl_type}.1D'} -stim_label {{label}} {f'PPI_neutral_{mtl_type}'} ",
         )
         gltsyms = (" ",)

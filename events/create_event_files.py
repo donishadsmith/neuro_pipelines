@@ -486,9 +486,9 @@ def _create_nback_eprime_events_files(
             event_df = add_cue_timing(event_df, cue_duration=2)
             event_df["trial_type"] = event_df["trial_type"].replace(
                 {
-                    "1-back_cue": "cue",
-                    "2-back_cue": "cue",
-                    "center_cue": "cue",
+                    "1-back_cue": "nback_cue",
+                    "2-back_cue": "nback_cue",
+                    "center_cue": "nback_cue",
                 }
             )
 
@@ -641,7 +641,10 @@ def _create_mtl_events_files(
 
         event_df = pd.DataFrame(events)
         event_df["trial_type"] = event_df["trial_type"].replace(
-            {f"{task_name}_cue": "cue"}
+            {
+                "indoor_cue": "mtle_cue",
+                "seen_cue": "mtlr_cue",
+            }
         )
 
         subject_id = re.search(r"(\d+).*_", excel_file.name).group(1)
@@ -755,7 +758,7 @@ def _create_princess_events_files(
                 "night": "nonswitch",
             }
             events["trial_type"] = [
-                trial_name_dict[trial_type] if trial_type in trial_name_dict else "cue"
+                trial_name_dict[trial_type]
                 for trial_type in extractor.extract_trial_types()
             ]
             events["block_cue"] = extractor.extract_trial_types()
