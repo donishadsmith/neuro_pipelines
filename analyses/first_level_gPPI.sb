@@ -102,18 +102,8 @@ echo Subject: ${SUBJECT#sub-}
 
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
-timeout -k 5m 5h $CMD
-EXITCODE=$?
-if [ $EXITCODE -eq 124 ] || [ $EXITCODE -eq 137 ]; then
-    echo $(hostname) >> $BAD_NODES_FILE
-    sort -u -o $BAD_NODES_FILE $BAD_NODES_FILE
-    echo "The current job has been hanging for 5 hours on $(hostname). Requeueing job"
-    SCONTROL_STRING="update JobId=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} ExcNodeList=$(paste -sd, $BAD_NODES_FILE)"
-    scontrol requeue ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
-    scontrol $SCONTROL_STRING
-	exit 0
-fi
+eval $CMD
 
-echo Exit Code: $EXITCODE
+echo Exit Code: $?
 date
 exit $EXITCODE
