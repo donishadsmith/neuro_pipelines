@@ -3,8 +3,8 @@
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=48G
 #SBATCH --time=12:00:00
 # Outputs --------------------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/extract_independent_roi_betas_%A_%a.out

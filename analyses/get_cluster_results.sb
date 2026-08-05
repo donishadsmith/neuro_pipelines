@@ -3,8 +3,8 @@
 #SBATCH --partition=cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=16G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=48G
 # Outputs ----------------------------------------------------------------------------
 #SBATCH --output=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.out
 #SBATCH --error=/projects/bigos_lab/mph-study/code/logs/get_cluster_results_%A_%a.err
