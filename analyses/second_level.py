@@ -503,7 +503,7 @@ def create_data_table(bids_dir, datacontainer, subject_list, beta_files, cohort)
         set(important_columns).intersection(data_table.columns)
     )
     filtered_important_columns = order_columns_names(filtered_important_columns)
-    data_table = data_table.dropna(subset=important_columns, axis=0)
+    data_table = data_table.dropna(subset=filtered_important_columns, axis=0)
 
     return sort_data_table(data_table), constant_columns, filtered_important_columns
 
