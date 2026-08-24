@@ -88,10 +88,12 @@ echo Subject: ${SUBJECT#sub-}
 
 # For node failure issues use the --exclude flag
 
+EXITCODE=$?
+
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
 
-echo Exit Code: $?
+echo Exit Code: $EXITCODE
 date
 exit $EXITCODE

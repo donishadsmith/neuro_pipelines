@@ -55,10 +55,12 @@ CMD="$PYTHON identify_cluster_locations.py \
     --atlas $WHEREAMI_ATLAS \
     --analysis_type $ANALYSIS_TYPE"
 
+EXITCODE=$?
+
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
 
-echo Exit Code: $?
+echo Exit Code: $EXITCODE
 date
-exit $?
+exit $EXITCODE
