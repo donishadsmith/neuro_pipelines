@@ -328,7 +328,10 @@ def create_dynamic_deconvolve_cmd(
                 timing_file=timing_dir / f"{regressor}.1D",
             )
 
-    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(num_labels=label)
+    num_labels = (start_indx - 1) + len(keep_trial_regressors)
+    deconvolve_cmd["num_stimts"] = deconvolve_cmd["num_stimts"].format(
+        num_labels=num_labels
+    )
 
     # Only keep gltsym with all conditions
     kept_gltsyms = []
