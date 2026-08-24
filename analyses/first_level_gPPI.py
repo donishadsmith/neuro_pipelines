@@ -394,12 +394,10 @@ def denoise_seed_timeseries(
 
 
 def get_cue_name(timing_dir, cohort, task, condition_filenames):
-    if task not in ["nback", "mtle", "mtlr"] and not (
-        task == "nback" and cohort == "adult"
-    ):
-        return condition_filenames
-    else:
+    if task in ("mtle", "mtlr") or (task == "nback" and cohort == "kids"):
         return condition_filenames + [timing_dir / f"{task}_cue.1D"]
+
+    return condition_filenames
 
 
 def resample_data(target_file, tr, afni_img_path, upsample_dt, method):
@@ -952,6 +950,13 @@ def main(
             task,
             condition_filenames,
         )
+
+        errors_timing_file = timing_dir / "errors.1D"
+        if (
+            not is_timing_file_empty(errors_timing_file)
+            and errors_timing_file not in condition_filenames
+        ):
+            condition_filenames = condition_filenames + [errors_timing_file]
 
         condition_names = []
         condition_plots = []

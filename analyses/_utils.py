@@ -242,10 +242,10 @@ def drop_dose_rows(
     target_doses = list(map(str, target_doses))
     data_table = data_table[data_table["dose"].astype(str).isin(target_doses)]
     if only_complete_cases:
-        counts = data_table["Subj"].value_counts()
-        removed_subjects = counts[counts < len(target_doses)].index.tolist()
+        dose_counts = data_table.groupby("Subj")["dose"].astype(str).nunique()
+        removed_subjects = dose_counts[dose_counts < len(target_doses)].index.tolist()
         data_table = data_table[~data_table["Subj"].isin(removed_subjects)]
-        total_subjects = len(data_table["Subj"].unique())
+        total_subjects = data_table["Subj"].nunique()
         contrast_name = get_contrast_name_from_file(data_table["InputFile"].tolist()[0])
 
         LGR.warning(

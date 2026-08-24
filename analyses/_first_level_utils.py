@@ -116,8 +116,15 @@ def _get_required_files(layout, label, **kwargs):
     return files
 
 
-def _select_by_space(files, space):
-    return [file for file in files if space in Path(file).name][0]
+def _select_by_space(files, space, label="files"):
+    matches = [file for file in files if space in Path(file).name]
+    if not matches:
+        raise MissingFileError(
+            f"No {label} matching space '{space}'. Available: "
+            f"{[Path(f).name for f in files]}"
+        )
+
+    return matches[0]
 
 
 def _collect_files(layout, subject, session, task, space, acompcor_strategy):

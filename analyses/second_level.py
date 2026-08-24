@@ -632,9 +632,9 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
         elif "_vs_" not in glt_code:
             # In future if ever asked to look at single group
             glt_str += glt_code if level_str in available_doses else ""
-        elif "mph_vs_placebo":
-            non_placebo_doses = set(available_doses) - {"0"}
-            if non_placebo_doses and len(non_placebo_doses) > 1:
+        elif glt_code == "mph_vs_placebo":
+            non_placebo_doses = set(available_doses) - {"0", "placebo"}
+            if non_placebo_doses and len(non_placebo_doses) > 0:
                 glt_str += glt_code
         else:
             dose_list = level_str.split("_vs_")
@@ -1028,8 +1028,14 @@ def create_concatenated_image(
     first_level_glt_label,
     second_level_glt_code,
 ):
-    prefix = f"task-{task}_{entity_key}-{first_level_glt_label}_gltcode-{second_level_glt_code}"
+    prefix = (
+        f"task-{task}_{entity_key}-{first_level_glt_label}"
+        f"_gltcode-{second_level_glt_code}"
+    )
+
     concatenated_filename = output_dir / f"{prefix}_desc-group_concatenated.nii.gz"
+    volume_order_filename = output_dir / f"{prefix}_desc-volume_order.tsv"
+
     if concatenated_filename.exists():
         concatenated_filename.unlink()
 
@@ -1050,14 +1056,20 @@ def create_concatenated_image(
         and glt_data_table.groupby(["Subj", "dose"]).size().max() > 1
     )
 
+    volume_records = []
     if second_level_glt_code == "mean":
         LGR.info("Averaging all doses within subjects for the mean contrast.")
 
-        sorted_table = sort_data_table(glt_data_table, subject_only=True)
+        sorted_table = sort_data_table(
+            glt_data_table,
+            subject_only=True,
+        )
 
         subject_mean_images = []
+
         for subject, group in sorted_table.groupby("Subj", sort=True):
             subject_files = group["InputFile"].tolist()
+
             subject_temp_merged = (
                 concatenated_filename.parent / f"temp_{prefix}_{subject}_merged.nii.gz"
             )
@@ -1072,11 +1084,25 @@ def create_concatenated_image(
                 fsl_maths_call,
                 subject_files,
             )
+
             subject_mean_images.append(str(subject_mean_img))
 
+            volume_records.append(
+                {
+                    "Subj": subject,
+                    "dose": "mean",
+                    "averaged": True,
+                    "n_source_images": len(subject_files),
+                    "source_images": "|".join(map(str, subject_files)),
+                }
+            )
+
         concatenate_all_images(
-            fsl_merge_call, concatenated_filename, subject_mean_images
+            fsl_merge_call,
+            concatenated_filename,
+            subject_mean_images,
         )
+
         delete_images(subject_mean_images)
 
     elif has_duplicate_dose_rows:
@@ -1089,8 +1115,13 @@ def create_concatenated_image(
 
         images_to_concat = []
         temp_files = []
-        for (subject, dose), group in sorted_table.groupby(["Subj", "dose"], sort=True):
+
+        for (subject, dose), group in sorted_table.groupby(
+            ["Subj", "dose"],
+            sort=True,
+        ):
             group_files = group["InputFile"].tolist()
+
             if len(group_files) > 1:
                 subject_temp_merged = (
                     concatenated_filename.parent
@@ -1108,18 +1139,73 @@ def create_concatenated_image(
                     fsl_maths_call,
                     group_files,
                 )
+
                 images_to_concat.append(str(subject_mean_img))
                 temp_files.append(subject_mean_img)
+
+                averaged = True
+
             else:
                 images_to_concat.append(group_files[0])
+                averaged = False
 
-        concatenate_all_images(fsl_merge_call, concatenated_filename, images_to_concat)
+            volume_records.append(
+                {
+                    "Subj": subject,
+                    "dose": dose,
+                    "averaged": averaged,
+                    "n_source_images": len(group_files),
+                    "source_images": "|".join(map(str, group_files)),
+                }
+            )
+
+        concatenate_all_images(
+            fsl_merge_call,
+            concatenated_filename,
+            images_to_concat,
+        )
+
         delete_images(temp_files)
-    else:
-        files_to_merge = glt_data_table["InputFile"].tolist()
-        concatenate_all_images(fsl_merge_call, concatenated_filename, files_to_merge)
 
-    return concatenated_filename
+    else:
+        sorted_table = sort_data_table(glt_data_table)
+
+        files_to_merge = sorted_table["InputFile"].tolist()
+
+        for _, row in sorted_table.iterrows():
+            volume_records.append(
+                {
+                    "Subj": row["Subj"],
+                    "dose": row["dose"],
+                    "averaged": False,
+                    "n_source_images": 1,
+                    "source_images": str(row["InputFile"]),
+                }
+            )
+
+        concatenate_all_images(
+            fsl_merge_call,
+            concatenated_filename,
+            files_to_merge,
+        )
+
+    volume_order = pd.DataFrame(volume_records)
+
+    volume_order.insert(
+        0,
+        "volume_index",
+        np.arange(1, len(volume_order) + 1),
+    )
+
+    volume_order.to_csv(
+        volume_order_filename,
+        sep="\t",
+        index=False,
+    )
+
+    LGR.info(f"Saved PALM volume ordering to: {volume_order_filename}")
+
+    return concatenated_filename, volume_order_filename
 
 
 def drop_within_subject_constant_regressors(datacontainer, glt_data_table):
@@ -1555,8 +1641,6 @@ def main(
                         # All doses averaged into one image per subject
                         n_files = n_subjects
                     else:
-                        # Duplicate dose rows averaged (e.g., two mph → one mph),
-                        # distinct dose levels remain (e.g., mph + placebo = 2)
                         n_dose_levels = glt_data_table["dose"].nunique()
                         n_files = n_subjects * n_dose_levels
                 else:
@@ -1575,7 +1659,7 @@ def main(
                     task,
                     space,
                     group_mask_threshold,
-                    data_table["InputFile"].tolist(),
+                    glt_data_table["InputFile"].tolist(),
                     gm_probseg_img_path,
                     gm_mask_threshold,
                     apriori_img_path,
