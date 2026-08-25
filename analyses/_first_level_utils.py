@@ -83,7 +83,7 @@ def validate_first_level_inputs(
         LGR.warning(
             f"The task must be one of the following: {iterable_to_str(VALID_TASK_NAMES[cohort])}"
         )
-        sys.exit(status=1)
+        sys.exit(1)
 
     layout = bids.BIDSLayout(bids_dir, derivatives=deriv_dir or True)
 
@@ -103,7 +103,7 @@ def validate_first_level_inputs(
         report.mark_excluded(msg)
         report.create_report(report_path, "first_level.html")
 
-        sys.exit(status=1)
+        sys.exit(1)
 
     return report_dir, layout, sessions
 
