@@ -69,11 +69,10 @@ if [[ ${SEED_MASK_PATH,,} != "none" && $ANALYSIS_TYPE == "gPPI" ]]; then
     fi
 fi
 
-EXITCODE=$?
-
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
+EXITCODE=$?
 
 echo Exit Code: $EXITCODE
 date

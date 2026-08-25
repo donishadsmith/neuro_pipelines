@@ -126,11 +126,10 @@ if [[ $METHOD == "parametric" && -n $AFNI_IMG_PATH ]]; then
 	CMD+=" --afni_img_path $AFNI_IMG_PATH"
 fi
 
-EXITCODE=$?
-
 echo Task ID: $SLURM_ARRAY_TASK_ID
 echo Commandline: $CMD
 eval $CMD
+EXITCODE=$?
 
 echo Exit Code: $EXITCODE
 date
