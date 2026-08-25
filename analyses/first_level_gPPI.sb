@@ -90,7 +90,7 @@ CMD="$PYTHON first_level_gPPI.py \
 	--fwhm $FWHM \
 	--upsample_dt $GPPI_UPSAMPLE_DT \
 	--pad_seconds $GPPI_PAD_SECONDS \
-	--faltung_penalty_syntax $GPPI_FALTUNG_PENALTY_SYNTAX \
+	--faltung_penalty_syntax \"$GPPI_FALTUNG_PENALTY_SYNTAX\" \
 	--exclude_niftis_file $EXCLUDE_NIFTIS_FILE"
 
 echo Hostname: $(hostname)
