@@ -633,8 +633,8 @@ def get_glt_codes_str(data_table, datacontainer, cohort):
             # In future if ever asked to look at single group
             glt_str += glt_code if level_str in available_doses else ""
         elif level_str == "mph_vs_placebo":
-            non_placebo_doses = set(available_doses) - {"0", "placebo"}
-            if non_placebo_doses and len(non_placebo_doses) > 0:
+            required = {"mph", "placebo"} if cohort == "adults" else {"0", "5", "10"}
+            if required.issubset(set(available_doses)):
                 glt_str += glt_code
         else:
             dose_list = level_str.split("_vs_")
