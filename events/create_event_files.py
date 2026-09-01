@@ -186,6 +186,11 @@ def _create_flanker_events_files(
                 scanner_event_type="Pulse",
                 scanner_trigger_code="99",
             )
+
+            events = {}
+            events["onset"] = extractor.extract_onsets()
+            events["duration"] = extractor.extract_durations()
+            trial_types = extractor.extract_trial_types()
         except:
             LGR.exception(
                 f"An event file could not be created for the following file: {excel_file}",
@@ -193,13 +198,9 @@ def _create_flanker_events_files(
             )
             continue
 
-        events = {}
-        events["onset"] = extractor.extract_onsets()
-        events["duration"] = extractor.extract_durations()
-
         # Separate trial name from arrow direction
         info = []
-        for trial_type in extractor.extract_trial_types():
+        for trial_type in trial_types:
             trial_name = trial_type.removesuffix("left").removesuffix("right")
             arrow_dir = trial_type.removeprefix(trial_name)
             info.append((trial_name, arrow_dir))
@@ -607,20 +608,20 @@ def _create_mtl_events_files(
                 quit_code="quit",
                 split_cue_from_block=True,
             )
+
+            events = {}
+            events["onset"] = extractor.extract_onsets()
+            durations = extractor.extract_durations()
+            # Fix for those that do not have the quit event type
+            durations[-1] = durations[-1] if durations[-1] != 0 else 20.0
+            events["duration"] = durations
+            events["trial_type"] = extractor.extract_trial_types()
         except:
             LGR.exception(
                 f"An event file could not be created for the following file: {excel_file}",
                 exc_info=True,
             )
             continue
-
-        events = {}
-        events["onset"] = extractor.extract_onsets()
-        durations = extractor.extract_durations()
-        # Fix for those that do not have the quit event type
-        durations[-1] = durations[-1] if durations[-1] != 0 else 20.0
-        events["duration"] = durations
-        events["trial_type"] = extractor.extract_trial_types()
 
         # Ensure "other" not counted, for mean reaction time and response counts
         # if one of the keys in the map is NaN it is ignored completely
@@ -660,9 +661,16 @@ def _create_mtl_events_files(
                 f"aversive_{suffix}"
             ] * 4 + [f"neutral_{suffix}"] * 4
         else:
+            n = len(
+                event_df.loc[event_df["trial_type"] == task_name, "trial_type"].tolist()
+            )
+            if n < 8:
+                LGR.warning(
+                    f"Subject {subject_id} has less than 8 neutral blocks (total neutral blocks = {n})."
+                )
             event_df.loc[event_df["trial_type"] == task_name, "trial_type"] = [
                 f"neutral_{suffix}"
-            ] * 4
+            ] * n
 
         save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
 
