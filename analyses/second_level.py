@@ -1205,7 +1205,7 @@ def create_concatenated_image(
 
     LGR.info(f"Saved PALM volume ordering to: {volume_order_filename}")
 
-    return concatenated_filename, volume_order_filename
+    return concatenated_filename
 
 
 def drop_within_subject_constant_regressors(datacontainer, glt_data_table):
