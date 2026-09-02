@@ -664,10 +664,11 @@ def _create_mtl_events_files(
             n = len(
                 event_df.loc[event_df["trial_type"] == task_name, "trial_type"].tolist()
             )
-            if n < 8:
-                LGR.warning(
-                    f"Subject {subject_id} has less than 8 neutral blocks (total neutral blocks = {n})."
-                )
+            # If 8 blocks that is the adult task that somehow made its way into the kids source data due to
+            # similar IDs
+            if n > 4:
+                continue
+
             event_df.loc[event_df["trial_type"] == task_name, "trial_type"] = [
                 f"neutral_{suffix}"
             ] * n
