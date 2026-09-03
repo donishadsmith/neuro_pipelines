@@ -52,7 +52,7 @@ def run_pipeline(
     dst_dir, log_files = run_events_pipeline(**kwargs)
 
     is_event_task = task not in BLOCK_TASKS[cohort]
-    behavioral_data_dict = {"participant_id": [], "session_id": []}
+    behavioral_data_dict = {"participant_id": [], "session_id": [], "date": []}
     if behavioral_data_file:
         behavioral_df = pd.read_csv(behavioral_data_file, sep=None, engine="python")
 
@@ -63,6 +63,7 @@ def run_pipeline(
     for index, event_file in enumerate(events_files):
         participant_id = get_entity_value(event_file, "sub")
         session_id = get_entity_value(event_file, "ses")
+        date = get_entity_value(event_file, "date")
         if behavioral_data_file:
             is_empty = behavioral_df[
                 (behavioral_df["participant_id"] == participant_id)
@@ -73,6 +74,7 @@ def run_pipeline(
 
         behavioral_data_dict["participant_id"].append(participant_id)
         behavioral_data_dict["session_id"].append(session_id)
+        behavioral_data_dict["date"].append(date)
 
         events_df = pd.read_csv(event_file, sep="\t")
         trial_types = [x for x in events_df["trial_type"].unique() if "cue" not in x]

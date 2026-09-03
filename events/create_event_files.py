@@ -138,10 +138,11 @@ def _get_presentation_session(
 
 
 def map_date_to_session(subject_id, subjects_visits_df, curr_log_date):
-    visit_session_map = _get_subject_visits(subject_id, subjects_visits_df)
+    date_to_session_map = _get_subject_visits(subject_id, subjects_visits_df)
+    visit_session_map = {}
 
-    if visit_session_map:
-        visit_session_map = {v: k for k, v in visit_session_map.items()}
+    if date_to_session_map:
+        visit_session_map.update({v: k for k, v in date_to_session_map.items()})
         date_in_map = curr_log_date in visit_session_map
     else:
         date_in_map = False
@@ -153,15 +154,17 @@ def map_date_to_session(subject_id, subjects_visits_df, curr_log_date):
         )
 
     return (
-        visit_session_map[curr_log_date]
-        if date_in_map
-        else curr_log_date.replace("/", "-")
+        (visit_session_map[curr_log_date], curr_log_date)
+        if visit_session_map and date_in_map
+        else (curr_log_date.replace("/", "-"), curr_log_date.replace("/", "-"))
     )
 
 
-def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
+def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, date, caller, task):
+    date_string = f"date-{date}_" if caller == "Behavioral Data" else ""
     tsv_filename = (
-        dst_dir / f"sub-{subject_id}_ses-{session_id}_task-{task}_run-01_events.tsv"
+        dst_dir
+        / f"sub-{subject_id}_ses-{session_id}_{date_string}task-{task}_run-01_events.tsv"
     )
 
     event_df.to_csv(tsv_filename, sep="\t", index=False)
@@ -170,11 +173,7 @@ def save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task):
 # See: https://www.neurobs.com/pres_docs/html/03_presentation/03_stimulus_presentation/01_trials/03_fmri_mode/index.html
 # Stimulus duration is 800 ms
 def _create_flanker_events_files(
-    temp_dir,
-    dst_dir,
-    subjects,
-    subjects_visits_df,
-    exclude_filenames,
+    temp_dir, dst_dir, subjects, subjects_visits_df, exclude_filenames, caller
 ):
     excel_files = _filter_log_files(temp_dir.glob("*.xls"), subjects, exclude_filenames)
     for excel_file in excel_files:
@@ -235,13 +234,15 @@ def _create_flanker_events_files(
 
         # Getting subject ID and organising files to get subject ID
         subject_id = re.search(r"(\d+).*_", excel_file.name).group(1)
-        session_id = _get_presentation_session(
+        session_id, date = _get_presentation_session(
             subject_id,
             excel_file,
             subjects_visits_df,
         )
 
-        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="flanker")
+        save_df_as_tsv(
+            event_df, dst_dir, subject_id, session_id, date, caller, task="flanker"
+        )
 
     return excel_files
 
@@ -291,12 +292,7 @@ def _determine_complexgng_nogo_accuracy(event_df):
 # volumes so collect 245 seconds of data. The Presentation tasks last for ~260 seconds, so the BIDS events
 # for this file is truncated to drop trials at the end if the onset and duration exceeds the 245 second limit
 def _create_gng_events_files(
-    temp_dir,
-    dst_dir,
-    task,
-    subjects,
-    subjects_visits_df,
-    exclude_filenames,
+    temp_dir, dst_dir, task, subjects, subjects_visits_df, exclude_filenames, caller
 ):
     task_name = "SimpleRepeatGNG" if task == "simplegng" else "RepeatSimpleGNG"
     log_files = _filter_log_files(
@@ -382,23 +378,19 @@ def _create_gng_events_files(
 
         # Getting subject ID and organising files to get subject ID
         subject_id = re.search(r"(\d+).*-", log_file.name).group(1)
-        session_id = _get_presentation_session(
+        session_id, date = _get_presentation_session(
             subject_id,
             log_file,
             subjects_visits_df,
         )
 
-        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
+        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, date, caller, task)
 
     return log_files
 
 
 def _create_nback_eprime_events_files(
-    temp_dir,
-    dst_dir,
-    subjects,
-    subjects_visits_df,
-    exclude_filenames,
+    temp_dir, dst_dir, subjects, subjects_visits_df, exclude_filenames, caller
 ):
     edat_files = _filter_log_files(
         temp_dir.glob("*.edat3"), subjects, exclude_filenames
@@ -494,13 +486,15 @@ def _create_nback_eprime_events_files(
             )
 
             subject_id = re.search(r"(\d+)-\d+", edat_file.name).group(1)
-            session_id = _get_eprime_session(
+            session_id, date = _get_eprime_session(
                 subject_id,
                 edat_file,
                 subjects_visits_df,
             )
 
-            save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
+            save_df_as_tsv(
+                event_df, dst_dir, subject_id, session_id, date, caller, task="nback"
+            )
         finally:
             csv_path.unlink()
 
@@ -508,11 +502,7 @@ def _create_nback_eprime_events_files(
 
 
 def _create_nback_presentation_events_files(
-    temp_dir,
-    dst_dir,
-    subjects,
-    subjects_visits_df,
-    exclude_filenames,
+    temp_dir, dst_dir, subjects, subjects_visits_df, exclude_filenames, caller
 ):
     text_files = _filter_log_files(temp_dir.glob("*.txt"), subjects, exclude_filenames)
     for text_file in text_files:
@@ -564,13 +554,15 @@ def _create_nback_presentation_events_files(
         )
 
         subject_id = re.search(r"^(\d+).*_", text_file.name).group(1)
-        session_id = _get_presentation_session(
+        session_id, date = _get_presentation_session(
             subject_id,
             text_file,
             subjects_visits_df,
         )
 
-        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="nback")
+        save_df_as_tsv(
+            event_df, dst_dir, subject_id, session_id, date, caller, task="nback"
+        )
 
     return text_files
 
@@ -583,6 +575,7 @@ def _create_mtl_events_files(
     task,
     subjects_visits_df,
     exclude_filenames,
+    caller,
 ):
     # MTLE and MTLR are separate tasks but can be processed in one function
     filename = "_PEARenc" if task == "mtle" else "_PEARret"
@@ -649,7 +642,7 @@ def _create_mtl_events_files(
         )
 
         subject_id = re.search(r"(\d+).*_", excel_file.name).group(1)
-        session_id = _get_presentation_session(
+        session_id, date = _get_presentation_session(
             subject_id,
             excel_file,
             subjects_visits_df,
@@ -673,17 +666,15 @@ def _create_mtl_events_files(
                 f"neutral_{suffix}"
             ] * n
 
-        save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task)
+            save_df_as_tsv(
+                event_df, dst_dir, subject_id, session_id, date, caller, task
+            )
 
     return excel_files
 
 
 def _create_princess_events_files(
-    temp_dir,
-    dst_dir,
-    subjects,
-    subjects_visits_df,
-    exclude_filenames,
+    temp_dir, dst_dir, subjects, subjects_visits_df, exclude_filenames, caller
 ):
     edat_files = _filter_log_files(
         temp_dir.glob("*.edat3"), subjects, exclude_filenames
@@ -796,7 +787,7 @@ def _create_princess_events_files(
             )
 
             subject_id = re.search(r"(\d+)-\d+\.edat3$", edat_file.name).group(1)
-            session_id = _get_eprime_session(
+            session_id, date = _get_eprime_session(
                 subject_id,
                 edat_file,
                 subjects_visits_df,
@@ -805,7 +796,9 @@ def _create_princess_events_files(
             # Note, duration of all trials in block without cue is 48-50 seconds and duration of cue is ~3
             # seconds with above implementation: Paper says each block has 8 trials which lasts 6500 ms:
             # Paper: https://pubmed.ncbi.nlm.nih.gov/20604616/
-            save_df_as_tsv(event_df, dst_dir, subject_id, session_id, task="princess")
+            save_df_as_tsv(
+                event_df, dst_dir, subject_id, session_id, date, caller, task="princess"
+            )
         finally:
             csv_path.unlink()
 
@@ -872,6 +865,7 @@ def run_pipeline(
             _standardize_dates(_get_dataframe(subjects_visits_file), sort_data=True)
         ),
         "exclude_filenames": exclude_filenames,
+        "caller": caller,
     }
     if task in ["mtle", "mtlr", "simplegng", "complexgng"]:
         kwargs.update({"task": task})
