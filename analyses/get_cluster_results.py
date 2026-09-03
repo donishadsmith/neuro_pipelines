@@ -460,7 +460,6 @@ def create_seed_masks(
     sphere_radius,
 ):
     sphere_parent_path = dst_dir / "sphere_masks" / method
-    delete_dir(sphere_parent_path)
     sphere_parent_path.mkdir(parents=True, exist_ok=True)
 
     plot_parent_path = sphere_parent_path / "plots"
@@ -551,6 +550,7 @@ def main(
     delete_dir(dst_dir / "cluster_results" / method)
     delete_dir(dst_dir / "cluster_masks" / method)
     delete_dir(dst_dir / "stat_plots" / method)
+    delete_dir(dst_dir / "sphere_masks" / method)
 
     LGR.info(f"TASK: {task}, METHOD: {method}")
 
