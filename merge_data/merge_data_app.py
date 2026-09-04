@@ -21,9 +21,14 @@ st.markdown("""
 Pipeline for merging data from a primary and secondary file.
 
 **Notes:**
-- You can keep updating the secondary file to merge different files with the primary file.
+- Rows are always matched on subject ID. Date and dose are optional and only used for matching
+when a column is selected for both files.
+- For data that does not vary by visit (e.g., demographics), only select the subject ID columns.
+The values will be copied to every row for that subject.
+- For data that varies by visit (e.g., beta coefficients), also select the date columns.
 - If a file only contains specific doses for subjects (e.g., "0_vs_10", "10_vs_0", "5_vs_0", etc), then
-it is recommended to select the dose columns for both the primary and secondary files
+it is recommended to also select the dose columns for both the primary and secondary files
+- You can keep updating the secondary file to merge different files with the primary file.
 - Columns in the secondary file that share a name with a column already in the primary file cannot be added
 as is, to prevent overwriting or duplicating data. Use the optional "Suffix for added columns" field to append
 a unique suffix to every added column (e.g., "GLM_Individual_Cluster_Beta" -> "GLM_Individual_Cluster_Beta_5_vs_0_superior_parietal"),
@@ -45,24 +50,11 @@ if st.session_state.get("primary_file"):
     st.success(f"Primary file: {st.session_state.primary_file}")
 
 if st.session_state.get("primary_file"):
-    primary_columns = st.session_state.primary_columns
     st.session_state.primary_file_subject_column = st.selectbox(
         "Primary File Subject ID Column:",
-        primary_columns,
+        st.session_state.primary_columns,
         index=None,
         help="Name of the column containing the subject IDs in the primary file.",
-    )
-
-    primary_columns = [
-        col
-        for col in primary_columns
-        if col != st.session_state.primary_file_subject_column
-    ]
-    st.session_state.primary_file_date_column = st.selectbox(
-        "Primary File Date Column:",
-        primary_columns,
-        index=None,
-        help="Name of the column containing the dates in the primary file.",
     )
 
 if st.button(
@@ -90,18 +82,6 @@ if filename := st.session_state.get("secondary_file"):
         for col in secondary_columns
         if col != st.session_state.secondary_file_subject_column
     ]
-    st.session_state.secondary_file_date_column = st.selectbox(
-        "Secondary File Date Column:",
-        secondary_columns,
-        index=None,
-        help="Name of the column containing the dates in the secondary file.",
-    )
-
-    secondary_columns = [
-        col
-        for col in secondary_columns
-        if col != st.session_state.secondary_file_date_column
-    ]
 
     st.session_state.columns_to_add = st.multiselect(
         "Columns to add:",
@@ -119,11 +99,23 @@ if st.session_state.get("primary_file") or st.session_state.get("secondary_file"
         primary_columns = [
             col
             for col in st.session_state.primary_columns
-            if col
-            not in [
-                st.session_state.primary_file_subject_column,
-                st.session_state.primary_file_date_column,
-            ]
+            if col != st.session_state.primary_file_subject_column
+        ]
+
+        st.session_state.primary_file_date_column = st.selectbox(
+            "Primary File Date Column:",
+            primary_columns,
+            index=None,
+            help=(
+                "Name of the column containing the dates in the primary file. "
+                "Leave empty for data that does not vary by visit."
+            ),
+        )
+
+        primary_columns = [
+            col
+            for col in primary_columns
+            if col != st.session_state.primary_file_date_column
         ]
 
         st.session_state.primary_file_dose_column = st.selectbox(
@@ -141,9 +133,24 @@ if st.session_state.get("primary_file") or st.session_state.get("secondary_file"
             if col
             not in [
                 st.session_state.secondary_file_subject_column,
-                st.session_state.secondary_file_date_column,
                 *(st.session_state.columns_to_add or []),
             ]
+        ]
+
+        st.session_state.secondary_file_date_column = st.selectbox(
+            "Secondary File Date Column:",
+            secondary_columns,
+            index=None,
+            help=(
+                "Name of the column containing the dates in the secondary file. "
+                "Leave empty for data that does not vary by visit."
+            ),
+        )
+
+        secondary_columns = [
+            col
+            for col in secondary_columns
+            if col != st.session_state.secondary_file_date_column
         ]
 
         st.session_state.secondary_file_dose_column = st.selectbox(
@@ -180,6 +187,7 @@ kwargs = {
 
 st.divider()
 if st.button("Run Pipeline", type="primary"):
+
     suffix = st.session_state.get("column_suffix") or ""
     existing_columns = (
         _get_dataframe(st.session_state.primary_file).columns.tolist()
@@ -192,21 +200,22 @@ if st.button("Run Pipeline", type="primary"):
         if f"{col}{suffix}" in existing_columns
     ]
 
-    # Ugly code
     if not st.session_state.get("primary_file"):
         st.error("Please select a primary file before running.")
     elif not st.session_state.get("secondary_file"):
         st.error("Please select a secondary file before running.")
     elif not st.session_state.get("primary_file_subject_column"):
         st.error("Please select a primary subject column before running.")
-    elif not st.session_state.get("primary_file_date_column"):
-        st.error("Please select a primary date column before running.")
     elif not st.session_state.get("secondary_file_subject_column"):
         st.error("Please select a secondary subject column before running.")
-    elif not st.session_state.get("secondary_file_date_column"):
-        st.error("Please select a secondary date column before running.")
     elif not st.session_state.get("columns_to_add"):
         st.error("Please select covariates to add before running.")
+    elif (st.session_state.get("primary_file_date_column") is None) != (
+        st.session_state.get("secondary_file_date_column") is None
+    ):
+        st.error(
+            "Please select the date columns for both the primary and secondary file if merging should also consider date."
+        )
     elif (st.session_state.get("primary_file_dose_column") is None) != (
         st.session_state.get("secondary_file_dose_column") is None
     ):

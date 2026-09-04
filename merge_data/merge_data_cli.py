@@ -8,7 +8,10 @@ from merge_data import run_pipeline
 
 def _get_cmd_args() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Merge columns from a secondary file into a primary file."
+        description=(
+            "Merge columns from a secondary file into a primary file. "
+            "Rows are matched on subject ID, and optionally on date and dose."
+        )
     )
     parser.add_argument(
         "--primary_file",
@@ -25,8 +28,12 @@ def _get_cmd_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--primary_file_date_column",
         dest="primary_file_date_column",
-        required=True,
-        help="Name of the column containing the dates in the primary file.",
+        required=False,
+        default=None,
+        help=(
+            "Name of the column containing the dates in the primary file. "
+            "Omit for data that does not vary by visit (e.g., demographics)."
+        ),
     )
     parser.add_argument(
         "--primary_file_dose_column",
@@ -50,8 +57,12 @@ def _get_cmd_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--secondary_file_date_column",
         dest="secondary_file_date_column",
-        required=True,
-        help="Name of the column containing the dates in the secondary file.",
+        required=False,
+        default=None,
+        help=(
+            "Name of the column containing the dates in the secondary file. "
+            "Must be given together with --primary_file_date_column."
+        ),
     )
     parser.add_argument(
         "--secondary_file_dose_column",
@@ -83,4 +94,21 @@ def _get_cmd_args() -> argparse.ArgumentParser:
 
 if __name__ == "__main__":
     args = _get_cmd_args().parse_args()
+
+    if (args.primary_file_date_column is None) != (
+        args.secondary_file_date_column is None
+    ):
+        raise SystemExit(
+            "Both --primary_file_date_column and --secondary_file_date_column "
+            "must be given to merge on date."
+        )
+
+    if (args.primary_file_dose_column is None) != (
+        args.secondary_file_dose_column is None
+    ):
+        raise SystemExit(
+            "Both --primary_file_dose_column and --secondary_file_dose_column "
+            "must be given to merge on dose."
+        )
+
     run_pipeline(**vars(args))
