@@ -1,4 +1,4 @@
-import csv, tempfile, re
+import tempfile, re
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +12,7 @@ from bidsaid.parsers import _is_float
 
 LGR = setup_logger(__name__)
 
+SEPARATORS = (",", "\t", ";", "|", " ")
 
 COHORT_MAP = {
     "kids": {
@@ -169,13 +170,6 @@ def _standardize_participant_ids(
     return df
 
 
-def guess_delimiter(file: str | Path):
-    with open(file, "r") as f:
-        sep = csv.Sniffer().sniff(f.readline()).delimiter
-
-    return sep
-
-
 class SubjectsVisitsFileError(Exception):
     """Exception for issues with the subjects sessions file."""
 
@@ -250,10 +244,16 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
         subjects_visits_file
     ).endswith(".xls"):
         return pd.read_excel(subjects_visits_file)
-    else:
-        return pd.read_csv(
-            subjects_visits_file, sep=None, engine="python", encoding="utf-8-sig"
-        )
+
+    with open(subjects_visits_file, "r", encoding="utf-8-sig") as f:
+        header = f.readline()
+
+    if not any(sep in header for sep in SEPARATORS):
+        return pd.read_csv(subjects_visits_file, encoding="utf-8-sig")
+
+    return pd.read_csv(
+        subjects_visits_file, sep=None, engine="python", encoding="utf-8-sig"
+    )
 
 
 def _check_coordinate(coordinate):
