@@ -251,7 +251,9 @@ def _get_dataframe(subjects_visits_file: str | Path) -> pd.DataFrame | None:
     ).endswith(".xls"):
         return pd.read_excel(subjects_visits_file)
     else:
-        return pd.read_csv(subjects_visits_file, sep=None, engine="python")
+        return pd.read_csv(
+            subjects_visits_file, sep=None, engine="python", encoding="utf-8-sig"
+        )
 
 
 def _check_coordinate(coordinate):
