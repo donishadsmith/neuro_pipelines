@@ -11,15 +11,7 @@ import pandas as pd, streamlit as st
 from participants_demographics import run_pipeline
 from _streamlit_utils import _select_content
 
-
-def _get_df(filename):
-    if filename.endswith(".xlsx"):
-        df = pd.read_excel(filename)
-    else:
-        df = pd.read_csv(filename, sep=None, engine="python")
-
-    return df
-
+from _general_utils import _get_dataframe
 
 st.set_page_config(layout="centered")
 
@@ -75,7 +67,7 @@ if st.button(
     file = _select_content("file")
     if file:
         st.session_state.demographics_file = file
-        if "participant_id" in _get_df(file).columns:
+        if "participant_id" in _get_dataframe(file).columns:
             st.session_state.valid_demographics_file = True
         else:
             st.session_state.valid_demographics_file = False
@@ -88,7 +80,7 @@ if st.session_state.get("demographics_file"):
         st.error(f"Invalid demographics file: {st.session_state.demographics_file}")
 
 if filename := st.session_state.get("demographics_file"):
-    df = _get_df(filename)
+    df = _get_dataframe(filename)
 
     columns = [
         col

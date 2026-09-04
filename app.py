@@ -30,6 +30,7 @@ connors = st.Page("connors/connors_app.py", title="Connors 4 Pipeline")
 nih_toolbox = st.Page("nih_toolbox/nih_toolbox_app.py", title="NIH Toolbox Pipeline")
 sphere_mask = st.Page("masks/sphere_mask_app.py", title="Sphere Mask Pipeline")
 whereami = st.Page("afni_whereami/whereami_app.py", title="AFNI WhereAmI Pipeline")
+merge_data = st.Page("merge_data/merge_data_app.py", title="Merge Data Pipeline")
 
 pg = st.navigation(
     [
@@ -46,6 +47,7 @@ pg = st.navigation(
         nih_toolbox,
         sphere_mask,
         whereami,
+        merge_data,
     ],
     position="sidebar",
 )

@@ -102,20 +102,23 @@ def _get_subject_visits(
 
 
 def _standardize_dates(
-    df: pd.DataFrame, date_column_name="date", sort_data=True
+    df: pd.DataFrame,
+    date_column_name="date",
+    sort_data=True,
+    participant_column_name="participant_id",
 ) -> list[str]:
     df.columns = [col.strip() for col in df.columns]
 
-    if "participant_id" in df.columns:
-        df[["participant_id", date_column_name]] = df[
-            ["participant_id", date_column_name]
+    if participant_column_name in df.columns:
+        df[[participant_column_name, date_column_name]] = df[
+            [participant_column_name, date_column_name]
         ].astype(str)
     else:
         df[date_column_name] = df[date_column_name].astype(str)
 
     null_dates = df[date_column_name].isna()
     if any(null_dates.tolist()):
-        LGR.info("Dropping Null/NaN dates in subjects visits data")
+        LGR.info("Dropping Null/NaN dates")
 
     df = df[~null_dates]
     df[date_column_name] = [
@@ -130,15 +133,15 @@ def _standardize_dates(
     invalid_dates = df[date_column_name] == "NaT"
     if any(invalid_dates.tolist()):
         LGR.info(
-            f"Dropping the following invalid dates in subjects visits data: {df.loc[invalid_dates, date_column_name]}"
+            f"Dropping the following invalid dates: {df.loc[invalid_dates, date_column_name]}"
         )
 
     df = df[~invalid_dates]
 
     if sort_data:
-        if "participant_id" in df.columns:
+        if participant_column_name in df.columns:
             df = df.sort_values(
-                by=["participant_id", date_column_name],
+                by=[participant_column_name, date_column_name],
                 ascending=True,
                 key=lambda col: (
                     pd.to_datetime(col) if col.name == date_column_name else col
@@ -154,9 +157,11 @@ def _standardize_dates(
     return df
 
 
-def _standardize_participant_ids(df: pd.DataFrame):
-    df["participant_id"] = (
-        df["participant_id"]
+def _standardize_participant_ids(
+    df: pd.DataFrame, participant_id_column="participant_id"
+):
+    df[participant_id_column] = (
+        df[participant_id_column]
         .apply(lambda x: str(x))
         .apply(lambda x: re.findall(r"\d{5}", x)[0])
     )

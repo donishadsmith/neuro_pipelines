@@ -19,7 +19,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("\U0001f9e0 Neuro Pipelines", text_alignment="center")
+st.title("Neuro Pipelines", text_alignment="center")
 
 st.divider()
 
@@ -50,12 +50,13 @@ with col1:
     )
     st.caption(" Add or update demographic data in the participants TSV file.")
 
-with col2:
     st.page_link(
         "bids_conversion_pipeline/streamlit/add_dosages_app.py", label="**Add Dosages**"
     )
     st.caption("Add dosage information to sessions TSV files.")
 
+
+with col2:
     st.page_link("events/bids_events_app.py", label="**BIDS Events**")
     st.caption("Create BIDS-compliant events TSV files.")
 
@@ -65,15 +66,19 @@ with col2:
     st.page_link("move_files/move_files_app.py", label="**Move BIDS Files**")
     st.caption("Move BIDS files to a BIDS-compliant directory.")
 
-with col3:
     st.page_link("connors/connors_app.py", label="**Connors 4**")
     st.caption("Extract Connors 4 scores from PDF files.")
 
     st.page_link("nih_toolbox/nih_toolbox_app.py", label="**NIH Toolbox**")
     st.caption("Convert NIH Toolbox from long form to wide form.")
 
+with col3:
+
     st.page_link("masks/sphere_mask_app.py", label="**Sphere Mask**")
     st.caption("Create an a-priori sphere mask for seed-based connectivity.")
 
     st.page_link("afni_whereami/whereami_app.py", label="**AFNI WhereAmI**")
     st.caption("Lookup MNI coordinates with AFNI's ``whereami``.")
+
+    st.page_link("merge_data/merge_data_app.py", label="**Merge Data**")
+    st.caption("Merge data between two files.")

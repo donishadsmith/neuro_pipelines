@@ -21,9 +21,7 @@ def _get_cmd_args() -> argparse.ArgumentParser:
         dest="demographics_file",
         required=False,
         default=None,
-        help=(
-            "Path to a demographics file. " "Must contain a 'participant_id' column."
-        ),
+        help=("Path to a demographics file. Must contain a 'participant_id' column."),
     )
     parser.add_argument(
         "--covariates_to_add",

@@ -1,0 +1,84 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import pandas as pd
+from _general_utils import (
+    _get_dataframe,
+    _standardize_dates,
+    _standardize_participant_ids,
+)
+
+SEP_DICT = {"csv": ",", "tsv": "\t"}
+
+
+def run_pipeline(
+    primary_file,
+    primary_file_subject_column,
+    primary_file_date_column,
+    primary_file_dose_column,
+    secondary_file,
+    secondary_file_subject_column,
+    secondary_file_date_column,
+    secondary_file_dose_column,
+    columns_to_add,
+    column_suffix=None,
+):
+    primary_df = _get_dataframe(primary_file)
+    primary_df = _standardize_participant_ids(primary_df, primary_file_subject_column)
+    primary_df = _standardize_dates(
+        primary_df,
+        date_column_name=primary_file_date_column,
+        participant_column_name=primary_file_subject_column,
+    )
+
+    secondary_df = _get_dataframe(secondary_file)
+    secondary_df = _standardize_participant_ids(
+        secondary_df, secondary_file_subject_column
+    )
+    secondary_df = _standardize_dates(
+        secondary_df,
+        date_column_name=secondary_file_date_column,
+        participant_column_name=secondary_file_subject_column,
+    )
+
+    secondary_df = secondary_df.rename(
+        columns={
+            secondary_file_subject_column: primary_file_subject_column,
+            secondary_file_date_column: primary_file_date_column,
+        }
+    )
+
+    if column_suffix:
+        rename_map = {col: f"{col}{column_suffix}" for col in columns_to_add}
+        secondary_df = secondary_df.rename(columns=rename_map)
+        columns_to_add = list(rename_map.values())
+
+    columns_to_add = [col for col in columns_to_add if col not in primary_df.columns]
+    columns_to_add += [primary_file_subject_column, primary_file_date_column]
+    old_columns = primary_df.columns.tolist()
+    merge_columns = [primary_file_subject_column, primary_file_date_column]
+    if primary_file_dose_column and secondary_file_dose_column:
+        secondary_df = secondary_df.rename(
+            columns={secondary_file_dose_column: primary_file_dose_column}
+        )
+        columns_to_add += [primary_file_dose_column]
+        merge_columns += [primary_file_dose_column]
+
+    merged_df = pd.merge(
+        primary_df,
+        secondary_df[columns_to_add],
+        on=merge_columns,
+        how="left",
+    )
+
+    new_columns = set(merged_df.columns.tolist()).difference(old_columns)
+    merged_df.to_csv(
+        primary_file,
+        index=None,
+        sep=SEP_DICT[Path(primary_file).suffix.removeprefix(".")],
+        encoding="utf-8-sig",
+    )
+
+    return new_columns
