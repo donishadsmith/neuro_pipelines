@@ -392,13 +392,14 @@ def main(
                     )
 
                     add_condition_entity_key = beta_name != first_level_glt_label
+
                     output_dir = (
                         dst_dir
                         / "individual_betas"
                         / method
                         / second_level_glt_code
                         / first_level_glt_label
-                        / beta_name
+                        / (beta_name if add_condition_entity_key else "")
                     )
                     output_csv_name = cluster_mask_filename.name.replace(
                         "_cluster_mask_", "_individual_betas_"

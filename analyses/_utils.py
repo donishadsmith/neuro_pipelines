@@ -554,13 +554,17 @@ def format_beta_df(analysis_type, beta_coefficient_df, method=None):
             "percent (percent signal change)"
         )
 
-    for drop_col in ["InputFile", "acq_time"]:
+    for drop_col in ["InputFile"]:
         if drop_col in beta_coefficient_df.columns:
             beta_coefficient_df = beta_coefficient_df.drop(columns=[drop_col])
 
     beta_coefficient_df["Analysis_Type"] = (
         f"{method} {analysis_type}" if method else analysis_type
     )
+
+    beta_coefficient_df["Subj"] = [
+        x.removeprefix("sub-") for x in beta_coefficient_df["Subj"].tolist()
+    ]
 
     beta_coefficient_df.columns = [
         col.replace(" ", "_") for col in beta_coefficient_df.columns

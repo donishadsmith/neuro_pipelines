@@ -5,10 +5,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from typing import Literal, Optional
+from typing import Literal
 from datetime import datetime
 
-import pandas as pd, pdfplumber
+import pandas as pd, pdfplumber, numpy as np
 from pypdf import PdfReader
 from bidsaid.files import get_entity_value
 from bidsaid.logging import setup_logger
@@ -18,9 +18,8 @@ from _general_utils import guess_delimiter
 LGR = setup_logger(__name__)
 
 CSV_COLUMN_NAMES = [
-    "SN",
-    "Visit",
-    "Snvisit",
+    "Subject",
+    "Session",
     "Assessment Date",
     "Rater",
     "INA/EDF T score",
@@ -233,7 +232,7 @@ def get_sessions(subject_id_list: list[str]) -> list[str]:
     unique_ids = list(dict.fromkeys(subject_id_list).keys())
     for unique_id in unique_ids:
         visit_num_list = [val + 1 for val in range(subject_id_list.count(unique_id))]
-        session_list.extend([f"v{val}" for val in visit_num_list])
+        session_list.extend([f"ses-0{val}" for val in visit_num_list])
 
     return session_list
 
@@ -379,6 +378,14 @@ def extract_conners_datafields(
                 adhd_index_list = [
                     x for x in get_target_list(table, "ADHD Index") if x and "%" in x
                 ]
+
+                if not adhd_index_list:
+                    adhd_index_list = [
+                        x
+                        for x in get_target_list(table, "ADHD Index")
+                        if x and "?" in x
+                    ]
+
                 column_names_dict["Prob score %"].append(adhd_index_list[0])
 
     return column_names_dict
@@ -418,13 +425,10 @@ def run_pipeline(
         reformatted_pdf_files, assessment_dates
     )
 
-    data_fields_dict["SN"], data_fields_dict["Rater"] = get_subject_ids(
+    data_fields_dict["Subject"], data_fields_dict["Rater"] = get_subject_ids(
         reformatted_pdf_files
     )
-    data_fields_dict["Visit"] = get_sessions(data_fields_dict["SN"])
-    data_fields_dict["Snvisit"] = get_sn_visit(
-        data_fields_dict["SN"], data_fields_dict["Visit"]
-    )
+    data_fields_dict["Session"] = get_sessions(data_fields_dict["Subject"])
 
     conners_data_fields_dict = dict(
         zip(create_unique_column_dict(), UNIQUE_DATA_FIELD_NAMES)
@@ -436,7 +440,7 @@ def run_pipeline(
     )
 
     df = pd.DataFrame(extracted_conners_data_dict)
-    df["SN"] = df["SN"].astype(str)
+    df["Subject"] = df["Subject"].astype(str)
     filename = (
         pdf_dir / "reformatted_filenames" / "conners_data.csv"
         if csv_file_path is None
@@ -453,10 +457,11 @@ def run_pipeline(
             )
 
         original_df.columns = [col.replace("\ufeff", "") for col in original_df.columns]
-        original_df["SN"] = original_df["SN"].astype(str)
+        original_df["Subject"] = original_df["Subject"].astype(str)
 
         df = pd.concat([original_df, df], axis=0, ignore_index=True)
         df = df.drop_duplicates()
+        df = df.replace("?", np.nan)
 
         df = clean_df(df, include_assessment_dates)
         if csv_file_path.endswith(".xlsx"):
