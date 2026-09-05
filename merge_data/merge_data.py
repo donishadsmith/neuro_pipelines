@@ -25,10 +25,10 @@ def run_pipeline(
     secondary_file_dose_column=None,
     column_suffix=None,
 ):
-    primary_df = _get_dataframe(primary_file)
+    primary_df = _get_dataframe(primary_file).drop_duplicates()
     primary_df = _standardize_participant_ids(primary_df, primary_file_subject_column)
 
-    secondary_df = _get_dataframe(secondary_file)
+    secondary_df = _get_dataframe(secondary_file).drop_duplicates()
     secondary_df = _standardize_participant_ids(
         secondary_df, secondary_file_subject_column
     )
@@ -66,10 +66,10 @@ def run_pipeline(
 
     merged_df = pd.merge(
         primary_df,
-        secondary_df[columns_to_add + merge_columns],
+        secondary_df[columns_to_add + merge_columns].drop_duplicates(),
         on=merge_columns,
         how="left",
-    )
+    ).drop_duplicates()
 
     new_columns = set(merged_df.columns.tolist()).difference(old_columns)
     merged_df.to_csv(
