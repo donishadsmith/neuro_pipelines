@@ -250,7 +250,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_CLUSTER_RESULTS
     # ===================
     if [[ $RUN_CLUSTER_RESULTS == true ]]; then
-        [[ -n $SECOND_LEVEL_JOB_IDS ]] && DEPENDENCY_STR="--dependency=afterok:$SECOND_LEVEL_JOB_IDS" || DEPENDENCY_STR=""
+        [[ -n $SECOND_LEVEL_JOB_IDS ]] && DEPENDENCY_STR="--dependency=afterany:$SECOND_LEVEL_JOB_IDS" || DEPENDENCY_STR=""
         JOB_ID_3=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" get_cluster_results.sb $CURRENT_TASK)
 
         echo -e "- GET CLUSTER RESULTS SUBMITTED (JOB ID: $JOB_ID_3)\n"
@@ -262,7 +262,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_CLUSTER_MNI_LOCATIONS
     # =========================
     if [[ $RUN_CLUSTER_MNI_LOCATIONS == true ]]; then
-        [[ -n $JOB_ID_3 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_3" || DEPENDENCY_STR=""
+        [[ -n $JOB_ID_3 ]] && DEPENDENCY_STR="--dependency=afterany:$JOB_ID_3" || DEPENDENCY_STR=""
         JOB_ID_4=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" identify_cluster_locations.sb $CURRENT_TASK)
 
         echo -e "- IDENTIFY MNI LOCATIONS SUBMITTED (JOB ID: $JOB_ID_4)\n"
@@ -274,7 +274,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_EXTRACT_INDIVIDUAL_BETAS
     # ============================
     if [[ $RUN_EXTRACT_INDIVIDUAL_BETAS == true ]]; then
-        [[ -n $JOB_ID_4 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_4" || DEPENDENCY_STR=""
+        [[ -n $JOB_ID_4 ]] && DEPENDENCY_STR="--dependency=afterany:$JOB_ID_4" || DEPENDENCY_STR=""
         JOB_ID_5=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" extract_individual_betas.sb $CURRENT_TASK)
 
         echo -e "- EXTRACT INDIVIDUAL BETAS SUBMITTED (JOB ID: $JOB_ID_5)\n"
