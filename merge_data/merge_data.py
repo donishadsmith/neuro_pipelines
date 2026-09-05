@@ -84,6 +84,13 @@ def run_pipeline(
         merged_df[primary_file_subject_column] = "sub-" + merged_df[
             primary_file_subject_column
         ].astype(int).astype(str)
+    else:
+        merged_df[primary_file_subject_column] = (
+            merged_df[primary_file_subject_column].astype(int).astype(str)
+        )
+        merged_df[primary_file_subject_column] = merged_df[
+            primary_file_subject_column
+        ].str.removeprefix("sub-")
 
     merged_df.to_csv(
         primary_file,
