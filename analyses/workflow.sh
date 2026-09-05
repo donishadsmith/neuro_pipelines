@@ -220,7 +220,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
     # RUN_EXTRACT_INDEPENDENT_ROI_BETAS
     # =================================
     if [[ $RUN_EXTRACT_INDEPENDENT_ROI_BETAS == true ]]; then
-        [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_1" || DEPENDENCY_STR=""
+        [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterany:$JOB_ID_1" || DEPENDENCY_STR=""
         JOB_ID_ROI=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" extract_independent_roi_betas.sb $CURRENT_TASK)
 
         echo -e "- EXTRACT INDEPENDENT ROI BETAS SUBMITTED (JOB ID: $JOB_ID_ROI)\n"
@@ -235,7 +235,7 @@ for CURRENT_TASK in "${TASKS[@]}"; do
         for LABEL in ${FIRST_LEVEL_GLT_LABELS[@]}; do
             [[ $LABEL != "placeholder" ]] && { export FIRST_LEVEL_GLT_LABEL=$LABEL; TEXT_STR="FOR $LABEL"; } || { export FIRST_LEVEL_GLT_LABEL=""; TEXT_STR=""; }
 
-            [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterok:$JOB_ID_1" || DEPENDENCY_STR=""
+            [[ -n $JOB_ID_1 ]] && DEPENDENCY_STR="--dependency=afterany:$JOB_ID_1" || DEPENDENCY_STR=""
             JOB_ID_2=$(sbatch --parsable $DEPENDENCY_STR --array=0 "${MAIL_ARGS[@]}" second_level.sb $CURRENT_TASK)
 
             echo -e "- SECOND LEVEL SUBMITTED $TEXT_STR (JOB ID: $JOB_ID_2)\n" | tr -s " "
