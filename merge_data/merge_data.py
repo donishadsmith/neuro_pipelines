@@ -24,6 +24,7 @@ def run_pipeline(
     primary_file_dose_column=None,
     secondary_file_dose_column=None,
     column_suffix=None,
+    add_subject_prefix=True,
 ):
     primary_df = _get_dataframe(primary_file).drop_duplicates()
     primary_df = _standardize_participant_ids(primary_df, primary_file_subject_column)
@@ -56,6 +57,13 @@ def run_pipeline(
 
     secondary_df = secondary_df.rename(columns=rename_map)
 
+    primary_df[primary_file_subject_column] = (
+        primary_df[primary_file_subject_column].astype(int).astype(str)
+    )
+    secondary_df[primary_file_subject_column] = (
+        secondary_df[primary_file_subject_column].astype(int).astype(str)
+    )
+
     if column_suffix:
         suffix_map = {col: f"{col}{column_suffix}" for col in columns_to_add}
         secondary_df = secondary_df.rename(columns=suffix_map)
@@ -72,6 +80,11 @@ def run_pipeline(
     ).drop_duplicates()
 
     new_columns = set(merged_df.columns.tolist()).difference(old_columns)
+    if add_subject_prefix:
+        merged_df[primary_file_subject_column] = "sub-" + merged_df[
+            primary_file_subject_column
+        ].astype(int).astype(str)
+
     merged_df.to_csv(
         primary_file,
         index=None,

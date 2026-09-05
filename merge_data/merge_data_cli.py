@@ -88,6 +88,13 @@ def _get_cmd_args() -> argparse.ArgumentParser:
             "Use this when the secondary file shares column names with the primary file."
         ),
     )
+    parser.add_argument(
+        "--add_subject_prefix",
+        dest="add_subject_prefix",
+        required=False,
+        default=True,
+        help="Add the 'sub-' prefix to subject IDs in the saved primary file",
+    )
 
     return parser
 

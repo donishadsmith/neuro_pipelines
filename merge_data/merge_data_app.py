@@ -169,6 +169,11 @@ if st.session_state.get("primary_file") or st.session_state.get("secondary_file"
             ),
         ).strip()
 
+add_subject_prefix = st.checkbox(
+    "Add Subject Prefix",
+    value=True,
+    help="Add the 'sub-' prefix to subject IDs in the saved primary file",
+)
 
 kwargs = {
     "primary_file": st.session_state.get("primary_file"),
@@ -182,7 +187,8 @@ kwargs = {
     "columns_to_add": st.session_state.get("columns_to_add"),
     "primary_file_dose_column": st.session_state.get("primary_file_dose_column"),
     "secondary_file_dose_column": st.session_state.get("secondary_file_dose_column"),
-    "column_suffix": st.session_state.get("column_suffix") or None,
+    "column_suffix": st.session_state.get("column_suffix"),
+    "add_subject_prefix": add_subject_prefix,
 }
 
 st.divider()
