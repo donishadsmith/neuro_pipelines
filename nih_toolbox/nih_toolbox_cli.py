@@ -17,6 +17,14 @@ def _get_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
+        "--cohort",
+        dest="cohort",
+        required=False,
+        default="kids",
+        choices=["kids", "adults"],
+        help="Cohort name. Default: kids.",
+    )
+    parser.add_argument(
         "--unorganized_nih_toolbox_file",
         dest="unorganized_nih_toolbox_file",
         required=True,
