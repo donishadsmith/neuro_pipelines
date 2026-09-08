@@ -129,7 +129,7 @@ def run_pipeline(
     data_dict = {
         "Participant ID": list(participant_ids),
         "Session ID": list(session_ids),
-        assessment_column: assessment_dates,
+        "Date": assessment_dates,
     }
 
     products = list(itertools.product(instrument_names, SCORE_COLUMNS[cohort]))
@@ -157,16 +157,16 @@ def run_pipeline(
     if preexisting_nih_toolbox_file and Path(preexisting_nih_toolbox_file).exists():
         preexisting_organized_df = _get_dataframe(preexisting_nih_toolbox_file)
 
-        if assessment_column not in preexisting_organized_df.columns:
-            organized_df = organized_df.drop(columns=[assessment_column])
+        if date_column not in preexisting_organized_df.columns:
+            organized_df = organized_df.drop(columns=[date_column])
 
         organized_df = pd.concat(
             [preexisting_organized_df, organized_df], axis=0, ignore_index=True
         )
         organized_df = organized_df.drop_duplicates()
 
-    if not include_assessment_dates and assessment_column in organized_df.columns:
-        organized_df = organized_df.drop(columns=[assessment_column])
+    if not include_assessment_dates and date_column in organized_df.columns:
+        organized_df = organized_df.drop(columns=[date_column])
 
     prefix_filename = f"{prefix_filename}_" if prefix_filename else ""
     output_dir = Path(dst_dir) if dst_dir else unorganized_nih_toolbox_file.parent
